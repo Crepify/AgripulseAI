@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #050706;
+  color: #f3f4f6;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+.font-display {
+  font-family: 'Cinzel', Georgia, serif;
+}
+
+.font-sans {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Hide scrollbars */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
