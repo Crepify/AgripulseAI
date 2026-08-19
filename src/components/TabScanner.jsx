@@ -1,11 +1,14 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Volume2, VideoOff, Leaf } from 'lucide-react';
+import { Camera, Upload, Volume2, VideoOff, Leaf, Calculator, Check, Sparkles } from 'lucide-react';
 import { CROPS } from '../data/agriData';
 import { analyzeLeafOnDevice } from '../utils/onDeviceModel';
 import { speechEngine } from '../utils/speech';
 import { sound } from '../utils/audio';
+import { T } from '../data/translations';
+import ImageScanOverlay from './ImageScanOverlay';
 
-export default function TabScanner({ selectedLang }) {
+export default function TabScanner({ selectedLang, isSunlightMode }) {
+  const t = T[selectedLang] || T['en'];
   const [selectedCrop, setSelectedCrop] = useState(CROPS[0]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -13,6 +16,7 @@ export default function TabScanner({ selectedLang }) {
   const [dosageType, setDosageType] = useState('bio');
   const [sprayerSize, setSprayerSize] = useState('15L');
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [mixingAcres, setMixingAcres] = useState(2);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -77,10 +81,12 @@ export default function TabScanner({ selectedLang }) {
     const img = new Image();
     img.src = imgSrc;
     img.onload = async () => {
-      const res = await analyzeLeafOnDevice(img, canvasRef.current);
-      setSelectedCrop(res.matchedCrop);
-      setIsAnalyzing(false);
-      sound.playSuccess();
+      setTimeout(async () => {
+        const res = await analyzeLeafOnDevice(img, canvasRef.current);
+        setSelectedCrop(res.matchedCrop);
+        setIsAnalyzing(false);
+        sound.playSuccess();
+      }, 1200);
     };
   };
 
@@ -94,10 +100,12 @@ export default function TabScanner({ selectedLang }) {
     img.crossOrigin = 'anonymous';
     img.src = crop.image;
     img.onload = async () => {
-      const res = await analyzeLeafOnDevice(img, canvasRef.current);
-      setSelectedCrop(crop);
-      setIsAnalyzing(false);
-      sound.playSuccess();
+      setTimeout(async () => {
+        const res = await analyzeLeafOnDevice(img, canvasRef.current);
+        setSelectedCrop(crop);
+        setIsAnalyzing(false);
+        sound.playSuccess();
+      }, 1000);
     };
   };
 
@@ -117,44 +125,52 @@ export default function TabScanner({ selectedLang }) {
   };
 
   const getDoseText = () => {
-    if (sprayerSize === '20L') return '2.5 Bottle Caps (40ml)';
-    if (sprayerSize === '100L') return '10 Bottle Caps (150ml) in 100L Drum';
+    if (sprayerSize === '20L') return selectedLang === 'hi' ? '2.5 ढक्कन (40ml) दवा' : '2.5 Bottle Caps (40ml)';
+    if (sprayerSize === '100L') return selectedLang === 'hi' ? '10 ढक्कन (150ml) प्रति 100L ड्रम' : '10 Bottle Caps (150ml) in 100L Drum';
     return selectedCrop.dosage[dosageType].measure;
   };
 
   return (
     <div className="max-w-6xl mx-auto px-4 lg:px-8 py-4 space-y-6">
-      {/* Sample Crop Selector */}
+      {/* Sample Crop Selector with Solid High-Contrast Buttons */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        <span className="text-xs text-zinc-400 whitespace-nowrap">Sample Crops:</span>
-        {CROPS.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => handleSelectCrop(c)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-all ${
-              selectedCrop.id === c.id && !customImage && !isCameraActive
-                ? 'bg-emerald-500 text-black font-bold'
-                : 'bg-[#151817] text-zinc-400 hover:text-zinc-200 border border-[#232925]'
-            }`}
-          >
-            {c.name} ({c.localName})
-          </button>
-        ))}
+        <span className={`text-xs whitespace-nowrap font-bold ${isSunlightMode ? 'text-zinc-900' : 'text-zinc-200'}`}>
+          {t.scanner.samplesTitle}
+        </span>
+        {CROPS.map((c) => {
+          const isSelected = selectedCrop.id === c.id && !customImage && !isCameraActive;
+          return (
+            <button
+              key={c.id}
+              onClick={() => handleSelectCrop(c)}
+              style={{
+                backgroundColor: isSelected ? '#34d399' : isSunlightMode ? '#ffffff' : '#1f2937',
+                color: isSelected ? '#000000' : isSunlightMode ? '#111827' : '#ffffff',
+                borderColor: isSelected ? '#10b981' : isSunlightMode ? '#9ca3af' : '#4b5563',
+                opacity: 1,
+                visibility: 'visible',
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-all border-2 shadow-sm"
+            >
+              {c.name} ({c.localName})
+            </button>
+          );
+        })}
       </div>
 
       {/* 2-Column Clean Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Viewfinder */}
         <div className="lg:col-span-5 space-y-3">
-          <div className="relative rounded-2xl overflow-hidden bg-black border border-[#1f2421] min-h-[320px] flex items-center justify-center">
+          <div className="relative rounded-2xl overflow-hidden bg-black border-2 border-zinc-700 min-h-[320px] flex items-center justify-center shadow-xl">
             {isCameraActive ? (
               <div className="relative w-full h-[320px]">
                 <video ref={videoRef} playsInline autoPlay className="w-full h-full object-cover" />
                 <button
                   onClick={capturePhoto}
-                  className="absolute bottom-4 left-1/2 -translate-x-1/2 px-5 py-2 rounded-full bg-emerald-500 text-black font-bold text-xs shadow-lg"
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 px-6 py-2.5 rounded-full bg-emerald-400 text-black font-black text-xs shadow-xl animate-bounce border-2 border-emerald-300"
                 >
-                  Snap Photo
+                  {t.scanner.snapPhoto}
                 </button>
               </div>
             ) : (
@@ -167,25 +183,27 @@ export default function TabScanner({ selectedLang }) {
                 <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-10" />
               </div>
             )}
+
+            <ImageScanOverlay isScanning={isAnalyzing} text={t.scanner.analyzingText} />
           </div>
 
           {/* Action Buttons: Camera & Upload */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             {!isCameraActive ? (
               <button
                 onClick={startCamera}
-                className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs transition-transform active:scale-95 shadow-sm"
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black font-black text-xs transition-transform active:scale-95 shadow-md border-2 border-emerald-300"
               >
                 <Camera className="w-4 h-4" />
-                <span>Open Camera</span>
+                <span>{t.scanner.openCamera}</span>
               </button>
             ) : (
               <button
                 onClick={stopCamera}
-                className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold text-xs"
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 hover:bg-red-400 text-white font-black text-xs shadow-md border-2 border-red-400"
               >
                 <VideoOff className="w-4 h-4" />
-                <span>Close Camera</span>
+                <span>{t.scanner.closeCamera}</span>
               </button>
             )}
 
@@ -198,118 +216,161 @@ export default function TabScanner({ selectedLang }) {
             />
             <button
               onClick={() => fileInputRef.current.click()}
-              className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#151817] hover:bg-[#1e2320] text-zinc-300 border border-[#232925] font-bold text-xs"
+              style={{
+                backgroundColor: isSunlightMode ? '#ffffff' : '#1f2937',
+                color: isSunlightMode ? '#111827' : '#ffffff',
+                borderColor: isSunlightMode ? '#9ca3af' : '#4b5563',
+              }}
+              className="flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all border-2 shadow-sm"
             >
               <Upload className="w-4 h-4" />
-              <span>Upload Photo</span>
+              <span>{t.scanner.uploadPhoto}</span>
             </button>
           </div>
         </div>
 
         {/* Right: Diagnosis & Dosage */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="p-6 rounded-2xl bg-[#121514] border border-[#1f2421] space-y-5">
+          <div className={`p-6 rounded-2xl border-2 space-y-5 shadow-xl ${
+            isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-700 text-white'
+          }`}>
             {/* Title & Listen Button */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#1f2421]">
+            <div className={`flex flex-wrap items-center justify-between gap-3 pb-4 border-b-2 ${isSunlightMode ? 'border-zinc-200' : 'border-zinc-800'}`}>
               <div>
-                <span className="text-xs text-emerald-400 font-bold">
-                  Diagnosis Result ({selectedCrop.confidence}% Match)
+                <span className="text-xs text-emerald-400 font-black tracking-wide">
+                  {t.scanner.scanComplete} ({selectedCrop.confidence}% {t.scanner.matchScore})
                 </span>
-                <h2 className="text-xl md:text-2xl font-bold text-white mt-0.5">
+                <h2 className={`text-xl md:text-2xl font-black mt-0.5 ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>
                   {selectedCrop.disease}
                 </h2>
               </div>
 
               <button
                 onClick={playVoicePrescription}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all shadow-md border-2 ${
                   isPlayingAudio
-                    ? 'bg-red-500 text-white animate-pulse'
-                    : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-sm'
+                    ? 'bg-red-500 text-white border-red-400 animate-pulse'
+                    : 'bg-emerald-400 hover:bg-emerald-300 text-black border-emerald-300'
                 }`}
               >
                 <Volume2 className="w-4 h-4" />
-                <span>{isPlayingAudio ? 'Stop Voice' : 'Listen Advice'}</span>
+                <span>{isPlayingAudio ? t.scanner.stopVoice : t.scanner.listenAdvice}</span>
               </button>
             </div>
 
             {/* Symptoms */}
-            <p className="text-xs text-zinc-300 font-light leading-relaxed">
-              <strong>Symptoms:</strong> {selectedCrop.symptoms}
+            <p className={`text-xs font-medium leading-relaxed ${isSunlightMode ? 'text-zinc-800' : 'text-zinc-200'}`}>
+              <strong>{t.scanner.symptomsLabel}</strong> {selectedCrop.symptoms}
             </p>
 
-            {/* Dosage Recipe Box */}
-            <div className="p-4 rounded-xl bg-[#181c1a] border border-emerald-500/20 space-y-3">
+            {/* Dosage Recipe Box with Visual Graphic */}
+            <div className={`p-4 rounded-xl border-2 space-y-3.5 ${
+              isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-950 border-zinc-800'
+            }`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <span className={`text-xs font-black flex items-center gap-1.5 ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>
                   <Leaf className="w-4 h-4 text-emerald-400" />
-                  Practical Dosage Measure
+                  {t.scanner.recipeTitle}
                 </span>
 
-                {/* Bio vs Chemical */}
-                <div className="flex items-center bg-[#0e100f] p-1 rounded-lg border border-[#232925] text-xs">
+                {/* Bio vs Chemical Toggle */}
+                <div className={`flex items-center p-1 rounded-lg border-2 text-xs ${isSunlightMode ? 'bg-white border-zinc-300' : 'bg-zinc-900 border-zinc-700'}`}>
                   <button
                     onClick={() => { sound.playClick(); setDosageType('bio'); }}
-                    className={`px-2.5 py-0.5 rounded font-medium transition-all ${
-                      dosageType === 'bio' ? 'bg-emerald-500 text-black font-bold' : 'text-zinc-400'
+                    className={`px-3 py-1 rounded font-black transition-all ${
+                      dosageType === 'bio' ? 'bg-emerald-400 text-black shadow-sm' : isSunlightMode ? 'text-zinc-700' : 'text-zinc-300'
                     }`}
                   >
-                    Organic Bio
+                    {t.scanner.organicBio}
                   </button>
                   <button
                     onClick={() => { sound.playClick(); setDosageType('chemical'); }}
-                    className={`px-2.5 py-0.5 rounded font-medium transition-all ${
-                      dosageType === 'chemical' ? 'bg-amber-500 text-black font-bold' : 'text-zinc-400'
+                    className={`px-3 py-1 rounded font-black transition-all ${
+                      dosageType === 'chemical' ? 'bg-amber-400 text-black shadow-sm' : isSunlightMode ? 'text-zinc-700' : 'text-zinc-300'
                     }`}
                   >
-                    Chemical
+                    {t.scanner.chemical}
                   </button>
                 </div>
               </div>
 
-              {/* Equipment Selector */}
-              <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <span>Sprayer:</span>
+              {/* Sprayer Equipment Selector */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className={`font-bold ${isSunlightMode ? 'text-zinc-700' : 'text-zinc-300'}`}>{t.scanner.sprayerLabel}</span>
                 {['15L', '20L', '100L'].map((s) => (
                   <button
                     key={s}
                     onClick={() => { sound.playClick(); setSprayerSize(s); }}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
-                      sprayerSize === s
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                        : 'bg-[#0e100f] text-zinc-500 border border-transparent'
-                    }`}
+                    style={{
+                      backgroundColor: sprayerSize === s ? '#34d399' : isSunlightMode ? '#ffffff' : '#1f2937',
+                      color: sprayerSize === s ? '#000000' : isSunlightMode ? '#111827' : '#ffffff',
+                      borderColor: sprayerSize === s ? '#10b981' : isSunlightMode ? '#9ca3af' : '#4b5563',
+                    }}
+                    className="px-3 py-1 rounded text-xs font-black transition-all border-2 shadow-sm"
                   >
-                    {s === '15L' ? '15L Backpack' : s === '20L' ? '20L Tank' : '100L Drum'}
+                    {s === '15L' ? t.scanner.backpack15 : s === '20L' ? t.scanner.tank20 : t.scanner.drum100}
                   </button>
                 ))}
               </div>
 
-              {/* Callout */}
-              <div className="p-3 rounded-lg bg-[#0c0e0d] border border-[#232925] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <div className="text-[10px] text-zinc-400">Remedy: {selectedCrop.dosage[dosageType].name}</div>
-                  <div className="text-base font-bold text-white mt-0.5">
-                    👉 {getDoseText()}
+              {/* Visual Bottle-Cap Sprayer Recipe Card */}
+              <div className={`p-4 rounded-xl border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm ${
+                isSunlightMode ? 'bg-white border-zinc-300' : 'bg-zinc-900 border-zinc-700'
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-400/20 border-2 border-emerald-400 flex items-center justify-center text-2xl shrink-0">
+                    🧴
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-zinc-400">{t.scanner.remedyLabel} {selectedCrop.dosage[dosageType].name}</div>
+                    <div className="text-base md:text-lg font-black text-emerald-400 mt-0.5">
+                      👉 {getDoseText()}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-[10px] text-zinc-400">Estimated Cost</div>
-                  <div className="text-sm font-bold text-amber-400">
+
+                <div className="text-right shrink-0 border-t sm:border-t-0 sm:border-l border-zinc-700/60 pt-2 sm:pt-0 sm:pl-4">
+                  <div className="text-[11px] font-bold text-zinc-400">{t.scanner.estCost}</div>
+                  <div className="text-base font-black text-amber-400">
                     {selectedCrop.dosage[dosageType].cost}
                   </div>
                 </div>
               </div>
 
-              <div className="text-[11px] text-zinc-400 font-light">
+              <div className="text-xs text-zinc-300 font-medium">
                 🛡️ {selectedCrop.dosage[dosageType].safety}
               </div>
             </div>
 
+            {/* Field Size Mixing Multiplier Tool */}
+            <div className={`p-3.5 rounded-xl border-2 space-y-2 shadow-sm ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-950 border-zinc-800'}`}>
+              <div className="flex items-center justify-between text-xs font-black">
+                <span className="flex items-center gap-1.5">
+                  <Calculator className="w-4 h-4 text-emerald-400" />
+                  {t.scanner.calculatorTitle}
+                </span>
+                <span className="text-emerald-400 font-black">{mixingAcres} {t.profit.selectedAcres}</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={mixingAcres}
+                onChange={(e) => setMixingAcres(Number(e.target.value))}
+                className="w-full h-2 bg-zinc-600 rounded appearance-none cursor-pointer accent-emerald-400"
+              />
+              <div className="flex justify-between text-xs text-zinc-300 font-bold">
+                <span>{t.scanner.totalMixNeeded} <strong>{mixingAcres * 150}L ({mixingAcres * 10} Tanks)</strong></span>
+                <span className="text-emerald-400 font-black">{t.scanner.bottlesCapsTotal} {mixingAcres * 20} Caps</span>
+              </div>
+            </div>
+
             {/* Spray Window Banner */}
-            <div className="p-3 rounded-xl bg-[#151817] border border-[#232925] flex items-center justify-between text-xs">
-              <span className="text-zinc-400">Best Spray Time:</span>
-              <span className="text-emerald-400 font-bold">{selectedCrop.sprayTime}</span>
+            <div className={`p-3.5 rounded-xl border-2 flex items-center justify-between text-xs font-black ${
+              isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-950 border-zinc-800'
+            }`}>
+              <span className={isSunlightMode ? 'text-zinc-700' : 'text-zinc-300'}>{t.scanner.sprayTimeLabel}</span>
+              <span className="text-emerald-400">{selectedCrop.sprayTime}</span>
             </div>
           </div>
         </div>
