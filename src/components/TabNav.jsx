@@ -16,14 +16,16 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
   ];
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-3 pb-1 sticky top-[56px] z-30">
+    <div className="w-full max-w-6xl mx-auto px-2 sm:px-6 lg:px-8 pt-2.5 pb-1 sticky top-[52px] sm:top-[56px] z-30 overflow-hidden">
       <nav 
         aria-label="Main Navigation"
-        className={`flex items-center gap-2 p-1.5 rounded-2xl border shadow-xl overflow-x-auto transition-colors ${
-          isSunlightMode 
-            ? 'bg-zinc-100 border-zinc-300' 
-            : 'bg-[#141816] border-[#2b3630]'
-        }`}
+        style={{
+          backgroundColor: isSunlightMode ? '#f3f4f6' : '#111827',
+          borderColor: isSunlightMode ? '#d1d5db' : '#374151',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }}
+        className="flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl border-2 shadow-lg overflow-x-auto w-full max-w-full"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -54,8 +56,8 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
                 opacity: 1,
                 visibility: 'visible',
               }}
-              className={`flex-1 min-w-[105px] sm:min-w-[130px] flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-black transition-all border-2 whitespace-nowrap cursor-pointer shadow-md ${
-                isActive ? 'scale-[1.02] shadow-lg' : 'hover:scale-[1.01]'
+              className={`shrink-0 flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all border-2 whitespace-nowrap cursor-pointer shadow-sm ${
+                isActive ? 'scale-[1.02] shadow-md' : 'hover:scale-[1.01]'
               }`}
             >
               <Icon 
@@ -66,7 +68,7 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
                 }} 
                 className="w-4 h-4 shrink-0" 
               />
-              <span className="truncate">{tab.label}</span>
+              <span>{tab.label}</span>
             </button>
           );
         })}
