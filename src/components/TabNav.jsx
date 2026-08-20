@@ -16,15 +16,14 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
   ];
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 pb-2 sticky top-[62px] z-30">
-      {/* ALWAYS VISIBLE TOP NAVIGATION BAR (All screen sizes) */}
+    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-3 pb-1 sticky top-[56px] z-30">
       <nav 
         aria-label="Main Navigation"
-        style={{
-          backgroundColor: isSunlightMode ? '#e5e7eb' : '#111827',
-          borderColor: isSunlightMode ? '#9ca3af' : '#374151',
-        }}
-        className="flex items-center gap-2 p-2 rounded-2xl border-2 shadow-2xl overflow-x-auto"
+        className={`flex items-center gap-2 p-1.5 rounded-2xl border shadow-xl overflow-x-auto transition-colors ${
+          isSunlightMode 
+            ? 'bg-zinc-100 border-zinc-300' 
+            : 'bg-[#141816] border-[#2b3630]'
+        }`}
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -41,12 +40,12 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
                   ? '#34d399' // Solid bright emerald
                   : isSunlightMode 
                     ? '#ffffff' 
-                    : '#1f2937', // Solid bright dark-slate (zinc-800)
+                    : '#1f2937', // Solid bright dark-slate
                 color: isActive 
                   ? '#000000' 
                   : isSunlightMode 
                     ? '#111827' 
-                    : '#ffffff', // Pure white text
+                    : '#ffffff', // Pure crisp white text
                 borderColor: isActive 
                   ? '#10b981' 
                   : isSunlightMode 
@@ -55,8 +54,8 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
                 opacity: 1,
                 visibility: 'visible',
               }}
-              className={`flex-1 min-w-[120px] sm:min-w-[140px] flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-xs sm:text-sm font-black transition-all border-2 whitespace-nowrap cursor-pointer shadow-md ${
-                isActive ? 'scale-[1.03] shadow-lg' : 'hover:scale-[1.01]'
+              className={`flex-1 min-w-[105px] sm:min-w-[130px] flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-black transition-all border-2 whitespace-nowrap cursor-pointer shadow-md ${
+                isActive ? 'scale-[1.02] shadow-lg' : 'hover:scale-[1.01]'
               }`}
             >
               <Icon 
@@ -65,19 +64,9 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
                   opacity: 1,
                   visibility: 'visible',
                 }} 
-                className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" 
+                className="w-4 h-4 shrink-0" 
               />
-              <span 
-                style={{
-                  color: isActive ? '#000000' : isSunlightMode ? '#111827' : '#ffffff',
-                  opacity: 1,
-                  visibility: 'visible',
-                  fontWeight: 800,
-                }}
-                className="truncate"
-              >
-                {tab.label}
-              </span>
+              <span className="truncate">{tab.label}</span>
             </button>
           );
         })}

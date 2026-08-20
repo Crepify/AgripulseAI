@@ -80,7 +80,7 @@ export default function App() {
         onNavigate={handleAutoNavigate}
       />
 
-      {/* Top Tab Navigation Bar (Always visible at the top on all screens) */}
+      {/* Top Tab Navigation Bar (Sticky & Always Visible on all screen sizes) */}
       <TabNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -88,8 +88,8 @@ export default function App() {
         isSunlightMode={isSunlightMode}
       />
 
-      {/* Main Tab Stage */}
-      <main className="flex-1 pb-12 relative z-10">
+      {/* Main Tab Stage (Full Natural Scroll) */}
+      <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-3 pb-28 relative z-10">
         {activeTab === 'scan' && (
           <TabScanner
             selectedLang={selectedLang}
@@ -129,10 +129,10 @@ export default function App() {
       </main>
 
       {/* Floating 1-Tap Voice Assistant Button */}
-      <div className="fixed bottom-6 right-6 z-40">
+      <div className="fixed bottom-6 right-4 sm:right-6 z-40">
         <button
           onClick={() => { sound.playClick(); setIsVoiceOpen(true); }}
-          className="flex items-center gap-2 px-5 py-3 rounded-full bg-emerald-400 hover:bg-emerald-300 text-black font-black text-xs md:text-sm border-2 border-emerald-300 shadow-[0_0_25px_rgba(52,211,153,0.6)] transition-transform hover:scale-105 active:scale-95"
+          className="flex items-center gap-2 px-4 py-2.5 sm:px-5 sm:py-3 rounded-full bg-emerald-400 hover:bg-emerald-300 text-black font-black text-xs sm:text-sm border-2 border-emerald-300 shadow-[0_0_25px_rgba(52,211,153,0.6)] transition-transform hover:scale-105 active:scale-95"
         >
           <Mic className="w-4 h-4 fill-black" />
           <span>{t.askAiBtn}</span>
@@ -140,7 +140,7 @@ export default function App() {
       </div>
 
       {/* Clean Minimalist Footer */}
-      <footer className={`border-t-2 px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between text-xs transition-colors relative z-10 ${
+      <footer className={`border-t px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between text-xs transition-colors relative z-10 ${
         isSunlightMode ? 'bg-zinc-200 border-zinc-300 text-zinc-700 font-bold' : 'bg-zinc-950 border-zinc-800 text-zinc-400 font-medium'
       }`}>
         <div>{t.footerText}</div>

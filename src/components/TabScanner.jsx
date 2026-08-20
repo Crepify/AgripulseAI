@@ -115,10 +115,10 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
       speechEngine.stopSpeaking();
       setIsPlayingAudio(false);
     } else {
-      const textToSpeak = selectedCrop.audio[selectedLang] || selectedCrop.audio['en'];
+      const audioData = selectedCrop.audio[selectedLang] || selectedCrop.audio['en'];
       const speechLangCode = selectedLang === 'hi' ? 'hi-IN' : selectedLang === 'ta' ? 'ta-IN' : selectedLang === 'te' ? 'te-IN' : selectedLang === 'kn' ? 'kn-IN' : 'en-IN';
       setIsPlayingAudio(true);
-      speechEngine.speak(textToSpeak, speechLangCode, () => {
+      speechEngine.speak(audioData, speechLangCode, () => {
         setIsPlayingAudio(false);
       });
     }
@@ -131,7 +131,7 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 lg:px-8 py-4 space-y-6">
+    <div className="w-full space-y-6">
       {/* Sample Crop Selector with Solid High-Contrast Buttons */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         <span className={`text-xs whitespace-nowrap font-bold ${isSunlightMode ? 'text-zinc-900' : 'text-zinc-200'}`}>

@@ -1,4 +1,4 @@
-// Clean Agronomic Database for AgriPulse AI
+// Clean Agronomic Database for AgriPulse AI with Native & Phonetic Speech Scripts
 
 export const CROPS = [
   {
@@ -12,11 +12,26 @@ export const CROPS = [
     symptoms: 'Diamond-shaped brown spots with gray centers on leaves.',
     image: 'https://images.unsplash.com/photo-1536657464919-892534f60d6e?auto=format&fit=crop&w=800&q=80',
     audio: {
-      en: 'Rice blast detected with 97% confidence. Apply bio-mix before 10:30 AM before humidity causes spore spread. Mix 2 bottle caps in your 15 liter sprayer.',
-      hi: 'धान में ब्लास्ट रोग की पुष्टि हुई है। सुबह 10:30 बजे से पहले 15 लीटर स्प्रेयर में 2 ढक्कन ट्राइकोडर्मा मिलाकर छिड़काव करें।',
-      ta: 'நெல் குலை நோய் கண்டறியப்பட்டது. 15 லிட்டர் தெளிப்பானில் 2 மூடி மருந்து கலந்து காலை 10:30 மணிக்குள் தெளிக்கவும்.',
-      te: 'వరిలో అగ్గితెగులు గుర్తించబడింది. 15 లీటర్ల స్ప్రేయర్‌లో 2 మూతల మందు కలిపి ఉదయం 10:30 లోపు పిచికారీ చేయండి.',
-      kn: 'ಭತ್ತದ ಬೆಂಕಿ ರೋಗ ದೃಢಪಟ್ಟಿದೆ. 15 ಲೀಟರ್ ಸಿಂಪಡಕದಲ್ಲಿ 2 ಮುಚ್ಚಳ ಔಷಧ ಬೆರೆಸಿ ಬೆಳಿಗ್ಗೆ 10:30 ರೊಳಗೆ ಸಿಂಪಡಿಸಿ.',
+      en: {
+        devanagari: 'Rice blast detected with 97% confidence. Apply bio-mix before 10:30 AM before humidity causes spore spread. Mix 2 bottle caps in your 15 liter sprayer.',
+        phonetic: 'Rice blast detected with 97 percent confidence. Apply bio-mix before 10:30 AM before humidity causes spore spread. Mix 2 bottle caps in your 15 liter sprayer.',
+      },
+      hi: {
+        devanagari: 'धान में ब्लास्ट रोग की पुष्टि हुई है। सुबह 10:30 बजे से पहले 15 लीटर स्प्रेयर में 2 ढक्कन ट्राइकोडर्मा मिलाकर छिड़काव करें।',
+        phonetic: 'Dhaan mein blast rog ki pushti hui hai. Subah 10:30 baje se pehle 15 liter sprayer mein 2 dhakkan Trichoderma milakar chhidkaav karein.',
+      },
+      ta: {
+        devanagari: 'நெல் குலை நோய் கண்டறியப்பட்டது. 15 லிட்டர் தெளிப்பானில் 2 மூடி மருந்து கலந்து காலை 10:30 மணிக்குள் தெளிக்கவும்.',
+        phonetic: 'Nellil kulai noi kandariyappattadhu. 15 liter thelippaanil 2 moodi marundhai kalandhu kaalai 10:30 manikkul thelikkavum.',
+      },
+      te: {
+        devanagari: 'వరిలో అగ్గితెగులు గుర్తించబడింది. 15 లీటర్ల స్ప్రేయర్‌లో 2 మూతల మందు కలిపి ఉదయం 10:30 లోపు పిచికారీ చేయండి.',
+        phonetic: 'Varilo aggitegulu gurtinchabadindi. 15 leetarla sprayarlo 2 mootala mandu kalipi udayam 10:30 lopu pichikaaree cheyandi.',
+      },
+      kn: {
+        devanagari: 'ಭತ್ತದ ಬೆಂಕಿ ರೋಗ ದೃಢಪಟ್ಟಿದೆ. 15 ಲೀಟರ್ ಸಿಂಪಡಕದಲ್ಲಿ 2 ಮುಚ್ಚಳ ಔಷಧ ಬೆರೆಸಿ ಬೆಳಿಗ್ಗೆ 10:30 ರೊಳಗೆ ಸಿಂಪಡಿಸಿ.',
+        phonetic: 'Bhattadalli benki roga drudhapatithu. 15 liter simpadakadalli 2 mucchala aushadhi beresi beligge 10:30 rolage simpadisi.',
+      },
     },
     dosage: {
       bio: {
@@ -47,11 +62,26 @@ export const CROPS = [
     symptoms: 'Dark brown concentric rings on lower mature leaves.',
     image: 'https://images.unsplash.com/photo-1592841200221-a6898f307baa?auto=format&fit=crop&w=800&q=80',
     audio: {
-      en: 'Early Blight identified on tomato leaves. Remove affected bottom leaves. Mix 3 bottle caps into your 15-liter backpack sprayer.',
-      hi: 'टमाटर में अर्ली ब्लाइट की पहचान हुई है। नीचे के खराब पत्ते हटाएं और 15 लीटर स्प्रेयर में 3 ढक्कन दवा मिलाकर छिड़कें।',
-      ta: 'தக்காளியில் இலைக்கருகல் நோய் உள்ளது. 15 லிட்டர் தெளிப்பானில் 3 மூடி மருந்தை கலந்து தெளிக்கவும்.',
-      te: 'టమోటాలో ముందస్తు తెగులు ఉంది. 15 లీటర్ల స్ప్రేయర్‌లో 3 మూతల మందు పిచికారీ చేయండి.',
-      kn: 'ಟೊಮೆಟೊದಲ್ಲಿ ಎಲೆ ಕರಕಲು ರೋಗ ಕಾಣಿಸಿಕೊಂಡಿದೆ. 15 ಲೀಟರ್ ಸಿಂಪಡಕದಲ್ಲಿ 3 ಮುಚ್ಚಳ ಔಷಧಿ ಸಿಂಪಡಿಸಿ.',
+      en: {
+        devanagari: 'Early Blight identified on tomato leaves. Remove affected bottom leaves. Mix 3 bottle caps into your 15-liter backpack sprayer.',
+        phonetic: 'Early Blight identified on tomato leaves. Remove affected bottom leaves. Mix 3 bottle caps into your 15-liter backpack sprayer.',
+      },
+      hi: {
+        devanagari: 'टमाटर में अर्ली ब्लाइट की पहचान हुई है। नीचे के खराब पत्ते हटाएं और 15 लीटर स्प्रेयर में 3 ढक्कन दवा मिलाकर छिड़कें।',
+        phonetic: 'Tamatar mein early blight ki pehchaan hui hai. Neeche ke kharaab patte hatayein aur 15 liter sprayer mein 3 dhakkan dawa milakar chhidkein.',
+      },
+      ta: {
+        devanagari: 'தக்காளியில் இலைக்கருகல் நோய் உள்ளது. 15 லிட்டர் தெளிப்பானில் 3 மூடி மருந்தை கலந்து தெளிக்கவும்.',
+        phonetic: 'Thakkaliyil ilaikkarugal noi ulladhu. 15 liter thelippaanil 3 moodi marundhu kalandhu thelikkavum.',
+      },
+      te: {
+        devanagari: 'టమోటాలో ముందస్తు తెగులు ఉంది. 15 లీటర్ల స్ప్రేయర్‌లో 3 మూతల మందు పిచికారీ చేయండి.',
+        phonetic: 'Tomatolo mundastu tegulu undi. 15 leetarla sprayarlo 3 mootala mandu pichikaaree cheyandi.',
+      },
+      kn: {
+        devanagari: 'ಟೊಮೆಟೊದಲ್ಲಿ ಎಲೆ ಕರಕಲು ರೋಗ ಕಾಣಿಸಿಕೊಂಡಿದೆ. 15 ಲೀಟರ್ ಸಿಂಪಡಕದಲ್ಲಿ 3 ಮುಚ್ಚಳ ಔಷಧಿ ಸಿಂಪಡಿಸಿ.',
+        phonetic: 'Tometodalli ele karakalu roga kaanisikondide. 15 liter simpadakadalli 3 mucchala aushadhi simpadisi.',
+      },
     },
     dosage: {
       bio: {
@@ -82,11 +112,26 @@ export const CROPS = [
     symptoms: 'Upward leaf curling with thickened veins caused by whiteflies.',
     image: 'https://images.unsplash.com/photo-1605000797499-95a51c5269ae?auto=format&fit=crop&w=800&q=80',
     audio: {
-      en: 'Cotton Leaf Curl Virus transmitted by whiteflies. Install yellow sticky traps and spray 3 bottle caps of neem oil formulation.',
-      hi: 'कपास में सफेद मक्खी से फैलने वाला लीफ कर्ल वायरस मिला है। खेत में पीले ट्रैप लगाएं और 3 ढक्कन नीम तेल का घोल छिड़कें।',
-      ta: 'பருத்தி இலைச்சுருள் நோய். மஞ்சள் ஒட்டும் பொறிகளை வைத்து 3 மூடி வேப்பெண்ணெய் கரைசல் தெளிக்கவும்.',
-      te: 'ప్రత్తి ఆకు ముడుత వైరస్. పసుపు జిగురు కార్డులు పెట్టి 3 మూతల వేప నూనె పిచికారీ చేయండి.',
-      kn: 'ಹತ್ತಿ ಎಲೆ ಮುದುರು ರೋಗ. ಹಳದಿ ಬಲೆಗಳನ್ನು ಇರಿಸಿ 3 ಮುಚ್ಚಳ ಬೇವಿನ ಎಣ್ಣೆ ಸಿಂಪಡಿಸಿ.',
+      en: {
+        devanagari: 'Cotton Leaf Curl Virus transmitted by whiteflies. Install yellow sticky traps and spray 3 bottle caps of neem oil formulation.',
+        phonetic: 'Cotton Leaf Curl Virus transmitted by whiteflies. Install yellow sticky traps and spray 3 bottle caps of neem oil formulation.',
+      },
+      hi: {
+        devanagari: 'कपास में सफेद मक्खी से फैलने वाला लीफ कर्ल वायरस मिला है। खेत में पीले ट्रैप लगाएं और 3 ढक्कन नीम तेल का घोल छिड़कें।',
+        phonetic: 'Kapas mein safed makkhi se phailne wala leaf curl virus mila hai. Khet mein peele sticky trap lagayein aur 3 dhakkan neem tel ka ghol chhidkein.',
+      },
+      ta: {
+        devanagari: 'பருத்தி இலைச்சுருள் நோய். மஞ்சள் ஒட்டும் பொறிகளை வைத்து 3 மூடி வேப்பெண்ணெய் கரைசல் தெளிக்கவும்.',
+        phonetic: 'Paruthi ilaisuril noi. Manjal ottum porigalai vaithu 3 moodi veppennaik karaisal thelikkavum.',
+      },
+      te: {
+        devanagari: 'ప్రత్తి ఆకు ముడుత వైరస్. పసుపు జిగురు కార్డులు పెట్టి 3 మూతల వేప నూనె పిచికారీ చేయండి.',
+        phonetic: 'Prathi aaku muduta virus. Pasupu jiguru cardulu petti 3 mootala vepa noone pichikaaree cheyandi.',
+      },
+      kn: {
+        devanagari: 'ಹತ್ತಿ ಎಲೆ ಮುದುರು ರೋಗ. ಹಳದಿ ಬಲೆಗಳನ್ನು ಇರಿಸಿ 3 ಮುಚ್ಚಳ ಬೇವಿನ ಎಣ್ಣೆ ಸಿಂಪಡಿಸಿ.',
+        phonetic: 'Hatthi ele muduru roga. Haladi balegalannu irisi 3 mucchala bevina yenne simpadisi.',
+      },
     },
     dosage: {
       bio: {
@@ -117,11 +162,26 @@ export const CROPS = [
     symptoms: 'Yellowish-orange powder lines along leaf veins.',
     image: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=800&q=80',
     audio: {
-      en: 'Critical: Yellow rust spores detected. Mix 2 bottle caps of propiconazole in 15L water. Notify neighboring farms immediately.',
-      hi: 'अति आवश्यक: गेहूं में पीला रतुआ देखा गया है। तुरंत 15 लीटर पानी में 2 ढक्कन प्रोपिकोनाजोल मिलाकर छिड़काव करें।',
-      ta: 'கோதுமையில் மஞ்சள் துரு நோய். உடனே 15 லிட்டர் நீரில் 2 மூடி மருந்து கலந்து தெளிக்கவும்.',
-      te: 'గోధుమలో పసుపు తుప్పు తెగులు. వెంటనే 15 లీటర్ల నీటిలో 2 మూతల మందు పిచికారీ చేయండి.',
-      kn: 'ಗೋಧಿಯಲ್ಲಿ ಹಳದಿ ತುಕ್ಕು ರೋಗ. ತಕ್ಷಣ 15 ಲೀಟರ್ ನೀರಿನಲ್ಲಿ 2 ಮುಚ್ಚಳ ಔಷಧಿ ಬೆರೆಸಿ ಸಿಂಪಡಿಸಿ.',
+      en: {
+        devanagari: 'Critical: Yellow rust spores detected. Mix 2 bottle caps of propiconazole in 15L water. Notify neighboring farms immediately.',
+        phonetic: 'Critical: Yellow rust spores detected. Mix 2 bottle caps of propiconazole in 15 liter water. Notify neighboring farms immediately.',
+      },
+      hi: {
+        devanagari: 'अति आवश्यक: गेहूं में पीला रतुआ देखा गया है। तुरंत 15 लीटर पानी में 2 ढक्कन प्रोपिकोनाजोल मिलाकर छिड़काव करें।',
+        phonetic: 'Ati aavashyak: Gehun mein peela ratua dekha gaya hai. Turant 15 liter paani mein 2 dhakkan propiconazole milakar chhidkaav karein.',
+      },
+      ta: {
+        devanagari: 'கோதுமையில் மஞ்சள் துரு நோய். உடனே 15 லிட்டர் நீரில் 2 மூடி மருந்து கலந்து தெளிக்கவும்.',
+        phonetic: 'Godhumaiyil manjal thuru noi. Udane 15 liter neeril 2 moodi marundhu kalandhu thelikkavum.',
+      },
+      te: {
+        devanagari: 'గోధుమలో పసుపు తుప్పు తెగులు. వెంటనే 15 లీటర్ల నీటిలో 2 మూతల మందు పిచికారీ చేయండి.',
+        phonetic: 'Godhumalo pasupu thuppu tegulu. Ventane 15 leetarla neetilo 2 mootala mandu pichikaaree cheyandi.',
+      },
+      kn: {
+        devanagari: 'ಗೋಧಿಯಲ್ಲಿ ಹಳದಿ ತುಕ್ಕು ರೋಗ. ತಕ್ಷಣ 15 ಲೀಟರ್ ನೀರಿನಲ್ಲಿ 2 ಮುಚ್ಚಳ ಔಷಧಿ ಬೆರೆಸಿ ಸಿಂಪಡಿಸಿ.',
+        phonetic: 'Godhiyalli haladi thukku roga. Takshana 15 liter neerinalli 2 mucchala aushadhi beresi simpadisi.',
+      },
     },
     dosage: {
       bio: {
