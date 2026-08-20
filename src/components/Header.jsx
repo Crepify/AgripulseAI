@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wifi, WifiOff, Mic, Sun, Moon, Hand } from 'lucide-react';
+import { Wifi, WifiOff, Mic, Sun, Moon, Hand, Download } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
 
@@ -9,6 +9,7 @@ export default function Header({
   isOffline,
   setIsOffline,
   onOpenVoiceModal,
+  onOpenInstallModal,
   isSunlightMode,
   setIsSunlightMode,
   isHandsFree,
@@ -44,13 +45,23 @@ export default function Header({
 
         {/* Header Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Voice Assistant Action Button */}
+          {/* Download / Install App Action Button */}
+          <button
+            onClick={() => { sound.playClick(); onOpenInstallModal(); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-xs font-black border border-amber-300 shadow-md transition-transform active:scale-95 whitespace-nowrap"
+            title="Download App to Home Screen"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="text-[11px] sm:text-xs">{selectedLang === 'hi' ? 'ऐप डाउनलोड' : 'Install App'}</span>
+          </button>
+
+          {/* Voice Assistant Button */}
           <button
             onClick={() => { sound.playClick(); onOpenVoiceModal(); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black text-xs font-black border border-emerald-300 shadow-md transition-transform active:scale-95 whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black text-xs font-black border border-emerald-300 shadow-md transition-transform active:scale-95 whitespace-nowrap"
           >
             <Mic className="w-3.5 h-3.5 fill-black" />
-            <span>{t.askAiBtn}</span>
+            <span className="text-[11px] sm:text-xs">बोलें</span>
           </button>
 
           {/* Wet-Hands Hands-Free Button */}

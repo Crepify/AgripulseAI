@@ -11,20 +11,23 @@ import TabGroup from './components/TabGroup';
 import VoiceAssistant from './components/VoiceAssistant';
 import HandsFreeVoiceBanner from './components/HandsFreeVoiceBanner';
 import BackgroundCanvas from './components/BackgroundCanvas';
+import InstallAppModal from './components/InstallAppModal';
 
 import { initOnDeviceAI } from './utils/onDeviceModel';
 import { initOfflineDB } from './utils/offlineStore';
 import { sound } from './utils/audio';
 import { T } from './data/translations';
-import { WifiOff, Mic } from 'lucide-react';
+import { WifiOff, Mic, Download } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('scan');
   const [selectedLang, setSelectedLang] = useState('hi');
   const [isOffline, setIsOffline] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isSunlightMode, setIsSunlightMode] = useState(false);
   const [isHandsFree, setIsHandsFree] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   const t = T[selectedLang] || T['en'];
 
@@ -32,9 +35,23 @@ export default function App() {
     initOfflineDB();
     initOnDeviceAI();
 
+    // Listen for PWA install prompt
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      // Auto-open install banner if not dismissed
+      setIsInstallModalOpen(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+    };
   }, []);
 
   const handleAutoNavigate = (targetTab) => {
@@ -66,6 +83,7 @@ export default function App() {
         isOffline={isOffline}
         setIsOffline={setIsOffline}
         onOpenVoiceModal={() => setIsVoiceOpen(true)}
+        onOpenInstallModal={() => setIsInstallModalOpen(true)}
         isSunlightMode={isSunlightMode}
         setIsSunlightMode={setIsSunlightMode}
         isHandsFree={isHandsFree}
@@ -155,6 +173,14 @@ export default function App() {
         onClose={() => setIsVoiceOpen(false)}
         selectedLang={selectedLang}
         onNavigate={handleAutoNavigate}
+      />
+
+      {/* PWA Download to Home Screen Modal */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        deferredPrompt={deferredPrompt}
+        selectedLang={selectedLang}
       />
     </div>
   );
