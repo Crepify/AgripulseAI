@@ -19,7 +19,7 @@ export default function Header({
 
   const languages = [
     { code: 'hi', label: 'हिन्दी' },
-    { code: 'en', label: 'English' },
+    { code: 'en', label: 'EN' },
     { code: 'ta', label: 'தமிழ்' },
     { code: 'te', label: 'తెలుగు' },
     { code: 'kn', label: 'ಕನ್ನಡ' },
@@ -27,53 +27,53 @@ export default function Header({
 
   return (
     <header className={`border-b-2 ${isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-[#0c0e0d]/95 border-zinc-800 text-white'} px-2.5 sm:px-6 py-2 sticky top-0 z-40 backdrop-blur-md shadow-md w-full max-w-full overflow-hidden`}>
-      <div className="max-w-6xl mx-auto flex items-center justify-between gap-1.5 sm:gap-3">
+      <div className="w-full max-w-6xl mx-auto flex items-center justify-between gap-1.5 sm:gap-3">
         {/* Brand Logo & Name */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-400 border border-emerald-300 flex items-center justify-center text-black font-black text-base sm:text-lg shadow-sm">
+          <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl bg-emerald-400 border border-emerald-300 flex items-center justify-center text-black font-black text-sm sm:text-lg shadow-sm">
             🌾
           </div>
           <div>
-            <h1 className={`font-black text-sm sm:text-base tracking-tight leading-none ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>
+            <h1 className={`font-black text-xs sm:text-base tracking-tight leading-none ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>
               AgriPulse AI
             </h1>
-            <p className={`text-[9px] sm:text-[10px] font-medium mt-0.5 hidden sm:block ${isSunlightMode ? 'text-zinc-600' : 'text-zinc-400'}`}>
+            <p className={`text-[9px] font-medium mt-0.5 hidden sm:block ${isSunlightMode ? 'text-zinc-600' : 'text-zinc-400'}`}>
               {t.brandSubtitle}
             </p>
           </div>
         </div>
 
-        {/* Action Controls - Mobile Optimized (Zero Overflow) */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Action Controls (Clean, Compact & Zero Overflow on Mobile) */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           {/* Download / Install App Button */}
           <button
             onClick={() => { sound.playClick(); onOpenInstallModal(); }}
-            className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-xs font-black border border-amber-300 shadow-sm transition-transform active:scale-95 whitespace-nowrap"
+            className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-[11px] font-black border border-amber-300 shadow-sm transition-transform active:scale-95 whitespace-nowrap"
             title="Download App"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-black">{selectedLang === 'hi' ? 'ऐप डाउनलोड' : 'Install'}</span>
+            <span className="hidden xs:inline">{selectedLang === 'hi' ? 'ऐप' : 'Install'}</span>
           </button>
 
           {/* Voice Assistant Button */}
           <button
             onClick={() => { sound.playClick(); onOpenVoiceModal(); }}
-            className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black text-xs font-black border border-emerald-300 shadow-sm transition-transform active:scale-95 whitespace-nowrap"
+            className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black text-[11px] font-black border border-emerald-300 shadow-sm transition-transform active:scale-95 whitespace-nowrap"
           >
             <Mic className="w-3.5 h-3.5 fill-black" />
-            <span className="text-[11px] font-black">{selectedLang === 'hi' ? 'बोलें' : 'Voice'}</span>
+            <span>{selectedLang === 'hi' ? 'बोलें' : 'Voice'}</span>
           </button>
 
-          {/* Compact Vernacular Language Dropdown Selector (Fits any screen width) */}
+          {/* Compact Vernacular Language Dropdown Selector */}
           <div className={`flex items-center px-1.5 py-1 rounded-xl border ${isSunlightMode ? 'bg-zinc-100 border-zinc-300 text-zinc-900' : 'bg-zinc-800 border-zinc-700 text-white'}`}>
-            <Globe className="w-3.5 h-3.5 text-emerald-400 mr-1 shrink-0" />
+            <Globe className="w-3 h-3 text-emerald-400 mr-0.5 shrink-0" />
             <select
               value={selectedLang}
               onChange={(e) => {
                 sound.playClick();
                 setSelectedLang(e.target.value);
               }}
-              className="bg-transparent border-none outline-none text-[11px] sm:text-xs font-black cursor-pointer pr-1"
+              className="bg-transparent border-none outline-none text-[10px] sm:text-xs font-black cursor-pointer pr-0.5"
             >
               {languages.map((l) => (
                 <option key={l.code} value={l.code} className="bg-zinc-900 text-white">
@@ -83,7 +83,7 @@ export default function Header({
             </select>
           </div>
 
-          {/* Hands-Free Voice Button (Mobile Compact) */}
+          {/* Hands-Free Button */}
           <button
             onClick={() => {
               sound.playClick();
@@ -98,8 +98,7 @@ export default function Header({
             }`}
             title="Hands-Free Voice Mode"
           >
-            <Hand className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden lg:inline ml-1">{t.handsFreeMode}</span>
+            <Hand className="w-3 h-3 text-emerald-400" />
           </button>
 
           {/* Sunlight Mode Toggle */}
@@ -115,7 +114,7 @@ export default function Header({
             }`}
             title="Sunlight High-Contrast Mode"
           >
-            {isSunlightMode ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5 text-amber-400" />}
+            {isSunlightMode ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3 text-amber-400" />}
           </button>
 
           {/* Offline Toggle */}
@@ -130,7 +129,7 @@ export default function Header({
             }`}
             title="Offline Mode"
           >
-            {isOffline ? <WifiOff className="w-3.5 h-3.5 text-black" /> : <Wifi className="w-3.5 h-3.5 text-emerald-400" />}
+            {isOffline ? <WifiOff className="w-3 h-3 text-black" /> : <Wifi className="w-3 h-3 text-emerald-400" />}
           </button>
         </div>
       </div>

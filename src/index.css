@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
+*, ::before, ::after {
+  box-sizing: border-box;
+}
+
 html {
+  width: 100%;
+  max-width: 100vw;
   height: auto;
   min-height: 100%;
   overflow-x: hidden;
@@ -13,6 +19,8 @@ html {
 body {
   margin: 0;
   padding: 0;
+  width: 100%;
+  max-width: 100vw;
   min-height: 100vh;
   background-color: #090a09;
   color: #ffffff;
@@ -24,6 +32,8 @@ body {
 }
 
 #root {
+  width: 100%;
+  max-width: 100vw;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -33,8 +43,8 @@ body {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -42,10 +52,6 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: #27272a;
   border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #10b981;
 }

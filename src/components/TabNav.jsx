@@ -16,7 +16,7 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
   ];
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-2 sm:px-6 lg:px-8 pt-2.5 pb-1 sticky top-[52px] sm:top-[56px] z-30 overflow-hidden">
+    <div className="w-full max-w-6xl mx-auto px-2 sm:px-6 lg:px-8 pt-2 pb-1 sticky top-[48px] sm:top-[56px] z-30 overflow-hidden">
       <nav 
         aria-label="Main Navigation"
         style={{
@@ -25,7 +25,7 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
         }}
-        className="flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl border-2 shadow-lg overflow-x-auto w-full max-w-full"
+        className="flex items-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl border-2 shadow-lg overflow-x-auto w-full max-w-full touch-pan-x"
       >
         {tabs.map((tab) => {
           const Icon = tab.icon;
