@@ -12,6 +12,7 @@ import VoiceAssistant from './components/VoiceAssistant';
 import HandsFreeVoiceBanner from './components/HandsFreeVoiceBanner';
 import BackgroundCanvas from './components/BackgroundCanvas';
 import InstallAppModal from './components/InstallAppModal';
+import LandingPage from './components/LandingPage';
 
 import { initOnDeviceAI } from './utils/onDeviceModel';
 import { initOfflineDB } from './utils/offlineStore';
@@ -25,7 +26,8 @@ export default function App() {
   const [isOffline, setIsOffline] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
-  const [isSunlightMode, setIsSunlightMode] = useState(false);
+  const [isSunlightMode, setIsSunlightMode] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isHandsFree, setIsHandsFree] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
@@ -57,6 +59,10 @@ export default function App() {
   const handleAutoNavigate = (targetTab) => {
     setActiveTab(targetTab);
   };
+
+  if (!isAuthenticated) {
+    return <LandingPage onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className={`min-h-screen flex flex-col justify-between font-sans selection:bg-emerald-500 selection:text-black transition-colors ${

@@ -108,7 +108,7 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <div className={`p-3 rounded-xl border-2 ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-950 border-zinc-800'}`}>
                 <div className="text-[10px] text-zinc-400 font-bold">{t.verify.mfgLabel}</div>
-                <div className="font-black mt-0.5 text-white">{selectedSample.mfg}</div>
+                <div className={`font-black mt-0.5 ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{selectedSample.mfg}</div>
               </div>
               <div className={`p-3 rounded-xl border-2 ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-950 border-zinc-800'}`}>
                 <div className="text-[10px] text-zinc-400 font-bold">{t.verify.mrpLabel}</div>

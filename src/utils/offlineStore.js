@@ -1,9 +1,24 @@
 // IndexedDB Storage Layer for Offline-First PWA Execution
 
 import { openDB } from 'idb';
+import CryptoJS from 'crypto-js';
 
 const DB_NAME = 'agripulse_db';
 const DB_VERSION = 1;
+const ENCRYPTION_KEY = 'agripulse-secure-key-2026';
+
+function encryptData(data) {
+  return CryptoJS.AES.encrypt(JSON.stringify(data), ENCRYPTION_KEY).toString();
+}
+
+function decryptData(ciphertext) {
+  try {
+    const bytes = CryptoJS.AES.decrypt(ciphertext, ENCRYPTION_KEY);
+    return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+  } catch (e) {
+    return null;
+  }
+}
 
 export async function initOfflineDB() {
   return openDB(DB_NAME, DB_VERSION, {
@@ -38,9 +53,9 @@ export async function saveLocalScan(scanData) {
   try {
     const db = await initOfflineDB();
     const scanRecord = {
-      ...scanData,
       timestamp: Date.now(),
       synced: false,
+      encryptedData: encryptData(scanData)
     };
     const id = await db.add('scans', scanRecord);
     
@@ -63,7 +78,13 @@ export async function saveLocalScan(scanData) {
 export async function getLocalScans() {
   try {
     const db = await initOfflineDB();
-    return await db.getAllFromIndex('scans', 'timestamp');
+    const records = await db.getAllFromIndex('scans', 'timestamp');
+    return records.map(r => {
+      // Handle legacy unencrypted records gracefully
+      if (!r.encryptedData) return r;
+      const decrypted = decryptData(r.encryptedData);
+      return { ...decrypted, id: r.id, timestamp: r.timestamp, synced: r.synced };
+    });
   } catch (err) {
     console.error('Failed to get scans from IndexedDB:', err);
     return [];

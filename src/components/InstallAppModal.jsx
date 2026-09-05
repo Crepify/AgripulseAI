@@ -68,6 +68,7 @@ export default function InstallAppModal({ isOpen, onClose, deferredPrompt, selec
             <button
               onClick={onClose}
               className="absolute top-4 right-4 p-2 rounded-xl bg-zinc-800 text-zinc-400 hover:text-white"
+              aria-label="Close dialog"
             >
               <X className="w-5 h-5" />
             </button>
@@ -91,6 +92,7 @@ export default function InstallAppModal({ isOpen, onClose, deferredPrompt, selec
                 className={`flex-1 py-1.5 rounded-lg font-bold transition-all ${
                   deviceType === 'android' ? 'bg-emerald-400 text-black shadow-sm' : 'text-zinc-400 hover:text-white'
                 }`}
+                aria-label="Android"
               >
                 🤖 Android
               </button>
@@ -99,6 +101,7 @@ export default function InstallAppModal({ isOpen, onClose, deferredPrompt, selec
                 className={`flex-1 py-1.5 rounded-lg font-bold transition-all ${
                   deviceType === 'ios' ? 'bg-emerald-400 text-black shadow-sm' : 'text-zinc-400 hover:text-white'
                 }`}
+                aria-label="iPhone"
               >
                 🍎 iPhone
               </button>
@@ -107,6 +110,7 @@ export default function InstallAppModal({ isOpen, onClose, deferredPrompt, selec
                 className={`flex-1 py-1.5 rounded-lg font-bold transition-all ${
                   deviceType === 'desktop' ? 'bg-emerald-400 text-black shadow-sm' : 'text-zinc-400 hover:text-white'
                 }`}
+                aria-label="Laptop / PC"
               >
                 💻 Laptop / PC
               </button>
