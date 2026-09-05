@@ -77,6 +77,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
             <button
               onClick={onClose}
               className="absolute top-4 right-4 p-2 rounded-xl bg-[#181c1a] text-zinc-400 hover:text-white"
+              aria-label="Close voice assistant"
             >
               <X className="w-5 h-5" />
             </button>
@@ -96,6 +97,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
                     ? 'bg-red-500 text-white animate-pulse shadow-[0_0_30px_rgba(239,68,68,0.8)] scale-105'
                     : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:scale-105'
                 }`}
+                aria-label="Toggle voice listening"
               >
                 {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8 fill-black" />}
               </button>

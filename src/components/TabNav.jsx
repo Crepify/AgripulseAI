@@ -19,6 +19,7 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-6 lg:px-8 pt-2 pb-1 sticky top-[48px] sm:top-[56px] z-30 overflow-hidden">
       <nav 
         aria-label="Main Navigation"
+        role="tablist"
         style={{
           backgroundColor: isSunlightMode ? '#f3f4f6' : '#111827',
           borderColor: isSunlightMode ? '#d1d5db' : '#374151',
@@ -33,6 +34,9 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
           return (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`tabpanel-${tab.id}`}
               onClick={() => {
                 sound.playClick();
                 setActiveTab(tab.id);

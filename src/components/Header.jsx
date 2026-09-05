@@ -23,6 +23,16 @@ export default function Header({
     { code: 'ta', label: 'தமிழ்' },
     { code: 'te', label: 'తెలుగు' },
     { code: 'kn', label: 'ಕನ್ನಡ' },
+    { code: 'mr', label: 'मराठी' },
+    { code: 'pa', label: 'ਪੰਜਾਬੀ' },
+    { code: 'bn', label: 'বাংলা' },
+    { code: 'gu', label: 'ગુજરાતી' },
+    { code: 'or', label: 'ଓଡ଼ିଆ' },
+    { code: 'ml', label: 'മലയാളം' },
+    { code: 'as', label: 'অসমীয়া' },
+    { code: 'mai', label: 'मैथिली' },
+    { code: 'sat', label: 'ᱥᱟᱱᱛᱟᱲᱤ' },
+    { code: 'ks', label: 'کأشُر' },
   ];
 
   return (
@@ -50,6 +60,7 @@ export default function Header({
             onClick={() => { sound.playClick(); onOpenInstallModal(); }}
             className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-[11px] font-black border border-amber-300 shadow-sm transition-transform active:scale-95 whitespace-nowrap"
             title="Download App"
+            aria-label="Download App"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden xs:inline">{selectedLang === 'hi' ? 'ऐप' : 'Install'}</span>
@@ -59,6 +70,7 @@ export default function Header({
           <button
             onClick={() => { sound.playClick(); onOpenVoiceModal(); }}
             className="flex items-center gap-1 px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-black text-[11px] font-black border border-emerald-300 shadow-sm transition-transform active:scale-95 whitespace-nowrap"
+            aria-label="Voice Assistant"
           >
             <Mic className="w-3.5 h-3.5 fill-black" />
             <span>{selectedLang === 'hi' ? 'बोलें' : 'Voice'}</span>
@@ -68,6 +80,7 @@ export default function Header({
           <div className={`flex items-center px-1.5 py-1 rounded-xl border ${isSunlightMode ? 'bg-zinc-100 border-zinc-300 text-zinc-900' : 'bg-zinc-800 border-zinc-700 text-white'}`}>
             <Globe className="w-3 h-3 text-emerald-400 mr-0.5 shrink-0" />
             <select
+              aria-label="Select Language"
               value={selectedLang}
               onChange={(e) => {
                 sound.playClick();
@@ -97,6 +110,7 @@ export default function Header({
                   : 'bg-zinc-800 text-zinc-200 border-zinc-700'
             }`}
             title="Hands-Free Voice Mode"
+            aria-label="Hands-Free Voice Mode"
           >
             <Hand className="w-3 h-3 text-emerald-400" />
           </button>
@@ -113,6 +127,7 @@ export default function Header({
                 : 'bg-zinc-800 text-white border-zinc-700'
             }`}
             title="Sunlight High-Contrast Mode"
+            aria-label="Sunlight High-Contrast Mode"
           >
             {isSunlightMode ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3 text-amber-400" />}
           </button>
@@ -128,6 +143,7 @@ export default function Header({
                   : 'bg-zinc-800 text-zinc-300 border-zinc-700'
             }`}
             title="Offline Mode"
+            aria-label="Offline Mode"
           >
             {isOffline ? <WifiOff className="w-3 h-3 text-black" /> : <Wifi className="w-3 h-3 text-emerald-400" />}
           </button>
