@@ -2,6 +2,27 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
+import fs from 'node:fs'
+import path from 'node:path'
+
+// Stamp the service worker with a per-build id so every deploy installs a fresh app-shell cache
+// (the model cache is versioned separately inside sw.js and survives deploys).
+function swBuildId() {
+  let outDir = 'dist'
+  return {
+    name: 'agripulse-sw-build-id',
+    apply: 'build',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir)
+    },
+    closeBundle() {
+      const file = path.join(outDir, 'sw.js')
+      if (!fs.existsSync(file)) return
+      const id = (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 8) || Date.now().toString(36)
+      fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/__BUILD_ID__/g, id))
+    },
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -18,6 +39,7 @@ export default defineConfig({
         { src: 'node_modules/@ultralytics/yolo/pkg/ultralytics_inference_web_bg.wasm', dest: 'yolo' },
       ],
     }),
+    swBuildId(),
   ],
   optimizeDeps: {
     // Keep the wasm-backed package out of the dev pre-bundler (it 404s the .wasm otherwise).

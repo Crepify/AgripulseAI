@@ -28,6 +28,30 @@ function setStatus(patch) {
   listeners.forEach((cb) => cb({ ...status }));
 }
 
+const MODEL_CACHE = 'agripulse-models-v1'; // must match public/sw.js
+
+// Make sure every model/runtime file this page actually loaded is in the offline cache.
+// On a first visit some requests happen before the service worker controls the page; cache.add()
+// re-requests them with a conditional GET, which the browser's HTTP cache answers without re-downloading.
+async function ensureOfflineCache() {
+  if (typeof caches === 'undefined' || navigator.connection?.saveData) return;
+  try {
+    const cache = await caches.open(MODEL_CACHE);
+    const paths = new Set(
+      performance.getEntriesByType('resource')
+        .map((e) => e.name)
+        .filter((u) => u.startsWith(location.origin))
+        .map((u) => new URL(u).pathname)
+        .filter((p) => /^\/(models|litert|yolo)\//.test(p)),
+    );
+    for (const p of paths) {
+      if (!(await cache.match(p, { ignoreVary: true }))) await cache.add(p);
+    }
+  } catch (err) {
+    console.warn('Offline cache top-up skipped:', err);
+  }
+}
+
 // Load (or warm) the on-device model. First call downloads ~37 MB once; the browser + service worker cache it.
 export async function initOnDeviceAI() {
   if (status.state === 'ready') return true;
@@ -35,6 +59,7 @@ export async function initOnDeviceAI() {
   try {
     const model = await loadDetector();
     setStatus({ state: 'ready', device: model.device });
+    setTimeout(ensureOfflineCache, 2000);
     return true;
   } catch (err) {
     console.error('AgriPulse on-device model failed to load:', err);
