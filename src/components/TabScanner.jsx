@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, Volume2, VideoOff, Leaf, Calculator, Check, Sparkles } from 'lucide-react';
 import { CROPS } from '../data/agriData';
-import { analyzeLeafOnDevice } from '../utils/onDeviceModel';
+import { analyzeLeafOnDevice, initOnDeviceAI, subscribeModelStatus, clearOverlay } from '../utils/onDeviceModel';
 import { speechEngine } from '../utils/speech';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
@@ -17,10 +17,18 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   const [sprayerSize, setSprayerSize] = useState('15L');
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [mixingAcres, setMixingAcres] = useState(2);
+  const [modelStatus, setModelStatus] = useState({ state: 'idle' });
+  const [lastScan, setLastScan] = useState(null);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Warm the on-device model as soon as the scanner opens (one-time ~37 MB download, cached afterwards).
+  useEffect(() => {
+    initOnDeviceAI();
+    return subscribeModelStatus(setModelStatus);
+  }, []);
 
   const startCamera = async () => {
     sound.playClick();
@@ -81,32 +89,46 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
     const img = new Image();
     img.src = imgSrc;
     img.onload = async () => {
-      setTimeout(async () => {
-        const res = await analyzeLeafOnDevice(img, canvasRef.current);
+      const started = performance.now();
+      // Real on-device inference (YOLO26s via LiteRT.js); boxes are drawn on the overlay canvas.
+      const res = await analyzeLeafOnDevice(img, canvasRef.current);
+      // keep the scan animation visible for at least 700 ms
+      const remaining = Math.max(0, 700 - (performance.now() - started));
+      setTimeout(() => {
         setSelectedCrop(res.matchedCrop);
+        setLastScan({ backend: res.backend, latencyMs: res.latencyMs, count: res.detections.length });
         setIsAnalyzing(false);
         sound.playSuccess();
-      }, 1200);
+      }, remaining);
     };
   };
 
-  const handleSelectCrop = async (crop) => {
+  // Sample scans show the curated demo advisory (no inference on stock photos).
+  const handleSelectCrop = (crop) => {
     sound.playClick();
     setCustomImage(null);
     stopCamera();
     setIsAnalyzing(true);
+    clearOverlay(canvasRef.current);
+    setLastScan(null);
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = crop.image;
-    img.onload = async () => {
-      setTimeout(async () => {
-        const res = await analyzeLeafOnDevice(img, canvasRef.current);
-        setSelectedCrop(crop);
-        setIsAnalyzing(false);
-        sound.playSuccess();
-      }, 1000);
-    };
+    setTimeout(() => {
+      setSelectedCrop(crop);
+      setIsAnalyzing(false);
+      sound.playSuccess();
+    }, 800);
+  };
+
+  const modelStatusText = () => {
+    if (lastScan) {
+      return `Analysed ${lastScan.backend === 'cloud' ? 'online (cloud fallback)' : 'on device'} in ${lastScan.latencyMs} ms · ${lastScan.count} region${lastScan.count === 1 ? '' : 's'} found`;
+    }
+    if (modelStatus.state === 'ready') {
+      return `On-device AI ready · ${modelStatus.device === 'webgpu' ? 'GPU' : 'CPU'} · works offline`;
+    }
+    if (modelStatus.state === 'loading') return 'Preparing on-device AI model (one-time download, ~37 MB)…';
+    if (modelStatus.state === 'error') return 'On-device AI not supported in this browser · online analysis will be used';
+    return '';
   };
 
   const playVoicePrescription = () => {
@@ -227,6 +249,22 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
               <span>{t.scanner.uploadPhoto}</span>
             </button>
           </div>
+
+          {/* On-device model status */}
+          {modelStatusText() && (
+            <p
+              data-testid="model-status"
+              className={`text-[10px] font-semibold text-center tracking-wide ${isSunlightMode ? 'text-zinc-600' : 'text-zinc-500'}`}
+            >
+              {modelStatus.state === 'loading' && !lastScan && (
+                <span className="inline-block w-1.5 h-1.5 mr-1.5 rounded-full bg-amber-400 animate-pulse align-middle" />
+              )}
+              {modelStatus.state === 'ready' && (
+                <span className="inline-block w-1.5 h-1.5 mr-1.5 rounded-full bg-emerald-400 align-middle" />
+              )}
+              {modelStatusText()}
+            </p>
+          )}
         </div>
 
         {/* Right: Diagnosis & Dosage */}

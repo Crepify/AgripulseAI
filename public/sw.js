@@ -1,11 +1,15 @@
 // AgriPulse AI Service Worker for 100% Offline-First Execution
 
-const CACHE_NAME = 'agripulse-cache-v1';
+const CACHE_NAME = 'agripulse-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
 ];
+
+// Immutable, large files (on-device AI model + wasm runtime): cache-first, never re-downloaded
+// in the background. Bump CACHE_NAME when the model file changes.
+const CACHE_FIRST_PREFIXES = ['/models/', '/litert/', '/yolo/'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -32,35 +36,48 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Never cache API calls (cloud fallback) or non-GET requests.
+  if (request.method !== 'GET' || url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  const isCacheFirst = url.origin === self.location.origin &&
+    CACHE_FIRST_PREFIXES.some((p) => url.pathname.startsWith(p));
+
   // Stale-while-revalidate or cache-first for offline resilience
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch in background to update cache
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, networkResponse);
-            });
-          }
-        }).catch(() => {
-          // Offline, cachedResponse already returned
-        });
+        if (!isCacheFirst) {
+          // Fetch in background to update cache
+          fetch(request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, networkResponse);
+              });
+            }
+          }).catch(() => {
+            // Offline, cachedResponse already returned
+          });
+        }
         return cachedResponse;
       }
 
-      return fetch(event.request).then((networkResponse) => {
+      return fetch(request).then((networkResponse) => {
         if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
           return networkResponse;
         }
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
+          cache.put(request, responseToCache);
         });
         return networkResponse;
       }).catch(() => {
         // Fallback for offline navigation
-        if (event.request.mode === 'navigate') {
+        if (request.mode === 'navigate') {
           return caches.match('/index.html');
         }
       });

@@ -5,7 +5,7 @@
 
 [![NexHack 2026](https://img.shields.io/badge/NexHack-2026-10B981?style=for-the-badge&logo=target)](https://github.com)
 [![PWA Ready](https://img.shields.io/badge/PWA-100%25%20Offline-059669?style=for-the-badge&logo=pwa)](https://github.com)
-[![TensorFlow.js](https://img.shields.io/badge/AI-On--Device%20WebGL-F59E0B?style=for-the-badge&logo=tensorflow)](https://tensorflow.org)
+[![YOLO26 on-device](https://img.shields.io/badge/AI-YOLO26%20On--Device%20WebGPU-F59E0B?style=for-the-badge)](https://docs.ultralytics.com/integrations/litert/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 <br />
@@ -48,7 +48,7 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 │                              AGRIPULSE AI WORKFLOW                                     │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │  1. 📷 Real-Time Leaf Scan ──▶ 2. 🧠 On-Device AI Vision ──▶ 3. 🧴 Bottle-Cap Dosage    │
-│     (Camera / Upload)             (TensorFlow.js <40ms)          ("Mix 2 Bottle Caps") │
+│     (Camera / Upload)             (YOLO26 · LiteRT WebGPU)          ("Mix 2 Bottle Caps") │
 │                                                                        │               │
 │  4. 🛰️ 72h Spore Radar    ◀── 5. 🎙️ Vernacular Voice AI   ◀───────────┘               │
 │     (Pre-Symptom Warning)         (Hindi/Tamil/Telugu TTS)                             │
@@ -63,8 +63,9 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 ## ✨ Key Features & Innovations
 
 ### 1. 🌿 On-Device Neural Leaf Scanner
-- **Zero-Latency Inference:** Runs `@tensorflow/tfjs` directly on the phone's WebGL graphics chip in **<40ms** with **0 data bytes**.
-- **Visual Lesion HUD:** Dynamically draws bounding boxes around infected leaf tissue.
+- **Real YOLO26 detector, 52 crop-disease classes:** our own trained `yolo26s` model (`public/models/agripulse.tflite`, LiteRT export) runs **inside the browser** with `@ultralytics/yolo` + LiteRT.js on **WebGPU** (automatic CPU/wasm fallback) — **0 data bytes** per scan after the one-time ~37 MB model download, which the service worker caches for offline use.
+- **Visual Lesion HUD:** Draws the detector's real bounding boxes + confidence around infected leaf tissue; low-confidence results are shown as "Possible: …".
+- **Cloud safety net:** if a browser cannot run the model, the scan falls back to `/api/predict` (Ultralytics Platform inference proxy) when online — see `.env.example` for the server-side variables.
 - **Hardware Integration:** Native camera capture using HTML5 `navigator.mediaDevices.getUserMedia`.
 
 ### 2. 🧴 Smart Low-Tech Dosage Translator
@@ -100,7 +101,7 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
 | **Frontend UI** | React 19, Vite, Tailwind CSS | Ultra-lightweight, responsive client |
-| **On-Device AI** | TensorFlow.js (WebGL / CPU) | In-browser leaf pathology classification |
+| **On-Device AI** | YOLO26s → LiteRT (`@ultralytics/yolo`, LiteRT.js WebGPU / wasm) | In-browser crop-disease detection (52 classes, boxes + confidence) |
 | **Speech Engine** | Web Speech Recognition & SpeechSynthesis | Vernacular voice input and audio readout |
 | **Offline Storage** | IndexedDB (`idb`) | Local storage of scans, history & sync queue |
 | **PWA Layer** | Service Worker (`sw.js`) & Manifest | Offline caching & "Add to Home Screen" |
@@ -162,7 +163,7 @@ Open `http://localhost:5173` in your browser.
 <details>
 <summary><strong>Q: Is the on-device AI real or just mock images?</strong></summary>
 <p>
-The on-device AI uses genuine TensorFlow.js WebGL execution. It samples camera/image pixel tensors, computes color-space heuristics (necrosis/chlorosis clustering), and renders dynamic canvas bounding box overlays in under 40ms with zero network bytes.
+Yes — it is a real object-detection model. The scanner runs our trained YOLO26s detector (52 PlantVillage / cassava / wheat / rice / soybean classes, exported to LiteRT `.tflite`) directly in the browser through `@ultralytics/yolo` and LiteRT.js on WebGPU, with wasm/CPU fallback. Detections (class, confidence and box) are drawn on the canvas overlay and mapped to the bottle-cap dosage advisory; nothing leaves the phone. The model (~37 MB) is downloaded once and cached by the service worker, so later scans work fully offline.
 </p>
 </details>
 
