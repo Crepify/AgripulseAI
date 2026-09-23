@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wifi, WifiOff, Mic, Sun, Moon, Hand, Download, Globe } from 'lucide-react';
+import { Wifi, WifiOff, Mic, Sun, Moon, Hand, Download, Globe, LogOut } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
 
@@ -14,6 +14,8 @@ export default function Header({
   setIsSunlightMode,
   isHandsFree,
   setIsHandsFree,
+  user,
+  onLogout,
 }) {
   const t = T[selectedLang] || T['en'];
 
@@ -147,6 +149,35 @@ export default function Header({
           >
             {isOffline ? <WifiOff className="w-3 h-3 text-black" /> : <Wifi className="w-3 h-3 text-emerald-400" />}
           </button>
+
+          {/* Logged-in Farmer Chip + Logout */}
+          {user && (
+            <>
+              <div
+                className="flex items-center gap-1 px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40"
+                title={`${user.name} · +91 ${user.mobile}${user.village ? ` · ${user.village}` : ''}`}
+              >
+                <span className="w-5 h-5 rounded-full bg-emerald-500 text-black text-[10px] font-black flex items-center justify-center uppercase">
+                  {(user.name || 'K')[0]}
+                </span>
+                <span className={`hidden md:inline text-[11px] font-black max-w-[72px] truncate ${isSunlightMode ? 'text-zinc-800' : 'text-zinc-200'}`}>
+                  {(user.name || '').split(' ')[0]}
+                </span>
+              </div>
+              <button
+                onClick={onLogout}
+                className={`p-1.5 sm:px-2 sm:py-1.5 rounded-xl text-xs font-black border transition-all ${
+                  isSunlightMode
+                    ? 'bg-red-50 text-red-600 border-red-300 hover:bg-red-100'
+                    : 'bg-red-950/40 text-red-400 border-red-900 hover:bg-red-950/70'
+                }`}
+                title={selectedLang === 'hi' ? 'लॉगआउट' : 'Logout'}
+                aria-label="Logout"
+              >
+                <LogOut className="w-3 h-3" />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>

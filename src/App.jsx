@@ -16,6 +16,7 @@ import LandingPage from './components/LandingPage';
 
 import { initOnDeviceAI } from './utils/onDeviceModel';
 import { initOfflineDB } from './utils/offlineStore';
+import { getSession, clearSession } from './utils/authService';
 import { sound } from './utils/audio';
 import { T } from './data/translations';
 import { WifiOff, Mic, Download } from 'lucide-react';
@@ -27,7 +28,8 @@ export default function App() {
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isSunlightMode, setIsSunlightMode] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Real persistent session — restored from localStorage (30-day validity)
+  const [user, setUser] = useState(() => getSession());
   const [isHandsFree, setIsHandsFree] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
@@ -60,8 +62,21 @@ export default function App() {
     setActiveTab(targetTab);
   };
 
-  if (!isAuthenticated) {
-    return <LandingPage onLoginSuccess={() => setIsAuthenticated(true)} />;
+  const handleLogout = () => {
+    sound.playClick();
+    clearSession();
+    setUser(null);
+    setActiveTab('scan');
+  };
+
+  if (!user) {
+    return (
+      <LandingPage
+        onLoginSuccess={(session) => setUser(session)}
+        selectedLang={selectedLang}
+        setSelectedLang={setSelectedLang}
+      />
+    );
   }
 
   return (
@@ -94,6 +109,8 @@ export default function App() {
         setIsSunlightMode={setIsSunlightMode}
         isHandsFree={isHandsFree}
         setIsHandsFree={setIsHandsFree}
+        user={user}
+        onLogout={handleLogout}
       />
 
       {/* Wet-Hands / Hands-Free Voice Navigation Active Banner */}
