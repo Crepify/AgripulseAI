@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { Scan, ShieldCheck, Mic, Leaf, ArrowRight } from 'lucide-react';
-import MockAuthFlow from './MockAuthFlow';
+import LoginPage from './LoginPage';
 
-export default function LandingPage({ onLoginSuccess }) {
+export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedLang }) {
   const [showAuth, setShowAuth] = useState(false);
 
   if (showAuth) {
-    return <MockAuthFlow onSuccess={onLoginSuccess} onCancel={() => setShowAuth(false)} />;
+    return (
+      <LoginPage
+        onSuccess={onLoginSuccess}
+        onCancel={() => setShowAuth(false)}
+        selectedLang={selectedLang}
+        setSelectedLang={setSelectedLang}
+      />
+    );
   }
 
   return (
@@ -22,7 +29,7 @@ export default function LandingPage({ onLoginSuccess }) {
           onClick={() => setShowAuth(true)}
           className="px-4 py-2 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition-colors"
         >
-          Login
+          {selectedLang === 'hi' ? 'लॉगिन' : 'Login'}
         </button>
       </header>
 

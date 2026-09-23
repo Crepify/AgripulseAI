@@ -104,7 +104,19 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 | **Speech Engine** | Web Speech Recognition & SpeechSynthesis | Vernacular voice input and audio readout |
 | **Offline Storage** | IndexedDB (`idb`) | Local storage of scans, history & sync queue |
 | **PWA Layer** | Service Worker (`sw.js`) & Manifest | Offline caching & "Add to Home Screen" |
+| **Mandi Prices** | [mandi-api.vercel.app](https://mandi-api.vercel.app/) (keyless) | Live daily APMC rates from data.gov.in — MH, UP, PB, MP, KA (30-min cached) |
+| **Weather (IMD)** | [indianapi.in Weather API](https://indianapi.in/weather-api) | Live IMD observations + 7-day forecast (needs free `VITE_WEATHER_API_KEY`) |
 | **Icons & Motion** | Lucide React, Framer Motion, Canvas Confetti | Minimalist animations & visual feedback |
+
+### 🔐 Farmer Login (Device-Local, Offline-First)
+- **Indian mobile + OTP login**: 10-digit number validation, on-device 6-digit OTP with 5-minute expiry, 30-second resend cooldown, and max-attempt lockout — OTP is delivered via a simulated SMS push notification in the UI (no SMS backend required).
+- **New-farmer registration** (name, village/taluk, state) with a persistent **30-day session** in `localStorage` — logout anytime from the header chip.
+
+### 🔑 Environment Variables (copy `.env.example` → `.env`)
+```bash
+VITE_WEATHER_API_KEY=            # free key from https://indianapi.in/sign-in  (Radar tab live IMD data)
+VITE_MANDI_API_BASE=https://mandi-api.onrender.com/v1   # keyless — works out of the box
+```
 
 ---
 
