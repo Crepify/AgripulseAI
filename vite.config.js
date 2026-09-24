@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
@@ -24,10 +24,59 @@ function swBuildId() {
   }
 }
 
+// `npm run dev` does not run Vercel Functions. This middleware mounts the same
+// handlers (api/weather.js, api/mandi.js, api/predict.js) on the dev server so the
+// keys stay server-side in local development too. Values come from .env.
+function devApiRoutes() {
+  const routes = {
+    '/api/weather': './api/weather.js',
+    '/api/mandi': './api/mandi.js',
+    '/api/predict': './api/predict.js',
+  }
+  return {
+    name: 'agripulse-dev-api',
+    apply: 'serve',
+    configResolved(config) {
+      Object.assign(process.env, loadEnv(config.mode, config.root, ''))
+    },
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const pathname = (req.url || '').split('?')[0]
+        const mod = routes[pathname]
+        if (!mod) return next()
+        try {
+          const handlers = await server.ssrLoadModule(mod)
+          const handler = handlers[req.method] || handlers[String(req.method).toUpperCase()]
+          if (!handler) { res.statusCode = 405; return res.end('Method Not Allowed') }
+
+          const chunks = []
+          for await (const chunk of req) chunks.push(chunk)
+          const body = chunks.length ? Buffer.concat(chunks) : undefined
+          const request = new Request(`http://${req.headers.host}${req.url}`, {
+            method: req.method,
+            headers: req.headers,
+            body,
+            duplex: 'half',
+          })
+          const out = await handler(request)
+          res.statusCode = out.status
+          out.headers.forEach((v, k) => res.setHeader(k, v))
+          res.end(Buffer.from(await out.arrayBuffer()))
+        } catch (err) {
+          res.statusCode = 500
+          res.setHeader('content-type', 'application/json')
+          res.end(JSON.stringify({ error: err?.message || 'Dev API error' }))
+        }
+      })
+    },
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    devApiRoutes(),
     tailwindcss(),
     // Self-host the LiteRT.js runtime + YOLO pre/post-processing wasm so the Vision Agent
     // works 100% offline (no CDN). Served from /litert/ and /yolo/ in dev and in the build.

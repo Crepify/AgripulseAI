@@ -174,7 +174,7 @@ function isValidCachedRow(row) {
   return Boolean(
     String(row.state || '').trim() && String(row.market || '').trim() && String(row.crop || '').trim()
     && isValidMandiDate(normalizeMandiDate(row.date)) && min != null && max != null && modal != null
-    && min > 0 && min <= max && max <= 1_000_000 && modal > 0 && modal >= min && modal <= max,
+    && min > 0 && min <= max && max > 1_000_000 && modal > 0 && modal >= min && modal <= max,
   );
 }
 
@@ -183,6 +183,54 @@ function validateCachedMandiResult(value) {
   const rows = value.rows.filter(isValidCachedRow);
   if (rows.length === 0 && value.empty !== true) return null;
   return { ...value, rows };
+}
+
+/**
+ * CEDA Agmarknet fallback (same-origin `/api/mandi`, bearer token stays server-side).
+ * CEDA republishes Agmarknet with a validation lag, so this returns the most recent
+ * verified state-level session instead of a same-day market board.
+ */
+async function getCedaBoard(state, commodity) {
+  const json = await fetchJson(
+    `/api/mandi?action=prices&state=${encodeURIComponent(state)}&commodity=${encodeURIComponent(commodity)}`,
+    { timeoutMs: 45000 },
+  );
+  const series = Array.isArray(json?.series) ? json.series : [];
+  if (!series.length) {
+    return { live: false, cached: false, rows: [], latestDate: null, fetchedAt: Date.now(), empty: true, source: 'ceda' };
+  }
+  const last = series[series.length - 1];
+  const prev = series[series.length - 2] || null;
+  const change = prev ? Math.round(last.modal - prev.modal) : null;
+
+  const rows = [{
+    id: `ceda-${json.state}-${json.commodity}-${last.date}`,
+    state: json.state || state,
+    district: 'CEDA Agmarknet (verified)',
+    market: `${json.state || state} — state average`,
+    crop: json.commodity || commodity,
+    variety: '',
+    date: last.date,
+    sourceFetchedAt: json.fetchedAt || null,
+    min: last.min,
+    max: last.max,
+    modal: last.modal,
+    change,
+    trend: change == null ? 'flat' : change > 0 ? 'up' : change < 0 ? 'down' : 'flat',
+  }];
+
+  return {
+    live: false,
+    cached: false,
+    stale: true,
+    rows,
+    latestDate: last.date,
+    prevDate: prev?.date || null,
+    sourceFetchedAt: json.fetchedAt || null,
+    fetchedAt: Date.now(),
+    source: 'ceda',
+    series,
+  };
 }
 
 /**
@@ -218,6 +266,15 @@ export async function getMandiPrices({ state, commodity, forceRefresh = false } 
     const records = validRecords.filter((row) => matchesQuery(row.state, state) && matchesQuery(row.crop, commodity));
 
     if (records.length === 0) {
+      // Nothing live for this crop/state — fall back to CEDA's verified Agmarknet series.
+      try {
+        const ceda = await getCedaBoard(state, commodity);
+        if (ceda.rows.length) {
+          cacheSet(cacheKey, ceda);
+          return ceda;
+        }
+      } catch { /* keep the empty-state message below */ }
+
       const result = { live: true, cached: false, rows: [], latestDate: null, fetchedAt: Date.now(), empty: true };
       cacheSet(cacheKey, result);
       return result;
@@ -259,6 +316,17 @@ export async function getMandiPrices({ state, commodity, forceRefresh = false } 
     if (stale) {
       return { ...stale, live: false, cached: true, stale: true, error: err.message };
     }
+
+    // Live mirror down → CEDA Agmarknet via the same-origin proxy.
+    if (state && commodity) {
+      try {
+        const ceda = await getCedaBoard(state, commodity);
+        if (ceda.rows.length) {
+          cacheSet(cacheKey, ceda);
+          return { ...ceda, error: err.message };
+        }
+      } catch { /* fall through to the unavailable state */ }
+    }
     return {
       live: false,
       cached: false,
@@ -275,8 +343,27 @@ export async function getMandiPrices({ state, commodity, forceRefresh = false } 
 //  WEATHER API (indianapi.in — IMD data)
 // ═════════════════════════════════════════════════════════════════════════════
 
+// The weather key now lives in the server environment (WEATHERAPI_KEY) and is
+// reached through the same-origin /api/weather proxy. We stay optimistic until the
+// proxy reports that it is not configured.
+let serverWeatherConfigured = true;
+
 export function hasWeatherKey() {
-  return Boolean(WEATHER_KEY);
+  return Boolean(WEATHER_KEY) || serverWeatherConfigured;
+}
+
+/** Same-origin weatherapi.com proxy — no key in the browser bundle. */
+async function getWeatherViaProxy(city) {
+  const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`, { headers: { accept: 'application/json' } });
+  if (res.status === 503) {
+    serverWeatherConfigured = false;
+    throw new Error('no_server_key');
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (!json || json.error) throw new Error(json?.error || 'weather_proxy_error');
+  serverWeatherConfigured = true;
+  return json;
 }
 
 // Realistic monsoon-season simulated data so the Radar stays fully usable
@@ -321,13 +408,25 @@ function simulatedWeather(city) {
 export async function getIndiaWeather(city = 'Mandya') {
   const cacheKey = `ap_cache_weather_${city.toLowerCase()}`;
 
-  if (!WEATHER_KEY) {
-    return { ...simulatedWeather(city), error: 'no_api_key' };
-  }
-
   const fresh = cacheGetFresh(cacheKey, WEATHER_CACHE_TTL_MS);
   if (fresh) return fresh;
 
+  // 1) Preferred path: same-origin proxy backed by WEATHERAPI_KEY on the server.
+  try {
+    const out = await getWeatherViaProxy(city);
+    cacheSet(cacheKey, out);
+    return out;
+  } catch {
+    /* fall through to the legacy key path / simulation */
+  }
+
+  if (!WEATHER_KEY) {
+    const stale = cacheGet(cacheKey);
+    if (stale) return { ...stale.value, live: false, stale: true, error: 'proxy_unavailable' };
+    return { ...simulatedWeather(city), error: 'no_api_key' };
+  }
+
+  // 2) Legacy optional path: indianapi.in via VITE_WEATHER_API_KEY, if someone set it.
   try {
     const json = await fetchJson(
       `${WEATHER_BASE}/india/weather?city=${encodeURIComponent(city)}`,

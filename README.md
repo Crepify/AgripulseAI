@@ -19,8 +19,8 @@
 ## 📖 Table of Contents
 - [The Grassroots Problem](#-the-grassroots-problem)
 - [The AgriPulse AI Solution](#-the-agripulse-ai-solution)
-- [Key Features & Innovations](#-key-features--innovations)
-- [System Architecture](#-system-architecture)
+- [Key Features & Innovations](#key-features--innovations)
+- [System Architecture](#system-architecture)
 - [Technology Stack (100% Free & Open Source)](#-technology-stack-100-free--open-source)
 - [Getting Started & Local Setup](#-getting-started--local-setup)
 - [PWA Mobile Installation Guide](#-pwa-mobile-installation-guide)
@@ -48,7 +48,7 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 │                              AGRIPULSE AI WORKFLOW                                     │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │  1. 📷 Real-Time Leaf Scan ──▶ 2. 🧠 Hybrid AI Vision ──▶ 3. 🧴 Bottle-Cap Dosage       │
-│     (Camera / Upload)        (YOLO26 local + cloud safety net) ("Mix 2 Bottle Caps") │
+│     (Camera / Upload)        (YOLO26 local + cloud safety net) (\"Mix 2 Bottle Caps\") │
 │                                                                        │               │
 │  4. 🛰️ 72h Spore Radar    ◀── 5. 🎙️ Vernacular Voice AI   ◀───────────┘               │
 │     (Pre-Symptom Warning)         (Hindi/Tamil/Telugu TTS)                             │
@@ -120,14 +120,18 @@ The price board requests rows from the configured `VITE_MANDI_API_BASE` (default
 
 ### 🔑 Environment Variables (copy `.env.example` → `.env`)
 ```bash
-VITE_WEATHER_API_KEY=            # free key from https://indianapi.in/sign-in (Radar tab live IMD data)
+VITE_WEATHER_API_KEY=            # optional legacy indianapi.in fallback; leave blank (weather now uses /api/weather)
 VITE_MANDI_API_BASE=https://mandi-api.onrender.com/v1   # keyless third-party API; provenance caveat above
-ULTRALYTICS_ENDPOINT_URL=https://predict-6a8fe586becceb8c53b3b178-dproatj77a-el.a.run.app
-ULTRALYTICS_API_KEY=              # server-side only; set in Vercel if required by the endpoint
+ULTRALYTICS_ENDPOINT_URL=https://platform.ultralytics.com/api/models/agrovision/agrovisionai/exp
+ULTRALYTICS_API_KEY=              # server-side only (ul_…)
+WEATHERAPI_KEY=                   # server-side only — weatherapi.com, used by /api/weather
+CEDA_API_KEY=                     # server-side only — CEDA Agmarknet, used by /api/mandi
 ALLOWED_ORIGINS=                  # optional comma-separated extra trusted origins; same-origin is allowed
 ```
 
-The scanner tries the local YOLO26 model first. If it cannot run, the browser sends the image to the same-origin `/api/predict` Vercel function, which adds the `ULTRALYTICS_API_KEY` server-side. **Never put a private key in a `VITE_*` variable**; Vite embeds those values in the browser bundle. `npm run dev` does not run Vercel functions, so use `vercel dev` to exercise the cloud fallback locally. Keep local `.env` files untracked.
+For the exact Vercel cloud-inference setup and health check, see [CLOUD_INFERENCE_SETUP.md](CLOUD_INFERENCE_SETUP.md).
+
+The scanner tries the local YOLO26 model first. If it cannot run, the browser sends the image to the same-origin `/api/predict` Vercel function, which adds the `ULTRALYTICS_API_KEY` server-side. **Never put a private key in a `VITE_*` variable**; Vite embeds those values in the browser bundle. `npm run dev` now mounts `api/*.js` as dev middleware (see `vite.config.js`), so the cloud fallback, weather and mandi routes work locally; `vercel dev` also works. Keep local `.env` files untracked.
 
 ---
 
