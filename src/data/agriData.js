@@ -203,14 +203,6 @@ export const CROPS = [
   }
 ];
 
-export const MANDI_PRICES = [
-  { crop: 'Basmati Paddy', market: 'Karnal APMC', price: 4250, change: '+₹180', trend: 'up' },
-  { crop: 'Desi Cotton', market: 'Guntur APMC', price: 7420, change: '+₹240', trend: 'up' },
-  { crop: 'Hybrid Tomato', market: 'Kolar APMC', price: 2150, change: '-₹90', trend: 'down' },
-  { crop: 'Sharbati Wheat', market: 'Sehore APMC', price: 2880, change: '+₹60', trend: 'up' },
-  { crop: 'Nashik Red Onion', market: 'Lasalgaon APMC', price: 1950, change: '+₹110', trend: 'up' },
-];
-
 export const DEALERS = [
   {
     id: 1,

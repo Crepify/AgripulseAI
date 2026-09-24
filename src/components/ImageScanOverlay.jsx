@@ -65,7 +65,7 @@ export default function ImageScanOverlay({ isScanning, text = 'Analyzing Leaf Le
         </div>
 
         <div className="flex justify-between text-[10px] font-mono text-zinc-400">
-          <span>Processing Tensor</span>
+          <span>Running AI inference</span>
           <span className="text-emerald-400 font-bold">{progress}%</span>
         </div>
       </div>

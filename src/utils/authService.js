@@ -1,14 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // AgriPulse AI — Authentication Service (Device-Local, Offline-First)
 //
-// Real working login for a frontend-only PWA:
+// Local demo login for a frontend-only PWA (not production authentication):
 //   • Indian mobile number validation (+91, 10 digits, starts 6-9)
 //   • On-device 6-digit OTP with 5-minute expiry, max 3 verify attempts,
 //     30-second resend cooldown and a per-session resend cap
 //   • OTP is "delivered" through a simulated SMS push notification in the UI
 //     (and console.log for developers) since no SMS backend exists
-//   • Farmer profiles + sessions persisted in localStorage so a farmer stays
-//     logged in across app restarts for 30 days — then must re-verify
+//   • Google demo sign-in is a local dummy profile; it never contacts Google.
+//   • Farmer profiles + demo sessions are persisted in localStorage for 30 days.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const USERS_KEY = 'ap_users_v1';
@@ -164,7 +164,9 @@ export function verifyOtp(mobile, code) {
 export function saveSession(user) {
   const session = {
     name: user.name,
-    mobile: user.mobile,
+    mobile: user.mobile || '',
+    email: user.email || '',
+    authProvider: user.authProvider || 'phone-demo',
     village: user.village || '',
     state: user.state || 'Karnataka',
     loginAt: Date.now(),

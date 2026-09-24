@@ -155,7 +155,9 @@ export default function Header({
             <>
               <div
                 className="flex items-center gap-1 px-1.5 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40"
-                title={`${user.name} · +91 ${user.mobile}${user.village ? ` · ${user.village}` : ''}`}
+                title={user.email
+                  ? `${user.name} · ${user.email}${user.authProvider?.endsWith('-demo') ? ' · DEMO' : ''}${user.village ? ` · ${user.village}` : ''}`
+                  : `${user.name} · +91 ${user.mobile}${user.authProvider?.endsWith('-demo') ? ' · DEMO' : ''}${user.village ? ` · ${user.village}` : ''}`}
               >
                 <span className="w-5 h-5 rounded-full bg-emerald-500 text-black text-[10px] font-black flex items-center justify-center uppercase">
                   {(user.name || 'K')[0]}
@@ -163,6 +165,11 @@ export default function Header({
                 <span className={`hidden md:inline text-[11px] font-black max-w-[72px] truncate ${isSunlightMode ? 'text-zinc-800' : 'text-zinc-200'}`}>
                   {(user.name || '').split(' ')[0]}
                 </span>
+                {user.authProvider?.endsWith('-demo') && (
+                  <span className={`hidden sm:inline px-1 py-0.5 rounded text-[8px] font-black ${isSunlightMode ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400'}`}>
+                    DEMO
+                  </span>
+                )}
               </div>
               <button
                 onClick={onLogout}

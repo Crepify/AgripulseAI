@@ -14,8 +14,8 @@
  *   ULTRALYTICS_ENDPOINT_URL   one of the two URLs above (defaults to A)
  *   ULTRALYTICS_API_KEY        ul_xxxxxxxx   (Platform → Settings → API Keys). Optional for A while the
  *                              model is Public, but strongly recommended: anonymous calls share a per-IP quota.
- *   ALLOWED_ORIGINS            https://agripulse-ai-ten.vercel.app,http://localhost:5173   (comma-separated;
- *                              leave EMPTY during preview deploys, whose URLs change per branch)
+ *   ALLOWED_ORIGINS            optional comma-separated EXTRA origins (same-deployment-origin requests are
+ *                              always permitted; leave empty for standard same-origin deployments/previews)
  *
  * Node.js runtime, Web-standard signature. Request body limit is 4.5 MB — cloud-detector.js
  * downscales photos to ≤1024 px JPEG before upload.
@@ -28,10 +28,14 @@ const ALLOWED = (process.env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim
 const UPSTREAM_TIMEOUT_MS = 25_000;
 
 export async function POST(request) {
-  // basic abuse guard: only accept calls from your own site(s) when configured
+  // Same-origin is the default. Optionally allow additional trusted origins for embedded clients.
   const origin = request.headers.get("origin") ?? "";
-  if (ALLOWED.length && !ALLOWED.includes(origin)) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (origin) {
+    let requestOrigin = "";
+    try { requestOrigin = new URL(request.url).origin; } catch { /* handled by the deny below */ }
+    if (origin !== requestOrigin && !ALLOWED.includes(origin)) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   let form;

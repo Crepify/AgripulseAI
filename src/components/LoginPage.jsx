@@ -21,9 +21,12 @@ const INDIAN_STATES = [
 // Bilingual strings (en + hi) — login happens before the in-app language switch
 const L = {
   en: {
-    tagline: 'Secure Farmer Login',
-    phoneTitle: 'Enter your mobile number',
-    phoneSub: 'We will send a 6-digit OTP to verify you. No password needed.',
+    tagline: 'Demo Farmer Login',
+    phoneTitle: 'Choose a sign-in method',
+    phoneSub: 'Google and mobile OTP are demo-only in this prototype; no external account or SMS service is used.',
+    googleDemo: 'Continue with Google (Demo)',
+    googleDemoNote: 'Demo only — no Google account is contacted.',
+    orMobile: 'or continue with mobile number',
     phoneLabel: 'Mobile Number',
     phonePlaceholder: '98765 43210',
     phoneHint: '10-digit Indian mobile number',
@@ -56,14 +59,19 @@ const L = {
     changeNumber: '← Change number',
     welcomeBack: 'Welcome back!',
     welcomeNew: 'Account created!',
-    verified: 'Mobile Verified ✓',
+    demoWelcome: 'Demo login ready!',
+    demoStatus: 'Local demo profile · not verified',
+    verified: 'Demo OTP accepted · not verified by a carrier',
     loading: 'Please wait…',
     secNote: 'Your data never leaves this device — login works fully offline.',
   },
   hi: {
-    tagline: 'सुरक्षित किसान लॉगिन',
-    phoneTitle: 'अपना मोबाइल नंबर डालें',
-    phoneSub: 'हम आपके नंबर पर 6 अंकों का OTP भेजेंगे। पासवर्ड की जरूरत नहीं।',
+    tagline: 'डेमो किसान लॉगिन',
+    phoneTitle: 'लॉगिन का तरीका चुनें',
+    phoneSub: 'इस प्रोटोटाइप में Google और मोबाइल OTP दोनों डेमो हैं; कोई बाहरी खाता या SMS सेवा उपयोग नहीं होती।',
+    googleDemo: 'Google से जारी रखें (डेमो)',
+    googleDemoNote: 'सिर्फ डेमो — कोई Google खाता उपयोग नहीं होगा।',
+    orMobile: 'या मोबाइल नंबर से जारी रखें',
     phoneLabel: 'मोबाइल नंबर',
     phonePlaceholder: '98765 43210',
     phoneHint: '10 अंकों का भारतीय मोबाइल नंबर',
@@ -96,7 +104,9 @@ const L = {
     changeNumber: '← नंबर बदलें',
     welcomeBack: 'फिर से स्वागत है!',
     welcomeNew: 'खाता बन गया!',
-    verified: 'मोबाइल सत्यापित ✓',
+    demoWelcome: 'डेमो लॉगिन तैयार है!',
+    demoStatus: 'स्थानीय डेमो प्रोफाइल · सत्यापित नहीं',
+    verified: 'डेमो OTP स्वीकार · मोबाइल नेटवर्क से सत्यापित नहीं',
     loading: 'कृपया प्रतीक्षा करें…',
     secNote: 'आपका डेटा इसी डिवाइस पर रहता है — लॉगिन पूरी तरह ऑफलाइन चलता है।',
   },
@@ -119,6 +129,8 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [attemptsLeft, setAttemptsLeft] = useState(3);
   const [resendLocked, setResendLocked] = useState(false);
   const [welcomeName, setWelcomeName] = useState('');
+  const [welcomeEmail, setWelcomeEmail] = useState('');
+  const [isDemoLogin, setIsDemoLogin] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
 
   const otpRefs = useRef([]);
@@ -152,8 +164,37 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     return true;
   };
 
+  const handleGoogleDemoLogin = () => {
+    sound.playClick();
+    setError('');
+    setBusy(true);
+    setIsDemoLogin(true);
+
+    // Deliberately local demo identity: this does not contact Google or verify an account.
+    setTimeout(() => {
+      const demoProfile = {
+        name: 'Demo Farmer',
+        email: 'farmer.demo@example.com',
+        mobile: '',
+        village: 'Demo Farm',
+        state: 'Karnataka',
+        authProvider: 'google-demo',
+      };
+      const session = saveSession(demoProfile);
+      setWelcomeName(demoProfile.name);
+      setWelcomeEmail(demoProfile.email);
+      setIsReturning(false);
+      setBusy(false);
+      setStep('success');
+      sound.playSuccess();
+      setTimeout(() => onSuccess(session), 1200);
+    }, 450);
+  };
+
   const handlePhoneSubmit = () => {
     sound.playClick();
+    setIsDemoLogin(false);
+    setWelcomeEmail('');
     const mobile = normalizeMobile(phone);
     if (!isValidIndianMobile(mobile)) {
       setError(l.invalidPhone);
@@ -254,7 +295,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const maskedPhone = `+91 ${normalizeMobile(phone).slice(0, 2)}•••••${normalizeMobile(phone).slice(7)}`;
 
   return (
-    <div className="min-h-screen bg-[#f4f7f5] flex items-center justify-center p-4 relative">
+    <div className="auth-page min-h-screen w-full bg-[#f4f7f5] text-zinc-900 flex items-center justify-center p-3 sm:p-4 relative overflow-x-hidden">
       {/* Simulated SMS push notification (demo delivery channel) */}
       <AnimatePresence>
         {showSms && smsOtp && (
@@ -281,7 +322,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
         )}
       </AnimatePresence>
 
-      <div className="max-w-sm w-full bg-white rounded-3xl shadow-lg border border-zinc-200 overflow-hidden relative">
+      <div className="w-full max-w-sm min-w-0 bg-white text-zinc-900 rounded-3xl shadow-lg border border-zinc-200 overflow-hidden relative">
         {/* Back / cancel */}
         <button
           onClick={() => {
@@ -290,7 +331,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
             else if (step === 'register') { setStep('phone'); setError(''); }
             else onCancel();
           }}
-          className="absolute top-4 left-4 p-2 text-zinc-400 hover:text-zinc-600 rounded-full hover:bg-zinc-100 z-10"
+          className="absolute top-4 left-4 p-2 text-zinc-500 hover:text-zinc-600 rounded-full hover:bg-zinc-100 z-10"
           aria-label="Back"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -311,7 +352,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
           </div>
         )}
 
-        <div className="p-8 pt-14 flex flex-col items-center text-center">
+        <div className="min-w-0 px-5 py-8 pt-14 sm:px-8 flex flex-col items-center text-center">
           {/* ── STEP: phone ─────────────────────────────── */}
           {step === 'phone' && (
             <>
@@ -320,28 +361,46 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               </div>
               <div className="text-[10px] font-black tracking-[0.2em] text-emerald-600 uppercase mb-1">{l.tagline}</div>
               <h2 className="text-2xl font-black text-zinc-900 mb-2">{l.phoneTitle}</h2>
-              <p className="text-sm text-zinc-500 mb-7">{l.phoneSub}</p>
+              <p className="text-sm text-zinc-500 mb-5">{l.phoneSub}</p>
+
+              <button
+                type="button"
+                onClick={handleGoogleDemoLogin}
+                disabled={busy}
+                className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
+              >
+                <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
+                <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
+              </button>
+              <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleDemoNote}</p>
+
+              <div className="w-full flex items-center gap-3 my-5" aria-hidden="true">
+                <span className="h-px flex-1 bg-zinc-200" />
+                <span className="text-[10px] font-bold text-zinc-500">{l.orMobile}</span>
+                <span className="h-px flex-1 bg-zinc-200" />
+              </div>
 
               <div className="w-full text-left mb-1.5">
                 <label className="text-xs font-black text-zinc-700">{l.phoneLabel}</label>
               </div>
-              <div className="w-full flex items-center gap-2 mb-1">
-                <div className="flex items-center gap-1.5 px-3 py-3 rounded-xl bg-zinc-100 border-2 border-zinc-200 font-black text-zinc-700 text-sm">
+              <div className="phone-number-row w-full min-w-0 items-center mb-1">
+                <div className="flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap px-2.5 sm:px-3 py-3 rounded-xl bg-zinc-100 border-2 border-zinc-200 font-black text-zinc-700 text-sm">
                   <span>🇮🇳</span> +91
                 </div>
                 <input
                   type="tel"
                   inputMode="numeric"
+                  autoComplete="tel-national"
                   maxLength={10}
                   value={phone}
                   autoFocus
                   onChange={(e) => { setPhone(e.target.value.replace(/\D/g, '').slice(0, 10)); setError(''); }}
                   onKeyDown={(e) => e.key === 'Enter' && handlePhoneSubmit()}
                   placeholder={l.phonePlaceholder}
-                  className="flex-1 px-4 py-3 text-lg font-black tracking-[0.18em] border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                  className="phone-number-input block box-border w-full min-w-0 max-w-full bg-white text-zinc-900 placeholder:text-zinc-400 px-2.5 sm:px-4 py-3 text-base sm:text-lg font-black tracking-[0.12em] sm:tracking-[0.18em] border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none"
                 />
               </div>
-              <div className="w-full text-left text-[11px] text-zinc-400 mb-4">{l.phoneHint} · {phone.length}/10</div>
+              <div className="w-full text-left text-[11px] text-zinc-500 mb-4">{l.phoneHint} · {phone.length}/10</div>
 
               {error && (
                 <div className="w-full flex items-center gap-2 p-2.5 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
@@ -356,7 +415,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               >
                 {busy ? l.loading : l.sendOtp}
               </button>
-              <p className="text-[11px] text-zinc-400 mt-4">{l.newHere}</p>
+              <p className="text-[11px] text-zinc-500 mt-4">{l.newHere}</p>
             </>
           )}
 
@@ -379,7 +438,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                     maxLength={40}
                     onChange={(e) => { setName(e.target.value); setError(''); }}
                     placeholder={l.namePlaceholder}
-                    className="mt-1 w-full px-4 py-3 text-sm font-bold border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                    className="box-border mt-1 w-full min-w-0 bg-white text-zinc-900 placeholder:text-zinc-400 px-4 py-3 text-sm font-bold border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -390,7 +449,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                     maxLength={50}
                     onChange={(e) => setVillage(e.target.value)}
                     placeholder={l.villagePlaceholder}
-                    className="mt-1 w-full px-4 py-3 text-sm font-bold border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                    className="box-border mt-1 w-full min-w-0 bg-white text-zinc-900 placeholder:text-zinc-400 px-4 py-3 text-sm font-bold border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -429,9 +488,9 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               </div>
               <h2 className="text-2xl font-black text-zinc-900 mb-1">{l.otpTitle}</h2>
               <p className="text-sm text-zinc-500">{l.otpSub} <strong className="text-zinc-800 font-mono">{maskedPhone}</strong></p>
-              <p className="text-[11px] text-zinc-400 mb-6">{l.otpHint}</p>
+              <p className="text-[11px] text-zinc-500 mb-6">{l.otpHint}</p>
 
-              <div className="flex gap-2 justify-center mb-3" onPaste={handleOtpPaste}>
+              <div className="flex w-full min-w-0 gap-1 sm:gap-2 justify-center mb-3" onPaste={handleOtpPaste}>
                 {otpDigits.map((digit, i) => (
                   <input
                     key={i}
@@ -443,7 +502,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                     autoFocus={i === 0}
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                    className="w-11 h-13 py-3 text-center text-xl font-black border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-colors"
+                    className="box-border w-10 max-w-11 min-w-0 flex-1 h-12 sm:h-13 bg-white text-zinc-900 py-2 px-0 text-center text-xl font-black border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-colors"
                   />
                 ))}
               </div>
@@ -470,13 +529,13 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <div className="w-full flex items-center justify-between text-xs mb-4">
                 <button
                   onClick={() => { sound.playClick(); setStep(isReturning ? 'phone' : 'register'); setError(''); }}
-                  className="font-bold text-zinc-400 hover:text-zinc-600"
+                  className="font-bold text-zinc-500 hover:text-zinc-700"
                 >
                   {l.changeNumber}
                 </button>
                 {!resendLocked ? (
                   cooldown > 0 ? (
-                    <span className="flex items-center gap-1 font-bold text-zinc-400">
+                    <span className="flex items-center gap-1 font-bold text-zinc-500">
                       <Timer className="w-3.5 h-3.5" /> {l.resendIn} {cooldown}s
                     </span>
                   ) : (
@@ -488,7 +547,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                     </button>
                   )
                 ) : (
-                  <span className="font-bold text-red-400">{resendLocked ? l.resendMax : ''}</span>
+                  <span className="font-bold text-red-600">{resendLocked ? l.resendMax : ''}</span>
                 )}
               </div>
 
@@ -512,19 +571,25 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(16,185,129,0.5)]">
                 <CheckCircle2 className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-xl font-black text-emerald-600">{isReturning ? l.welcomeBack : l.welcomeNew}</h2>
+              <h2 className="text-xl font-black text-emerald-600">{isDemoLogin ? l.demoWelcome : isReturning ? l.welcomeBack : l.welcomeNew}</h2>
               <p className="text-base font-bold text-zinc-800 mt-1 flex items-center gap-1.5">
                 <Leaf className="w-4 h-4 text-emerald-500" /> {welcomeName}
               </p>
-              <p className="text-xs font-mono text-zinc-400 mt-2 flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" /> {l.verified}
+              {welcomeEmail && (
+                <p className="text-xs font-mono text-zinc-600 mt-1">{welcomeEmail} · DEMO</p>
+              )}
+              <p className="text-xs font-mono text-zinc-500 mt-2 flex items-center gap-1">
+                {isDemoLogin
+                  ? <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                  : <ShieldCheck className="w-3.5 h-3.5" />}
+                {isDemoLogin ? l.demoStatus : l.verified}
               </p>
             </motion.div>
           )}
         </div>
 
         {/* Footer strip */}
-        <div className="px-6 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-center gap-1.5 text-[10px] font-bold text-zinc-400">
+        <div className="px-6 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-center gap-1.5 text-[10px] font-bold text-zinc-600">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> {l.secNote}
         </div>
       </div>
