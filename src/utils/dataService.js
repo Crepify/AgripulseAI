@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // AgriPulse AI — Live Data Services
 //
-//  1. Mandi Prices  → https://mandi-api.onrender.com/v1 (keyless, free)
-//     Daily wholesale (APMC) prices for Maharashtra, Uttar Pradesh, Punjab,
-//     Madhya Pradesh & Karnataka, mirrored from data.gov.in.
-//     Rate limit: 100 req / 15 min / IP  →  responses are cached 30 minutes.
+//  1. Mandi Prices → https://mandi-api.onrender.com/v1 (keyless third-party API)
+//     Supports Maharashtra, Uttar Pradesh, Punjab, Madhya Pradesh & Karnataka.
+//     Provider claims a data.gov.in mirror; provenance is not independently verified.
+//     Rate limit: 100 req / 15 min / IP → validated API responses cached briefly.
 //
 //  2. Weather (IMD) → https://weather.indianapi.in (needs x-api-key)
 //     Current conditions + 7-day IMD forecast for Indian cities.
@@ -12,13 +12,11 @@
 //     realistic simulated dataset so the Radar UI always stays functional.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { MANDI_PRICES } from '../data/agriData';
-
 const MANDI_BASE = (import.meta.env.VITE_MANDI_API_BASE || 'https://mandi-api.onrender.com/v1').replace(/\/$/, '');
 const WEATHER_BASE = (import.meta.env.VITE_WEATHER_API_BASE || 'https://weather.indianapi.in').replace(/\/$/, '');
 const WEATHER_KEY = import.meta.env.VITE_WEATHER_API_KEY || '';
 
-const MANDI_CACHE_TTL_MS = 30 * 60 * 1000;   // 30 min (protects the 100/15min rate limit)
+const MANDI_CACHE_TTL_MS = 10 * 60 * 1000;  // 10 min; respects API's 100 requests / 15 min limit
 const WEATHER_CACHE_TTL_MS = 20 * 60 * 1000; // 20 min
 
 // ── generic helpers ──────────────────────────────────────────────────────────
@@ -94,10 +92,14 @@ export async function getMandiCommodities(state) {
   if (fresh) return fresh;
   try {
     const json = await fetchJson(`${MANDI_BASE}/commodities?state=${encodeURIComponent(state)}`);
-    const list = (Array.isArray(json?.data) ? json.data : [])
-      .map((c) => (typeof c === 'string' ? c : c?.commodity || c?.name))
+    const apiList = (Array.isArray(json?.data) ? json.data : [])
+      .map((c) => (typeof c === 'string' ? c.trim() : c?.commodity || c?.name))
       .filter(Boolean);
-    if (list.length === 0) throw new Error('empty');
+    if (json?.success !== true || apiList.length === 0) throw new Error('Mandi commodity list unavailable');
+
+    // The mirror's commodity directory can lag its price records. Keep common
+    // crops selectable and let the live price endpoint confirm availability.
+    const list = [...new Set([...COMMON_COMMODITIES, ...apiList])];
     cacheSet(cacheKey, list);
     return list;
   } catch {
@@ -110,86 +112,161 @@ export async function getMandiCommodities(state) {
  * Raw shape: { state, district, market, commodity, variety, grade,
  *              arrival_date, min_price, max_price, modal_price }
  */
+function parsePrice(value) {
+  const parsed = Number(String(value ?? '').replace(/,/g, '').trim());
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function normalizeMandiDate(value) {
+  const date = String(value || '').trim();
+  let normalized = date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const dayFirst = date.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+    if (!dayFirst) return '';
+    normalized = `${dayFirst[3]}-${dayFirst[2].padStart(2, '0')}-${dayFirst[1].padStart(2, '0')}`;
+  }
+  const parsed = new Date(`${normalized}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized ? '' : normalized;
+}
+
+function isValidMandiDate(date) {
+  const indiaToday = new Date(Date.now() + 330 * 60 * 1000).toISOString().slice(0, 10);
+  return Boolean(date && date <= indiaToday);
+}
+
+/** Drop malformed mandi rows rather than presenting impossible price ranges. */
 function normalizeRow(r) {
+  if (!r || typeof r !== 'object') return null;
+
+  const state = String(r.state || '').trim();
+  const market = String(r.market || '').trim();
+  const crop = String(r.commodity || '').trim();
+  const variety = String(r.variety || '').trim();
+  const date = normalizeMandiDate(r.arrival_date);
+  const parsedFetchedAt = Date.parse(String(r.fetched_at || ''));
+  const min = parsePrice(r.min_price);
+  const max = parsePrice(r.max_price);
+  const modal = parsePrice(r.modal_price);
+
+  if (!state || !market || !crop || !isValidMandiDate(date) || min == null || max == null || modal == null) return null;
+  if (min <= 0 || min > max || max > 1_000_000 || modal <= 0 || modal < min || modal > max) return null;
+
   return {
-    id: r.id,
-    state: r.state,
-    district: r.district || '',
-    market: r.market || '',
-    crop: r.commodity || '',
-    variety: r.variety || '',
-    date: r.arrival_date || '',
-    min: Number(r.min_price) || 0,
-    max: Number(r.max_price) || 0,
-    modal: Number(r.modal_price) || 0,
+    id: r.id ?? `${state}-${market}-${crop}-${variety}-${date}`,
+    state,
+    district: String(r.district || '').trim(),
+    market,
+    crop,
+    variety,
+    date,
+    sourceFetchedAt: Number.isFinite(parsedFetchedAt) && parsedFetchedAt > 0 ? parsedFetchedAt : null,
+    min,
+    max,
+    modal,
   };
+}
+
+function isValidCachedRow(row) {
+  if (!row || typeof row !== 'object') return false;
+  const min = parsePrice(row.min);
+  const max = parsePrice(row.max);
+  const modal = parsePrice(row.modal);
+  return Boolean(
+    String(row.state || '').trim() && String(row.market || '').trim() && String(row.crop || '').trim()
+    && isValidMandiDate(normalizeMandiDate(row.date)) && min != null && max != null && modal != null
+    && min > 0 && min <= max && max <= 1_000_000 && modal > 0 && modal >= min && modal <= max,
+  );
+}
+
+function validateCachedMandiResult(value) {
+  if (!value || !Array.isArray(value.rows)) return null;
+  const rows = value.rows.filter(isValidCachedRow);
+  if (rows.length === 0 && value.empty !== true) return null;
+  return { ...value, rows };
 }
 
 /**
  * Fetch live mandi prices and compute per-market day-over-day trend.
- * Returns { live, rows, latestDate, fetchedAt, error? } where rows are the
- * newest-dated records, each with { change, trend } vs. the previous date.
+ * Only API-returned, range-validated rows (or their validated local cache) are
+ * returned; the app does not invent fallback price rows when the service fails.
  */
-export async function getMandiPrices({ state, commodity } = {}) {
+export async function getMandiPrices({ state, commodity, forceRefresh = false } = {}) {
   const params = new URLSearchParams();
   if (state) params.set('state', state);
   if (commodity) params.set('commodity', commodity);
   const cacheKey = `ap_cache_mandi_prices_${state || ''}_${commodity || ''}`;
 
+  if (!forceRefresh) {
+    const fresh = validateCachedMandiResult(cacheGetFresh(cacheKey, MANDI_CACHE_TTL_MS));
+    if (fresh) return { ...fresh, live: false, cached: true, stale: false };
+  }
+
   try {
+    if (!state && !commodity) throw new Error('Choose a state or crop to fetch mandi prices.');
+
     const json = await fetchJson(`${MANDI_BASE}/prices?${params}`);
-    const records = (json?.success && Array.isArray(json.data) ? json.data : []).map(normalizeRow);
+    if (json?.success !== true || !Array.isArray(json?.data)) {
+      throw new Error(json?.error?.message || 'Mandi API returned an invalid response.');
+    }
+
+    const rawRecords = json.data;
+    const validRecords = rawRecords.map(normalizeRow).filter(Boolean);
+    if (rawRecords.length > 0 && validRecords.length === 0) {
+      throw new Error('The mandi API returned rows with invalid dates or price ranges.');
+    }
+    const matchesQuery = (value, query) => !query || String(value).trim().toLocaleLowerCase() === String(query).trim().toLocaleLowerCase();
+    const records = validRecords.filter((row) => matchesQuery(row.state, state) && matchesQuery(row.crop, commodity));
+
     if (records.length === 0) {
-      return { live: true, rows: [], latestDate: null, fetchedAt: Date.now(), empty: true };
+      const result = { live: true, cached: false, rows: [], latestDate: null, fetchedAt: Date.now(), empty: true };
+      cacheSet(cacheKey, result);
+      return result;
     }
 
     const dates = [...new Set(records.map((r) => r.date))].sort().reverse();
     const latestDate = dates[0];
     const prevDate = dates[1] || null;
+    const latestRecords = records.filter((r) => r.date === latestDate);
+    const sourceFetchedAt = latestRecords.reduce(
+      (latest, row) => Math.max(latest, row.sourceFetchedAt || 0),
+      0,
+    ) || null;
 
+    const marketKey = (row) => `${row.state}::${row.district}::${row.market}::${row.variety}`;
     const prevByMarket = new Map();
     if (prevDate) {
       records.filter((r) => r.date === prevDate).forEach((r) => {
-        if (!prevByMarket.has(r.market)) prevByMarket.set(r.market, r.modal);
+        prevByMarket.set(marketKey(r), r.modal);
       });
     }
 
-    const rows = records
-      .filter((r) => r.date === latestDate)
+    const rows = latestRecords
       .map((r) => {
-        const prev = prevByMarket.get(r.market);
+        const prev = prevByMarket.get(marketKey(r));
         const change = prev != null ? r.modal - prev : null;
         return { ...r, change, trend: change == null ? 'flat' : change > 0 ? 'up' : change < 0 ? 'down' : 'flat' };
       })
       .sort((a, b) => b.modal - a.modal);
 
-    const result = { live: true, rows, latestDate, prevDate, fetchedAt: Date.now() };
+    const result = { live: true, cached: false, rows, latestDate, prevDate, sourceFetchedAt, fetchedAt: Date.now() };
     cacheSet(cacheKey, result);
     return result;
   } catch (err) {
-    // Serve stale cache if we have it, else curated fallback rows
-    const stale = cacheGet(cacheKey);
-    if (stale) return { ...stale.value, live: false, stale: true, error: err.message };
+    // Revalidate stored rows too, including entries created by an older app
+    // version, before using them as a stale fallback.
+    const staleEntry = cacheGet(cacheKey);
+    const stale = validateCachedMandiResult(staleEntry?.value);
+    if (stale) {
+      return { ...stale, live: false, cached: true, stale: true, error: err.message };
+    }
     return {
       live: false,
+      cached: false,
       stale: false,
-      error: err.message,
+      error: err.message || 'Mandi API is unavailable.',
       latestDate: null,
       fetchedAt: Date.now(),
-      rows: MANDI_PRICES.map((m, i) => ({
-        id: `fallback-${i}`,
-        state: state || 'India',
-        district: '',
-        market: m.market,
-        crop: m.crop,
-        variety: '',
-        date: '',
-        min: m.price - 150,
-        max: m.price + 150,
-        modal: m.price,
-        change: parseInt(m.change.replace(/[₹+,]/g, ''), 10) || 0,
-        trend: m.trend,
-      })),
+      rows: [],
     };
   }
 }

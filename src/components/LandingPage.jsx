@@ -53,9 +53,9 @@ export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedL
             <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-4">
               <Scan className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-bold mb-2">100% On-Device AI</h3>
+            <h3 className="text-xl font-bold mb-2">Cloud + On-Device AI</h3>
             <p className="text-zinc-600 text-sm">
-              Our Vision Agent uses TensorFlow.js to detect crop diseases instantly. No internet required. Zero latency. Your data stays on your phone.
+              Crop photos can use our connected cloud AI endpoint, with on-device analysis available as an offline fallback.
             </p>
           </div>
           

@@ -1,16 +1,30 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Volume2, VideoOff, Leaf, Calculator, Check, Sparkles } from 'lucide-react';
+import { Camera, Upload, Volume2, VideoOff, Leaf, Calculator, Sparkles } from 'lucide-react';
+import scannerPlaceholder from '../assets/scanner-placeholder.webp';
 import { CROPS } from '../data/agriData';
 import { analyzeLeafOnDevice } from '../utils/onDeviceModel';
+import { isCloudAIConfigured, predictCropImage } from '../utils/aiService';
 import { speechEngine } from '../utils/speech';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
 import ImageScanOverlay from './ImageScanOverlay';
 
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('The selected image could not be loaded.'));
+    image.src = src;
+  });
+}
+
 export default function TabScanner({ selectedLang, isSunlightMode }) {
   const t = T[selectedLang] || T['en'];
+  const scannerText = { ...T.en.scanner, ...(t.scanner || {}) };
   const [selectedCrop, setSelectedCrop] = useState(CROPS[0]);
+  const [hasScanResult, setHasScanResult] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [inferenceSource, setInferenceSource] = useState(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [customImage, setCustomImage] = useState(null);
   const [dosageType, setDosageType] = useState('bio');
@@ -24,6 +38,9 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
 
   const startCamera = async () => {
     sound.playClick();
+    setHasScanResult(false);
+    setCustomImage(null);
+    setInferenceSource(null);
     try {
       setIsCameraActive(true);
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -75,24 +92,57 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   };
 
   const runScan = async (imgSrc) => {
+    setHasScanResult(false);
     setIsAnalyzing(true);
+    setInferenceSource(null);
     sound.playTransition();
 
-    const img = new Image();
-    img.src = imgSrc;
-    img.onload = async () => {
-      setTimeout(async () => {
-        const res = await analyzeLeafOnDevice(img, canvasRef.current);
-        setSelectedCrop(res.matchedCrop);
-        setIsAnalyzing(false);
-        sound.playSuccess();
-      }, 1200);
-    };
+    try {
+      const image = await loadImage(imgSrc);
+      let cloudResult = null;
+
+      if (isCloudAIConfigured) {
+        try {
+          const imageResponse = await fetch(imgSrc);
+          if (!imageResponse.ok) throw new Error('Could not prepare the image for cloud analysis.');
+          const imageBlob = await imageResponse.blob();
+          const extension = imageBlob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+          cloudResult = await predictCropImage(imageBlob, `leaf-image.${extension}`);
+        } catch (error) {
+          console.warn('Cloud AI unavailable; falling back to on-device analysis.', error);
+        }
+      }
+
+      if (cloudResult) {
+        setSelectedCrop({ ...cloudResult.crop, confidence: cloudResult.confidence });
+        setInferenceSource('cloud');
+        if (canvasRef.current) {
+          const context = canvasRef.current.getContext('2d');
+          canvasRef.current.width = image.naturalWidth;
+          canvasRef.current.height = image.naturalHeight;
+          context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+      } else {
+        const localResult = await analyzeLeafOnDevice(image, canvasRef.current);
+        setSelectedCrop(localResult.matchedCrop);
+        setInferenceSource('device');
+      }
+
+      setHasScanResult(true);
+      sound.playSuccess();
+    } catch (error) {
+      console.error('Could not analyze the selected crop image:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleSelectCrop = async (crop) => {
     sound.playClick();
     setCustomImage(null);
+    setHasScanResult(true);
+    setSelectedCrop(crop);
+    setInferenceSource(null);
     stopCamera();
     setIsAnalyzing(true);
 
@@ -107,6 +157,7 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
         sound.playSuccess();
       }, 1000);
     };
+    img.onerror = () => setIsAnalyzing(false);
   };
 
   const playVoicePrescription = () => {
@@ -138,7 +189,7 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
           {t.scanner.samplesTitle}
         </span>
         {CROPS.map((c) => {
-          const isSelected = selectedCrop.id === c.id && !customImage && !isCameraActive;
+          const isSelected = hasScanResult && selectedCrop.id === c.id && !customImage && !isCameraActive;
           return (
             <button
               key={c.id}
@@ -176,10 +227,15 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
             ) : (
               <div className="relative w-full h-[320px] flex items-center justify-center overflow-hidden">
                 <img
-                  src={customImage || selectedCrop.image}
-                  alt={selectedCrop.name}
+                  src={customImage || (hasScanResult ? selectedCrop.image : scannerPlaceholder)}
+                  alt={customImage ? 'Uploaded leaf photo' : hasScanResult ? selectedCrop.name : scannerText.readyTitle}
                   className="w-full h-full object-cover"
                 />
+                {!hasScanResult && !customImage && (
+                  <div className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 max-w-[90%] whitespace-nowrap rounded-full border border-emerald-300/40 bg-zinc-950/75 px-3 py-1.5 text-[9px] font-black tracking-wider text-emerald-100 shadow-lg backdrop-blur-sm">
+                    <Sparkles className="mr-1 inline h-3 w-3 text-emerald-300" />{scannerText.readyBadge}
+                  </div>
+                )}
                 <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-10" />
               </div>
             )}
@@ -230,16 +286,55 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
         </div>
 
         {/* Right: Diagnosis & Dosage */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className={`p-6 rounded-2xl border-2 space-y-5 shadow-xl ${
+        <div className="lg:col-span-7">
+          {!hasScanResult ? (
+            <div className={`min-h-[320px] h-full p-7 sm:p-9 rounded-2xl border-2 flex flex-col items-center justify-center text-center shadow-xl ${
+              isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-700 text-white'
+            }`}>
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${isSunlightMode ? 'bg-emerald-100' : 'bg-emerald-400/15'}`}>
+                <Sparkles className="w-7 h-7 text-emerald-500" />
+              </div>
+              {!isAnalyzing && (
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-2">
+                  {scannerText.readyBadge}
+                </span>
+              )}
+              <h2 className={`text-xl sm:text-2xl font-black ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>
+                {isAnalyzing ? scannerText.analyzingTitle : scannerText.readyTitle}
+              </h2>
+              <p className={`max-w-md mt-2 text-sm leading-relaxed ${isSunlightMode ? 'text-zinc-600' : 'text-zinc-300'}`}>
+                {isAnalyzing ? scannerText.analyzingDescription : scannerText.readyDescription}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className={`p-6 rounded-2xl border-2 space-y-5 shadow-xl ${
             isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-700 text-white'
           }`}>
             {/* Title & Listen Button */}
             <div className={`flex flex-wrap items-center justify-between gap-3 pb-4 border-b-2 ${isSunlightMode ? 'border-zinc-200' : 'border-zinc-800'}`}>
               <div>
-                <span className="text-xs text-emerald-400 font-black tracking-wide">
-                  {t.scanner.scanComplete} ({selectedCrop.confidence}% {t.scanner.matchScore})
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-emerald-400 font-black tracking-wide">
+                    {t.scanner.scanComplete} ({selectedCrop.confidence}% {t.scanner.matchScore})
+                  </span>
+                  {inferenceSource && (
+                    <span
+                      title={inferenceSource === 'cloud'
+                        ? 'Prediction returned by the configured cloud AI endpoint.'
+                        : isCloudAIConfigured
+                          ? 'Cloud prediction was unavailable or did not match a supported crop; using on-device analysis.'
+                          : 'Using on-device analysis. Configure VITE_AI_API_KEY to enable the cloud endpoint.'}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                        inferenceSource === 'cloud'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : isSunlightMode ? 'bg-zinc-100 text-zinc-600' : 'bg-zinc-800 text-zinc-300'
+                      }`}
+                    >
+                      {inferenceSource === 'cloud' ? 'Cloud AI' : 'On-device'}
+                    </span>
+                  )}
+                </div>
                 <h2 className={`text-xl md:text-2xl font-black mt-0.5 ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>
                   {selectedCrop.disease}
                 </h2>
@@ -372,7 +467,9 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
               <span className={isSunlightMode ? 'text-zinc-700' : 'text-zinc-300'}>{t.scanner.sprayTimeLabel}</span>
               <span className="text-emerald-400">{selectedCrop.sprayTime}</span>
             </div>
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

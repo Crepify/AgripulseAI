@@ -55,3 +55,53 @@ body {
   background: #27272a;
   border-radius: 9999px;
 }
+
+/* Keep the country code and phone field inside the card at narrow widths. */
+.phone-number-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.5rem;
+  max-width: 100%;
+}
+
+.phone-number-row .phone-number-input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Keep login controls readable even when the browser applies dark-mode autofill. */
+.auth-page {
+  color: #18181b !important;
+  color-scheme: light;
+}
+
+.auth-page input,
+.auth-page select,
+.auth-page textarea {
+  color: #18181b !important;
+  background-color: #ffffff !important;
+  -webkit-text-fill-color: #18181b !important;
+  caret-color: #059669;
+}
+
+.auth-page input::placeholder,
+.auth-page textarea::placeholder {
+  color: #71717a !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #71717a !important;
+}
+
+.auth-page input:-webkit-autofill,
+.auth-page input:-webkit-autofill:hover,
+.auth-page input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #18181b !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+}
+
+.auth-page select option {
+  color: #18181b;
+  background: #ffffff;
+}

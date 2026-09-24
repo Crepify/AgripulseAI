@@ -7,22 +7,12 @@ import { getMandiStates, getMandiCommodities, getMandiPrices } from '../utils/da
 import { useTranslation } from '../hooks/useLocalT';
 
 const fallbackT = {
-  liveBadge: 'LIVE · data.gov.in',
-  cacheBadge: 'CACHED',
-  offlineBadge: 'OFFLINE BACKUP',
   refresh: 'Refresh',
-  loading: 'Fetching today\'s rates…',
-  empty: 'No prices reported for this crop here today. Try another crop.',
-  errorMsg: 'Could not reach the mandi server.',
+  loading: 'Fetching mandi rates…',
   retry: 'Retry',
   perQtl: '/ Qtl',
   minMax: 'Min–Max',
-  updated: 'Updated',
-  prevDay: 'vs yesterday',
-  marketsShowing: 'mandis reporting today',
-  stateLabel: 'State',
-  cropLabel: 'Crop',
-  poweredBy: 'Source: data.gov.in AGMARKNET · via mandi-api.vercel.app (keyless)',
+  prevDay: 'vs previous report',
 };
 
 export default function TabProfit({ selectedLang, isSunlightMode }) {
@@ -34,7 +24,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
   const [commodities, setCommodities] = useState([]);
   const [stateSel, setStateSel] = useState('Karnataka');
   const [commoditySel, setCommoditySel] = useState('Tomato');
-  const [board, setBoard] = useState(null); // { live, rows, latestDate, fetchedAt, error?, empty? }
+  const [board, setBoard] = useState(null); // API/cache status + validated rows and market date
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const requestSeq = useRef(0);
@@ -66,7 +56,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
     const seq = ++requestSeq.current;
     if (isRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const result = await getMandiPrices({ state: stateSel, commodity: commoditySel });
+      const result = await getMandiPrices({ state: stateSel, commodity: commoditySel, forceRefresh: isRefresh });
       if (mountedRef.current && seq === requestSeq.current) setBoard(result);
     } finally {
       if (mountedRef.current && seq === requestSeq.current) {
@@ -86,6 +76,13 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
   const cropLoss = acreage * 22000;
 
   const topModal = board?.rows?.[0]?.modal;
+  const boardStatus = !board
+    ? null
+    : board.live
+      ? 'live'
+      : board.stale
+        ? 'stale'
+        : board.cached ? 'cached' : 'unavailable';
 
   const formatDate = (iso) => {
     if (!iso) return '';
@@ -98,7 +95,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
 
   const formatTime = (ts) => {
     if (!ts) return '';
-    return new Date(ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    return new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -182,7 +179,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
           )}
         </div>
 
-        {/* Right Column: LIVE APMC Mandi Rates (5 cols) */}
+        {/* Right Column: API-backed APMC Mandi Rates (5 cols) */}
         <div className={`lg:col-span-5 p-6 rounded-2xl border space-y-4 shadow-xl ${
           isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-[#121514] border-[#1f2421] text-white'
         }`}>
@@ -192,12 +189,24 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
             <div className="flex items-center gap-2">
               {board && (
                 <span className={`flex items-center gap-1 text-[9px] font-mono font-black px-2 py-0.5 rounded-full border ${
-                  board.live
+                  boardStatus === 'live'
                     ? 'text-emerald-500 border-emerald-500/40 bg-emerald-500/10'
-                    : 'text-amber-500 border-amber-500/40 bg-amber-500/10'
+                    : boardStatus === 'cached'
+                      ? 'text-sky-500 border-sky-500/40 bg-sky-500/10'
+                      : boardStatus === 'stale'
+                        ? 'text-amber-500 border-amber-500/40 bg-amber-500/10'
+                        : 'text-red-500 border-red-500/40 bg-red-500/10'
                 }`}>
-                  {board.live ? <Radio className="w-2.5 h-2.5 animate-pulse" /> : <Database className="w-2.5 h-2.5" />}
-                  {board.live ? t.mandiLive.liveBadge : board.stale ? t.mandiLive.cacheBadge : t.mandiLive.offlineBadge}
+                  {boardStatus === 'live'
+                    ? <Radio className="w-2.5 h-2.5 animate-pulse" />
+                    : boardStatus === 'unavailable' ? <AlertTriangle className="w-2.5 h-2.5" /> : <Database className="w-2.5 h-2.5" />}
+                  {boardStatus === 'live'
+                    ? t.mandiLive.liveBadge
+                    : boardStatus === 'cached'
+                      ? t.mandiLive.freshCacheBadge
+                      : boardStatus === 'stale'
+                        ? t.mandiLive.staleBadge
+                        : t.mandiLive.offlineBadge}
                 </span>
               )}
               <button
@@ -243,12 +252,20 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
 
           {/* Board meta */}
           {board?.latestDate && !loading && (
-            <div className={`flex items-center justify-between text-[10px] font-mono ${isSunlightMode ? 'text-zinc-500' : 'text-zinc-400'}`}>
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-emerald-500" />
-                {board.rows.length} {t.mandiLive.marketsShowing}
-              </span>
-              <span>{fallbackT.updated}: {formatDate(board.latestDate)} · {formatTime(board.fetchedAt)}</span>
+            <div className={`space-y-1 text-[10px] font-mono ${isSunlightMode ? 'text-zinc-500' : 'text-zinc-400'}`}>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-emerald-500" />
+                  {board.rows.length} {t.mandiLive.marketsShowing}
+                </span>
+                <span>{t.mandiLive.marketDateLabel}: {formatDate(board.latestDate)}</span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                {board.sourceFetchedAt && (
+                  <span>{t.mandiLive.recordFetchedAtLabel}: {formatTime(board.sourceFetchedAt)}</span>
+                )}
+                <span>{t.mandiLive.fetchedAtLabel}: {formatTime(board.fetchedAt)}</span>
+              </div>
             </div>
           )}
 
@@ -309,7 +326,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
           </div>
 
           <div className={`text-[9px] font-mono text-center pt-1 ${isSunlightMode ? 'text-zinc-400' : 'text-zinc-500'}`}>
-            {fallbackT.poweredBy}
+            {t.mandiLive.poweredBy}
           </div>
         </div>
       </div>
