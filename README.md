@@ -5,7 +5,7 @@
 
 [![NexHack 2026](https://img.shields.io/badge/NexHack-2026-10B981?style=for-the-badge&logo=target)](https://github.com)
 [![PWA Ready](https://img.shields.io/badge/PWA-100%25%20Offline-059669?style=for-the-badge&logo=pwa)](https://github.com)
-[![TensorFlow.js](https://img.shields.io/badge/AI-On--Device%20WebGL-F59E0B?style=for-the-badge&logo=tensorflow)](https://tensorflow.org)
+[![YOLO26 on-device](https://img.shields.io/badge/AI-YOLO26%20On--Device%20WebGPU-F59E0B?style=for-the-badge)](https://docs.ultralytics.com/integrations/litert/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 <br />
@@ -47,8 +47,8 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                              AGRIPULSE AI WORKFLOW                                     │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│  1. 📷 Real-Time Leaf Scan ──▶ 2. 🧠 Cloud AI / Offline Vision ──▶ 3. 🧴 Dosage         │
-│     (Camera / Upload)        (Ultralytics + local fallback)      ("Mix 2 Bottle Caps") │
+│  1. 📷 Real-Time Leaf Scan ──▶ 2. 🧠 Hybrid AI Vision ──▶ 3. 🧴 Bottle-Cap Dosage       │
+│     (Camera / Upload)        (YOLO26 local + cloud safety net) ("Mix 2 Bottle Caps") │
 │                                                                        │               │
 │  4. 🛰️ 72h Spore Radar    ◀── 5. 🎙️ Vernacular Voice AI   ◀───────────┘               │
 │     (Pre-Symptom Warning)         (Hindi/Tamil/Telugu TTS)                             │
@@ -63,9 +63,9 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 ## ✨ Key Features & Innovations
 
 ### 1. 🌿 Hybrid Cloud + On-Device Leaf Scanner
-- **Cloud inference:** Camera captures and uploaded crop photos can be sent to the configured Ultralytics endpoint for disease classification.
-- **Offline fallback:** If the endpoint is not configured, unavailable, or returns an unsupported class, the scanner continues with its on-device TensorFlow.js / image analysis path.
-- **Visual Lesion HUD:** Shows the local lesion overlay when offline inference is used.
+- **On-device inference:** a trained YOLO26 model (`public/models/agripulse.tflite`, 52 classes) runs in-browser with LiteRT.js on WebGPU and CPU/wasm fallback; the service worker caches it for offline scans after the initial download.
+- **Cloud safety net:** if local inference is unavailable, the scanner can use the same-origin `/api/predict` Vercel function, which keeps the Ultralytics key server-side.
+- **Visual Lesion HUD:** shows detected boxes and confidence; the scanner starts with a neutral AI preview and shows no diagnosis before a sample or user photo is scanned.
 - **Hardware Integration:** Native camera capture using HTML5 `navigator.mediaDevices.getUserMedia`.
 
 ### 2. 🧴 Smart Low-Tech Dosage Translator
@@ -96,17 +96,17 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 
 ---
 
-## 🛠️ Technology Stack (100% Free & Open Source)
+## 🛠️ Technology Stack
 
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |
 | **Frontend UI** | React 19, Vite, Tailwind CSS | Ultra-lightweight, responsive client |
-| **Cloud AI** | Ultralytics dedicated inference endpoint | Optional remote crop-image inference (`/predict`) |
-| **On-Device AI** | TensorFlow.js (WebGL / CPU) | Offline scanner fallback |
+| **Cloud AI** | Same-origin Vercel `/api/predict` proxy | Optional fallback; server-side key; dedicated endpoint may incur provider charges |
+| **On-Device AI** | YOLO26s → LiteRT (`@ultralytics/yolo`, LiteRT.js WebGPU / wasm) | In-browser crop-disease detection (52 classes, boxes + confidence) |
 | **Speech Engine** | Web Speech Recognition & SpeechSynthesis | Vernacular voice input and audio readout |
 | **Offline Storage** | IndexedDB (`idb`) | Local storage of scans, history & sync queue |
 | **PWA Layer** | Service Worker (`sw.js`) & Manifest | Offline caching & "Add to Home Screen" |
-| **Mandi Prices** | [mandi-api.onrender.com](https://mandi-api.onrender.com/v1) (keyless third-party API) | Market price records for MH, UP, PB, MP, KA; validated and briefly cached |
+| **Mandi Prices** | [mandi-api.onrender.com](https://mandi-api.onrender.com/v1) (keyless third-party API) | Validated market price rows; source provenance caveat below |
 | **Weather (IMD)** | [indianapi.in Weather API](https://indianapi.in/weather-api) | Live IMD observations + 7-day forecast (needs free `VITE_WEATHER_API_KEY`) |
 | **Icons & Motion** | Lucide React, Framer Motion, Canvas Confetti | Minimalist animations & visual feedback |
 
@@ -120,13 +120,14 @@ The price board requests rows from the configured `VITE_MANDI_API_BASE` (default
 
 ### 🔑 Environment Variables (copy `.env.example` → `.env`)
 ```bash
-VITE_WEATHER_API_KEY=            # free key from https://indianapi.in/sign-in  (Radar tab live IMD data)
+VITE_WEATHER_API_KEY=            # free key from https://indianapi.in/sign-in (Radar tab live IMD data)
 VITE_MANDI_API_BASE=https://mandi-api.onrender.com/v1   # keyless third-party API; provenance caveat above
-VITE_AI_API_URL=https://predict-6a8fe586becceb8c53b3b178-dproatj77a-el.a.run.app
-VITE_AI_API_KEY=                  # Ultralytics key bound to this deployment
+ULTRALYTICS_ENDPOINT_URL=https://predict-6a8fe586becceb8c53b3b178-dproatj77a-el.a.run.app
+ULTRALYTICS_API_KEY=              # server-side only; set in Vercel if required by the endpoint
+ALLOWED_ORIGINS=                  # optional comma-separated extra trusted origins; same-origin is allowed
 ```
 
-The scanner posts images to `VITE_AI_API_URL/predict` using multipart form data and a Bearer API key. The cloud result is mapped to the app's supported crop guides; a missing key, endpoint error, or unsupported class falls back to on-device analysis. The dedicated endpoint requires an Ultralytics API key. **Vite `VITE_*` values are included in browser code**, so do not put a private key in a public production build; use a server-side proxy for a public deployment. Keep local `.env` files untracked.
+The scanner tries the local YOLO26 model first. If it cannot run, the browser sends the image to the same-origin `/api/predict` Vercel function, which adds the `ULTRALYTICS_API_KEY` server-side. **Never put a private key in a `VITE_*` variable**; Vite embeds those values in the browser bundle. `npm run dev` does not run Vercel functions, so use `vercel dev` to exercise the cloud fallback locally. Keep local `.env` files untracked.
 
 ---
 
@@ -172,7 +173,7 @@ Open `http://localhost:5173` in your browser.
 <details>
 <summary><strong>Q: Is the on-device AI real or just mock images?</strong></summary>
 <p>
-The on-device AI uses genuine TensorFlow.js WebGL execution. It samples camera/image pixel tensors, computes color-space heuristics (necrosis/chlorosis clustering), and renders dynamic canvas bounding box overlays in under 40ms with zero network bytes.
+Yes — it is a real object-detection model. The scanner runs our trained YOLO26s detector (52 PlantVillage / cassava / wheat / rice / soybean classes, exported to LiteRT `.tflite`) directly in the browser through `@ultralytics/yolo` and LiteRT.js on WebGPU, with wasm/CPU fallback. Detections (class, confidence and box) are drawn on the canvas overlay and mapped to the bottle-cap dosage advisory; nothing leaves the phone. The model (~37 MB) is downloaded once and cached by the service worker, so later scans work fully offline.
 </p>
 </details>
 

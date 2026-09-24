@@ -3,6 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script type="importmap">
+      {
+        "imports": {
+          "@litertjs/core": "/litert/core.js",
+          "@litertjs/wasm-utils": "/litert/wasm-utils.js"
+        }
+      }
+    </script>
     <title>AgriPulse AI — Smart Crop Care</title>
     
     <!-- PWA Settings -->
@@ -25,8 +33,18 @@
     <script type="module" src="/src/main.jsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
+        // true when a previous version of the app is already controlling this page
+        const hadController = !!navigator.serviceWorker.controller;
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+        // A newer deploy just took over: refresh once (only right after opening, so we never
+        // interrupt a scan) instead of leaving the user on the stale bundle until the next visit.
+        let refreshed = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshed || !hadController || performance.now() > 20000) return;
+          refreshed = true;
+          window.location.reload();
         });
       }
     </script>

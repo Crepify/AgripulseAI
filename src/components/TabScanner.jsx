@@ -1,9 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Camera, Upload, Volume2, VideoOff, Leaf, Calculator, Sparkles } from 'lucide-react';
 import scannerPlaceholder from '../assets/scanner-placeholder.webp';
 import { CROPS } from '../data/agriData';
-import { analyzeLeafOnDevice } from '../utils/onDeviceModel';
-import { isCloudAIConfigured, predictCropImage } from '../utils/aiService';
+import { analyzeLeafOnDevice, initOnDeviceAI, subscribeModelStatus, clearOverlay } from '../utils/onDeviceModel';
 import { speechEngine } from '../utils/speech';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
@@ -19,38 +18,58 @@ function loadImage(src) {
 }
 
 export default function TabScanner({ selectedLang, isSunlightMode }) {
-  const t = T[selectedLang] || T['en'];
+  const t = T[selectedLang] || T.en;
   const scannerText = { ...T.en.scanner, ...(t.scanner || {}) };
   const [selectedCrop, setSelectedCrop] = useState(CROPS[0]);
   const [hasScanResult, setHasScanResult] = useState(false);
+  const [scanError, setScanError] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [inferenceSource, setInferenceSource] = useState(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [customImage, setCustomImage] = useState(null);
   const [dosageType, setDosageType] = useState('bio');
   const [sprayerSize, setSprayerSize] = useState('15L');
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [mixingAcres, setMixingAcres] = useState(2);
+  const [modelStatus, setModelStatus] = useState({ state: 'idle' });
+  const [lastScan, setLastScan] = useState(null);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
+  const scanIdRef = useRef(0);
+
+  // Warm the on-device model as soon as the scanner opens; the runtime and model are cached for later scans.
+  useEffect(() => {
+    const unsubscribe = subscribeModelStatus(setModelStatus);
+    const videoElement = videoRef.current;
+    initOnDeviceAI();
+    return () => {
+      unsubscribe();
+      scanIdRef.current += 1;
+      const stream = videoElement?.srcObject;
+      stream?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   const startCamera = async () => {
     sound.playClick();
+    scanIdRef.current += 1;
+    setIsAnalyzing(false);
     setHasScanResult(false);
+    setScanError('');
     setCustomImage(null);
-    setInferenceSource(null);
+    setLastScan(null);
+    clearOverlay(canvasRef.current);
     try {
       setIsCameraActive(true);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+        video: { facingMode: 'environment' },
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        await videoRef.current.play();
       }
-    } catch (err) {
+    } catch {
       setIsCameraActive(false);
       alert('Camera access not granted. You can upload an image or select a sample scan below.');
     }
@@ -58,8 +77,8 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
 
   const stopCamera = () => {
     sound.playClick();
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(t => t.stop());
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
@@ -78,86 +97,106 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
     await runScan(dataUrl);
   };
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setHasScanResult(false);
+      setScanError('Please choose an image file to scan.');
+      return;
+    }
+
+    scanIdRef.current += 1;
+    setIsAnalyzing(false);
+    setHasScanResult(false);
+    setScanError('');
+    setLastScan(null);
     const reader = new FileReader();
-    reader.onload = async (event) => {
-      const dataUrl = event.target.result;
+    reader.onload = async (loadEvent) => {
+      const dataUrl = loadEvent.target?.result;
+      if (typeof dataUrl !== 'string') {
+        setHasScanResult(false);
+        setScanError('The selected image could not be read. Please try again.');
+        return;
+      }
       setCustomImage(dataUrl);
       stopCamera();
       await runScan(dataUrl);
+    };
+    reader.onerror = () => {
+      setHasScanResult(false);
+      setScanError('The selected image could not be read. Please try again.');
     };
     reader.readAsDataURL(file);
   };
 
   const runScan = async (imgSrc) => {
+    const scanId = ++scanIdRef.current;
     setHasScanResult(false);
+    setScanError('');
     setIsAnalyzing(true);
-    setInferenceSource(null);
+    setLastScan(null);
+    clearOverlay(canvasRef.current);
     sound.playTransition();
 
     try {
       const image = await loadImage(imgSrc);
-      let cloudResult = null;
+      // On-device YOLO26/LiteRT first; the model service uses /api/predict only as an online fallback.
+      const result = await analyzeLeafOnDevice(image, canvasRef.current);
+      if (scanId !== scanIdRef.current) return;
+      const remaining = Math.max(0, 700 - (result.latencyMs || 0));
+      if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+      if (scanId !== scanIdRef.current) return;
 
-      if (isCloudAIConfigured) {
-        try {
-          const imageResponse = await fetch(imgSrc);
-          if (!imageResponse.ok) throw new Error('Could not prepare the image for cloud analysis.');
-          const imageBlob = await imageResponse.blob();
-          const extension = imageBlob.type.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
-          cloudResult = await predictCropImage(imageBlob, `leaf-image.${extension}`);
-        } catch (error) {
-          console.warn('Cloud AI unavailable; falling back to on-device analysis.', error);
-        }
-      }
-
-      if (cloudResult) {
-        setSelectedCrop({ ...cloudResult.crop, confidence: cloudResult.confidence });
-        setInferenceSource('cloud');
-        if (canvasRef.current) {
-          const context = canvasRef.current.getContext('2d');
-          canvasRef.current.width = image.naturalWidth;
-          canvasRef.current.height = image.naturalHeight;
-          context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        }
-      } else {
-        const localResult = await analyzeLeafOnDevice(image, canvasRef.current);
-        setSelectedCrop(localResult.matchedCrop);
-        setInferenceSource('device');
-      }
-
+      setSelectedCrop(result.matchedCrop);
+      setLastScan({
+        backend: result.backend || 'none',
+        latencyMs: result.latencyMs,
+        count: result.detections?.length ?? 0,
+      });
       setHasScanResult(true);
       sound.playSuccess();
     } catch (error) {
-      console.error('Could not analyze the selected crop image:', error);
+      if (scanId === scanIdRef.current) {
+        console.error('Could not analyze the selected crop image:', error);
+        clearOverlay(canvasRef.current);
+        setScanError('Analysis could not be completed. Try another photo or check your connection.');
+      }
     } finally {
-      setIsAnalyzing(false);
+      if (scanId === scanIdRef.current) setIsAnalyzing(false);
     }
   };
 
-  const handleSelectCrop = async (crop) => {
+  // Sample selections show curated demo advice immediately; stock photos are not sent to the AI model.
+  const handleSelectCrop = (crop) => {
     sound.playClick();
+    scanIdRef.current += 1;
     setCustomImage(null);
     setHasScanResult(true);
+    setScanError('');
     setSelectedCrop(crop);
-    setInferenceSource(null);
+    setLastScan(null);
     stopCamera();
-    setIsAnalyzing(true);
+    setIsAnalyzing(false);
+    clearOverlay(canvasRef.current);
+    sound.playSuccess();
+  };
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = crop.image;
-    img.onload = async () => {
-      setTimeout(async () => {
-        const res = await analyzeLeafOnDevice(img, canvasRef.current);
-        setSelectedCrop(crop);
-        setIsAnalyzing(false);
-        sound.playSuccess();
-      }, 1000);
-    };
-    img.onerror = () => setIsAnalyzing(false);
+  const modelStatusText = () => {
+    if (lastScan?.backend === 'none') {
+      return 'Analysis unavailable · try another photo or check your connection';
+    }
+    if (lastScan) {
+      const backend = lastScan.backend === 'cloud' ? 'cloud fallback' : 'on device';
+      return `Analysed ${backend} in ${lastScan.latencyMs} ms · ${lastScan.count} region${lastScan.count === 1 ? '' : 's'} found`;
+    }
+    if (modelStatus.state === 'ready') {
+      return `On-device AI ready · ${modelStatus.device === 'webgpu' ? 'GPU' : 'CPU'} · works offline`;
+    }
+    if (modelStatus.state === 'loading') return 'Preparing on-device AI model (one-time download, ~37 MB)…';
+    if (modelStatus.state === 'error') return 'On-device AI unavailable · online fallback is attempted when connected';
+    return '';
   };
 
   const playVoicePrescription = () => {
@@ -283,6 +322,22 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
               <span>{t.scanner.uploadPhoto}</span>
             </button>
           </div>
+
+          {/* On-device model status */}
+          {modelStatusText() && (
+            <p
+              data-testid="model-status"
+              className={`text-[10px] font-semibold text-center tracking-wide ${isSunlightMode ? 'text-zinc-600' : 'text-zinc-500'}`}
+            >
+              {modelStatus.state === 'loading' && !lastScan && (
+                <span className="inline-block w-1.5 h-1.5 mr-1.5 rounded-full bg-amber-400 animate-pulse align-middle" />
+              )}
+              {modelStatus.state === 'ready' && (
+                <span className="inline-block w-1.5 h-1.5 mr-1.5 rounded-full bg-emerald-400 align-middle" />
+              )}
+              {modelStatusText()}
+            </p>
+          )}
         </div>
 
         {/* Right: Diagnosis & Dosage */}
@@ -294,16 +349,16 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${isSunlightMode ? 'bg-emerald-100' : 'bg-emerald-400/15'}`}>
                 <Sparkles className="w-7 h-7 text-emerald-500" />
               </div>
-              {!isAnalyzing && (
+              {!isAnalyzing && !scanError && (
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-2">
                   {scannerText.readyBadge}
                 </span>
               )}
               <h2 className={`text-xl sm:text-2xl font-black ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>
-                {isAnalyzing ? scannerText.analyzingTitle : scannerText.readyTitle}
+                {scanError ? 'Scan unavailable' : isAnalyzing ? scannerText.analyzingTitle : scannerText.readyTitle}
               </h2>
               <p className={`max-w-md mt-2 text-sm leading-relaxed ${isSunlightMode ? 'text-zinc-600' : 'text-zinc-300'}`}>
-                {isAnalyzing ? scannerText.analyzingDescription : scannerText.readyDescription}
+                {scanError || (isAnalyzing ? scannerText.analyzingDescription : scannerText.readyDescription)}
               </p>
             </div>
           ) : (
@@ -318,20 +373,22 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
                   <span className="text-xs text-emerald-400 font-black tracking-wide">
                     {t.scanner.scanComplete} ({selectedCrop.confidence}% {t.scanner.matchScore})
                   </span>
-                  {inferenceSource && (
+                  {lastScan && (
                     <span
-                      title={inferenceSource === 'cloud'
-                        ? 'Prediction returned by the configured cloud AI endpoint.'
-                        : isCloudAIConfigured
-                          ? 'Cloud prediction was unavailable or did not match a supported crop; using on-device analysis.'
-                          : 'Using on-device analysis. Configure VITE_AI_API_KEY to enable the cloud endpoint.'}
+                      title={lastScan.backend === 'cloud'
+                        ? 'This photo was analysed using the online fallback.'
+                        : lastScan.backend === 'none'
+                          ? 'Neither local nor online analysis was available.'
+                          : 'This photo was analysed on this device.'}
                       className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
-                        inferenceSource === 'cloud'
+                        lastScan.backend === 'cloud'
                           ? 'bg-emerald-100 text-emerald-800'
-                          : isSunlightMode ? 'bg-zinc-100 text-zinc-600' : 'bg-zinc-800 text-zinc-300'
+                          : lastScan.backend === 'none'
+                            ? 'bg-amber-100 text-amber-800'
+                            : isSunlightMode ? 'bg-zinc-100 text-zinc-600' : 'bg-zinc-800 text-zinc-300'
                       }`}
                     >
-                      {inferenceSource === 'cloud' ? 'Cloud AI' : 'On-device'}
+                      {lastScan.backend === 'cloud' ? 'Cloud fallback' : lastScan.backend === 'none' ? 'Analysis unavailable' : 'On-device AI'}
                     </span>
                   )}
                 </div>
