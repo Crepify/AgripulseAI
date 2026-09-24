@@ -123,20 +123,17 @@ function listZipEntries(buf) {
   let cdOffset = buf.readUInt32LE(eocd + 16);
 
   // Zip64 EOCD if needed
+  let zip64Total = 0;
   if (cdOffset === 0xffffffff || total === 0xffff) {
     for (let i = eocd - 20; i >= Math.max(0, eocd - 56); i--) {
       if (buf.readUInt32LE(i) === 0x06064b50) {
-        const zip64 = Number(buf.readBigUInt64LE(i + 8));
         const zip64cd = Number(buf.readBigUInt64LE(i + 48));
         if (zip64cd) cdOffset = zip64cd;
-        if (zip64 && zip64 !== 0xffff) {
-          // total entries at +32
-          var zip64Total = Number(buf.readBigUInt64LE(i + 32));
-        }
+        zip64Total = Number(buf.readBigUInt64LE(i + 32));
         break;
       }
     }
-    if (typeof zip64Total === "number" && zip64Total) total = zip64Total;
+    if (zip64Total) total = zip64Total;
   }
 
   const entries = [];
@@ -206,8 +203,6 @@ function readZipEntry(buf, entry) {
 }
 
 async function getZipBuffer() {
-  const { getCache, setCache } = globalThis.__driveZipCache || {};
-  // simple in-instance cache
   if (globalThis.__driveZipCache && globalThis.__driveZipCache.buf) {
     return globalThis.__driveZipCache.buf;
   }
