@@ -32,6 +32,7 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   const [mixingAcres, setMixingAcres] = useState(2);
   const [modelStatus, setModelStatus] = useState({ state: 'idle' });
   const [lastScan, setLastScan] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -101,16 +102,8 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
     await runScan(dataUrl);
   };
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setHasScanResult(false);
-      setScanError('Please choose an image file to scan.');
-      return;
-    }
-
+  // Reads a chosen/dropped image file and runs the same scan path for both entry points.
+  const startScanFromFile = (file) => {
     scanIdRef.current += 1;
     setIsAnalyzing(false);
     setHasScanResult(false);
@@ -133,6 +126,18 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
       setScanError('The selected image could not be read. Please try again.');
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setHasScanResult(false);
+      setScanError('Please choose an image file to scan.');
+      return;
+    }
+    startScanFromFile(file);
   };
 
   const runScan = async (imgSrc) => {
@@ -185,6 +190,34 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
     setIsAnalyzing(false);
     clearOverlay(canvasRef.current);
     sound.playSuccess();
+  };
+
+  // Drag & drop: dropping a leaf photo on the viewfinder runs the same scan as the upload button.
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) return;
+    sound.playClick();
+    if (!file.type.startsWith('image/')) {
+      setHasScanResult(false);
+      setScanError('Please choose an image file to scan.');
+      return;
+    }
+    startScanFromFile(file);
   };
 
   const modelStatusText = () => {
@@ -268,12 +301,34 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
                 </button>
               </div>
             ) : (
-              <div className="relative w-full h-[320px] flex items-center justify-center overflow-hidden">
+              <div
+                className="relative w-full h-[320px] flex items-center justify-center overflow-hidden"
+                onDragEnter={handleDragOver}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 <img
                   src={customImage || (hasScanResult ? selectedCrop.image : scannerPlaceholder)}
                   alt={customImage ? 'Uploaded leaf photo' : hasScanResult ? selectedCrop.name : scannerText.readyTitle}
                   className="w-full h-full object-cover"
                 />
+                {isDragging && (
+                  <div className="pointer-events-none absolute inset-0 z-30 flex flex-col items-center justify-center bg-zinc-950/80 backdrop-blur-sm">
+                    <div className="absolute inset-3 rounded-2xl border-2 border-dashed border-emerald-400/80" />
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-400/20 border-2 border-emerald-400 flex items-center justify-center">
+                      <Upload className="w-6 h-6 text-emerald-300" />
+                    </div>
+                    <p className="mt-3 px-6 text-center text-sm font-black text-emerald-100 animate-pulse">
+                      {scannerText.dropHint}
+                    </p>
+                  </div>
+                )}
+                {!hasScanResult && !customImage && !isDragging && (
+                  <div className="pointer-events-none absolute top-3 left-1/2 z-20 -translate-x-1/2 max-w-[92%] whitespace-nowrap rounded-full border border-zinc-400/40 bg-zinc-950/70 px-3 py-1.5 text-[10px] font-bold text-zinc-100 shadow-lg backdrop-blur-sm">
+                    <Upload className="mr-1 inline h-3 w-3 text-emerald-300" />{scannerText.dropHintShort}
+                  </div>
+                )}
                 {!hasScanResult && !customImage && (
                   <div className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 max-w-[90%] whitespace-nowrap rounded-full border border-emerald-300/40 bg-zinc-950/75 px-3 py-1.5 text-[9px] font-black tracking-wider text-emerald-100 shadow-lg backdrop-blur-sm">
                     <Sparkles className="mr-1 inline h-3 w-3 text-emerald-300" />{scannerText.readyBadge}
