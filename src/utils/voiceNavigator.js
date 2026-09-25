@@ -1,194 +1,159 @@
-// Enhanced voice intent with all new features + 22 languages
-export function classifyVoiceIntent(query, lang = 'hi') {
-  const q = query.toLowerCase();
+// Voice intent classifier for the 8-feature AgriPulse build.
+// Same contract as before: classifyVoiceIntent(transcript, lang) →
+// { targetTab, tabLabel: {lang: label}, speechResponse: {lang: sentence} }
+// Consumed by App, VoiceAssistant(+Enhanced), HandsFreeVoiceBanner, LoginPage.
 
-  // Marketplace: seeds, tractor, sell
-  if (q.includes('marketplace') || q.includes('बाजार') || q.includes('seed') || q.includes('बीज') || q.includes('tractor') || q.includes('ट्रैक्टर') || q.includes('sell') || q.includes('बेच') || q.includes('खरीद') || q.includes('equipment')) {
+export function classifyVoiceIntent(query) {
+  const q = String(query || '').toLowerCase();
+  const has = (...words) => words.some((w) => q.includes(w));
+
+  // 1) Automated Patti Auditor — slip / receipt / commission / stolen fees
+  if (has('patti', 'पट्टी', 'slip', 'receipt', 'रसीद', 'commission', 'कमीशन', 'kata', 'कटौती', 'deduction', 'audit', 'fee', 'फीस', 'charges')) {
     return {
-      targetTab: 'marketplace',
-      tabLabel: { hi: 'किसान बाजार', en: 'Marketplace', ta: 'சந்தை', te: 'మార్కెట్', kn: 'ಮಾರುಕಟ್ಟೆ', mr: 'बाजार', pa: 'ਬਾਜ਼ਾਰ', bn: 'বাজার', gu: 'બજાર' },
+      targetTab: 'patti',
+      tabLabel: { hi: 'पट्टी ऑडिट', en: 'Patti Auditor', ta: 'ரசீது தணிக்கை', te: 'రసీదు ఆడిట్', kn: 'ರಶೀದಿ ಆಡಿಟ್', mr: 'पट्टी ऑडिट', pa: 'ਪੱਟੀ ਆਡਿਟ', bn: 'রসিদ অডিট', gu: 'પટ્ટી ઓડિટ' },
       speechResponse: {
-        hi: 'किसान बाजार खोल दिया गया है। यहां आप अतिरिक्त बीज, ट्रैक्टर, स्प्रेयर बेच और खरीद सकते हैं।',
-        en: 'Opening Farmer Marketplace. Sell excess seeds, tractor, equipment or buy from nearby farmers.',
-        ta: 'விவசாயி சந்தை திறக்கப்பட்டது.',
-        te: 'రైతు మార్కెట్ తెరవబడింది.',
-        kn: 'ರೈತ ಮಾರುಕಟ್ಟೆ ತೆರೆಯಲಾಗಿದೆ.',
-        mr: 'शेतकरी बाजार उघडला आहे.',
-        pa: 'ਕਿਸਾਨ ਬਾਜ਼ਾਰ ਖੋਲ੍ਹਿਆ ਗਿਆ।',
-        bn: 'কৃষক বাজার খোলা হয়েছে।',
-        gu: 'ખેડૂત બજાર ખોલવામાં આવ્યું છે।',
-      }
+        hi: 'पट्टी ऑडिटर खोल दिया गया है। पट्टी की फोटो खींचें — हर कटौती कानूनी सीमा से जांची जाएगी और चोरी हुए पैसे रुपये में दिखेंगे।',
+        en: 'Opening Patti Auditor. Photograph your commission slip — every fee is checked against your state\'s legal limit and the exact rupees stolen are shown.',
+        ta: 'ரசீது தணிக்கை திறக்கப்பட்டது. ரசீதை புகைப்படம் எடுங்கள்.',
+        te: 'రసీదు ఆడిట్ తెరవబడింది. రసీదు ఫోటో తీయండి.',
+        kn: 'ರಶೀದಿ ಆಡಿಟ್ ತೆರೆಯಲಾಗಿದೆ. ರಶೀದಿಯ ಫೋಟೋ ತೆಗೆಯಿರಿ.',
+        mr: 'पट्टी ऑडिट उघडले आहे. पट्टीचा फोटो काढा.',
+        pa: 'ਪੱਟੀ ਆਡਿਟ ਖੋਲ੍ਹਿਆ ਗਿਆ। ਪੱਟੀ ਦੀ ਫੋਟੋ ਖਿੱਚੋ।',
+        bn: 'রসিদ অডিট খোলা হয়েছে। রসিদের ছবি তুলুন।',
+        gu: 'પટ્ટી ઓડિટ ખોલવામાં આવ્યું છે. પટ્ટીનો ફોટો લો.',
+      },
     };
   }
 
-  // Community
-  if (q.includes('community') || q.includes('सवाल') || q.includes('forum') || q.includes('fellow') || q.includes('पूछो') || q.includes('community') || q.includes('help from farmer') || q.includes('किसान से पूछो')) {
+  // 2) Weighing Fraud Tracker — scale / weight / kata / tola
+  if (has('weigh', 'weight', 'वजन', 'तौल', 'scale', 'कांटा', 'kanta', 'तराजू', 'wajan', 'tol')) {
     return {
-      targetTab: 'community',
-      tabLabel: { hi: 'किसान समुदाय', en: 'Community', ta: 'சமூகம்', te: 'సమాజం', kn: 'ಸಮುದಾಯ' },
+      targetTab: 'weigh',
+      tabLabel: { hi: 'तौल जांच', en: 'Weighing Check', ta: 'எடை சரிபார்ப்பு', te: 'తూకం తనిఖీ', kn: 'ತೂಕ ಪರಿಶೀಲನೆ', mr: 'वजन तपासणी', pa: 'ਤੋਲ ਜਾਂਚ', bn: 'ওজন যাচাই', gu: 'તોલ તપાસ' },
       speechResponse: {
-        hi: 'किसान समुदाय खोल दिया गया है। अपनी भाषा में सवाल पूछें, साथी किसान जवाब देंगे।',
-        en: 'Opening Farmer Community. Ask in your mother tongue, fellow farmers and agronomists will answer.',
-        ta: 'விவசாயி சமூகம் திறக்கப்பட்டது.',
-        te: 'రైతు సమాజం తెరవబడింది.',
-        kn: 'ರೈತ ಸಮುದಾಯ ತೆರೆಯಲಾಗಿದೆ.',
-      }
+        hi: 'तौल जांच खोल दी गई है। मंडी के कांटे की फोटो खींचें — समय, जीपीएस और हैश से लॉक होगी, फिर पट्टी से मिलाई जाएगी।',
+        en: 'Opening Weighing Fraud Tracker. Photograph the mandi scale — it locks with time, GPS and a hash, then compares against your payment slip.',
+        ta: 'எடை சரிபார்ப்பு திறக்கப்பட்டது. தராசின் புகைப்படம் எடுங்கள்.',
+        te: 'తూకం తనిఖీ తెరవబడింది. కాటా ఫోటో తీయండి.',
+        kn: 'ತೂಕ ಪರಿಶೀಲನೆ ತೆರೆಯಲಾಗಿದೆ. ತಕ್ಕಡಿಯ ಫೋಟೋ ತೆಗೆಯಿರಿ.',
+        mr: 'वजन तपासणी उघडली आहे. काट्याचा फोटो काढा.',
+        pa: 'ਤੋਲ ਜਾਂਚ ਖੋਲ੍ਹੀ ਗਈ। ਕੰਡੇ ਦੀ ਫੋਟੋ ਖਿੱਚੋ।',
+        bn: 'ওজন যাচাই খোলা হয়েছে। দাঁড়িপাল্লার ছবি তুলুন।',
+        gu: 'તોલ તપાસ ખોલવામાં આવી છે. કાંટાનો ફોટો લો.',
+      },
     };
   }
 
-  // Jobs
-  if (q.includes('job') || q.includes('मजदूर') || q.includes('labour') || q.includes('work') || q.includes('काम') || q.includes('मदद चाहिए') || q.includes('need help')) {
+  // 3) Farm-Gate Proof of Grade — grade / quality / certificate
+  if (has('grade', 'ग्रेड', 'quality', 'गुणवत्ता', 'certificate', 'प्रमाण', 'quality cut', 'क्वालिटी')) {
     return {
-      targetTab: 'jobs',
-      tabLabel: { hi: 'काम व मदद', en: 'Jobs & Help', ta: 'வேலை', te: 'పని', kn: 'ಕೆಲಸ' },
+      targetTab: 'grade',
+      tabLabel: { hi: 'गुणवत्ता प्रमाण', en: 'Proof of Grade', ta: 'தர சான்று', te: 'గ్రేడ్ ధృవీకరణ', kn: 'ದರ್ಜೆ ಪ್ರಮಾಣ', mr: 'गुणवत्ता प्रमाण', pa: 'ਗ੍ਰੇਡ ਸਬੂਤ', bn: 'গ্রেড প্রমাণ', gu: 'ગ્રેડ પુરાવો' },
       speechResponse: {
-        hi: 'काम और मदद टैब खोल दिया गया है। मजदूर चाहिए या काम दे सकते हैं, पोस्ट करें।',
-        en: 'Opening Jobs & Help. Need labour or offer work — post here, nearby farmers will see.',
-        ta: 'வேலை பக்கம் திறக்கப்பட்டது.',
-        te: 'పని పేజీ తెరవబడింది.',
-        kn: 'ಕೆಲಸ ಪುಟ ತೆರೆಯಲಾಗಿದೆ.',
-      }
+        hi: 'गुणवत्ता प्रमाण खोल दिया गया है। ट्रक लोड होने से पहले फसल स्कैन करें — समय और जीपीएस के साथ ग्रेडिंग सर्टिफिकेट मिलेगा।',
+        en: 'Opening Proof of Grade. Scan your crop before it leaves the farm — you get a time and GPS locked grading certificate against fake quality cuts.',
+        ta: 'தர சான்று திறக்கப்பட்டது. பயிரை ஸ்கேன் செய்யுங்கள்.',
+        te: 'గ్రేడ్ ధృవీకరణ తెరవబడింది. పంటను స్కాన్ చేయండి.',
+        kn: 'ದರ್ಜೆ ಪ್ರಮಾಣ ತೆರೆಯಲಾಗಿದೆ. ಬೆಳೆ ಸ್ಕ್ಯಾನ್ ಮಾಡಿ.',
+        mr: 'गुणवत्ता प्रमाण उघडले आहे. पीक स्कॅन करा.',
+        pa: 'ਗ੍ਰੇਡ ਸਬੂਤ ਖੋਲ੍ਹਿਆ ਗਿਆ। ਫਸਲ ਸਕੈਨ ਕਰੋ।',
+        bn: 'গ্রেড প্রমাণ খোলা হয়েছে। ফসল স্ক্যান করুন।',
+        gu: 'ગ્રેડ પુરાવો ખોલવામાં આવ્યો છે. પાક સ્કેન કરો.',
+      },
     };
   }
 
-  // Fuel
-  if (q.includes('fuel') || q.includes('डीजल') || q.includes('diesel') || q.includes('mileage') || q.includes('tractor mileage') || q.includes('efficiency') || q.includes('ईंधन')) {
+  // 4) Pesticide Price Exposer — pesticide / spray brand / generic price
+  if (has('pesticide', 'दवाई', 'दवा', 'spray', 'स्प्रे', 'generic', 'जेनेरिक', 'brand', 'ब्रांड', 'fungicide', 'insecticide', 'chemical', 'कीटनाशक')) {
     return {
-      targetTab: 'fuel',
-      tabLabel: { hi: 'डीजल बचत', en: 'Fuel Tracker', ta: 'எரிபொருள்', te: 'ఇంధనం', kn: 'ಇಂಧನ' },
+      targetTab: 'exposer',
+      tabLabel: { hi: 'असली दाम', en: 'Price Exposer', ta: 'உண்மை விலை', te: 'నిజమైన ధర', kn: 'ನಿಜವಾದ ಬೆಲೆ', mr: 'खरी किंमत', pa: 'ਅਸਲੀ ਕੀਮਤ', bn: 'আসল দাম', gu: 'સાચી કિંમત' },
       speechResponse: {
-        hi: 'डीजल बचत ट्रैकर खोल दिया गया है। ट्रैक्टर घंटे और डीजल लिखें, दक्षता बताता है।',
-        en: 'Opening Fuel Efficiency Tracker. Log tractor hours and diesel to see L/hour efficiency and saving tips.',
-        ta: 'எரிபொருள் திறன் திறக்கப்பட்டது.',
-        te: 'ఇంధన సామర్థ్యం తెరవబడింది.',
-        kn: 'ಇಂಧನ ದಕ್ಷತೆ ತೆರೆಯಲಾಗಿದೆ.',
-      }
+        hi: 'असली दाम खोल दिया गया है। दवाई की बोतल की फोटो खींचें या ब्रांड बोलें — वही जेनेरिक दवा और उसका असली थोक दाम दिखेगा।',
+        en: 'Opening Pesticide Price Exposer. Photograph the bottle or speak the brand — I show the identical generic and its true wholesale price with nearby shops.',
+        ta: 'உண்மை விலை திறக்கப்பட்டது. பாட்டிலின் புகைப்படம் எடுங்கள்.',
+        te: 'నిజమైన ధర తెరవబడింది. సీసా ఫోటో తీయండి.',
+        kn: 'ನಿಜವಾದ ಬೆಲೆ ತೆರೆಯಲಾಗಿದೆ. ಬಾಟಲಿಯ ಫೋಟೋ ತೆಗೆಯಿರಿ.',
+        mr: 'खरी किंमत उघडली आहे. बाटलीचा फोटो काढा.',
+        pa: 'ਅਸਲੀ ਕੀਮਤ ਖੋਲ੍ਹੀ ਗਈ। ਬੋਤਲ ਦੀ ਫੋਟੋ ਖਿੱਚੋ।',
+        bn: 'আসল দাম খোলা হয়েছে। বোতলের ছবি তুলুন।',
+        gu: 'સાચી કિંમત ખોલવામાં આવી છે. બોટલનો ફોટો લો.',
+      },
     };
   }
 
-  // Chatbot
-  if (q.includes('chat') || q.includes('bot') || q.includes('सहायक') || q.includes('पूछो') || q.includes('बात करो') || q.includes('help') || q.includes('मदद')) {
+  // 5) Voice-Activated Truck Pooling — truck / transport / pool
+  if (has('truck', 'ट्रक', 'pool', 'पूल', 'transport', 'भाड़ा', 'tempo', 'टेम्पो', 'गाड़ी', 'freight', 'vehicle', 'share truck')) {
     return {
-      targetTab: 'chatbot',
-      tabLabel: { hi: 'AI चैटबॉट', en: 'AI Chatbot', ta: 'சாட்பாட்', te: 'చాట్‌బాట్', kn: 'ಚಾಟ್‌ಬಾಟ್' },
+      targetTab: 'pool',
+      tabLabel: { hi: 'साझा ट्रक', en: 'Truck Pooling', ta: 'லாரி பகிர்வு', te: 'ట్రక్ పూలింగ్', kn: 'ಟ್ರಕ್ ಹಂಚಿಕೆ', mr: 'सामायिक ट्रक', pa: 'ਸਾਂਝਾ ਟਰੱਕ', bn: 'ভাগাভাগি ট্রাক', gu: 'સહિયારો ટ્રક' },
       speechResponse: {
-        hi: 'किसान AI चैटबॉट खोल दिया गया है। कॉल, टाइप, वॉइस — किसी भी भाषा में पूछें, CSC केंद्र भी दिखाता है।',
-        en: 'Opening Kisan AI Chatbot. Call, type, or voice in mother tongue — plus nearest CSC centers for help.',
-        ta: 'சாட்பாட் திறக்கப்பட்டது.',
-        te: 'చాట్‌బాట్ తెరవబడింది.',
-        kn: 'ಚಾಟ್‌ಬಾಟ್ ತೆರೆಯಲಾಗಿದೆ.',
-      }
+        hi: 'साझा ट्रक खोल दिया गया है। अपना माल बोलें — पांच किलोमीटर के किसानों के साथ डेढ़ टन का ट्रक भरकर भाड़ा बंट जाएगा।',
+        en: 'Opening Truck Pooling. Speak your load — farmers within five kilometres fill one one-and-a-half ton pickup and the freight splits by weight.',
+        ta: 'லாரி பகிர்வு திறக்கப்பட்டது. உங்கள் சுமையை சொல்லுங்கள்.',
+        te: 'ట్రక్ పూలింగ్ తెరవబడింది. మీ లోడ్ చెప్పండి.',
+        kn: 'ಟ್ರಕ್ ಹಂಚಿಕೆ ತೆರೆಯಲಾಗಿದೆ. ನಿಮ್ಮ ಲೋಡ್ ಹೇಳಿ.',
+        mr: 'सामायिक ट्रक उघडला आहे. तुमचा माल सांगा.',
+        pa: 'ਸਾਂਝਾ ਟਰੱਕ ਖੋਲ੍ਹਿਆ ਗਿਆ। ਆਪਣਾ ਲੋਡ ਬੋਲੋ।',
+        bn: 'ভাগাভাগি ট্রাক খোলা হয়েছে। আপনার মাল বলুন।',
+        gu: 'સહિયારો ટ્રક ખોલવામાં આવ્યો છે. તમારો માલ બોલો.',
+      },
     };
   }
 
-  // Services: calendar, subsidy, soil, csc, ivr
-  if (q.includes('calendar') || q.includes('बुवाई') || q.includes('sowing') || q.includes('subsidy') || q.includes('सब्सिडी') || q.includes('soil') || q.includes('मिट्टी') || q.includes('csc') || q.includes('center') || q.includes('kendra') || q.includes('pm-kisan') || q.includes('बीमा') || q.includes('insurance')) {
+  // 6) Reverse Fertilizer Auction — fertilizer / urea / auction / bid
+  if (has('auction', 'नीलामी', 'बोली', 'bid', 'fertilizer', 'खाद', 'urea', 'यूरिया', 'dap', 'डीएपी', 'herbicide', 'उर्वरक')) {
     return {
-      targetTab: 'services',
-      tabLabel: { hi: 'किसान सेवाएं', en: 'Services', ta: 'சேவைகள்', te: 'సేవలు', kn: 'ಸೇವೆಗಳು' },
+      targetTab: 'auction',
+      tabLabel: { hi: 'उल्टी बोली', en: 'Reverse Auction', ta: 'தலைகீழ் ஏலம்', te: 'రివర్స్ వేలం', kn: 'ರಿವರ್ಸ್ ಹರಾಜು', mr: 'उलटा लिलाव', pa: 'ਉਲਟੀ ਬੋਲੀ', bn: 'বিপরীত নিলাম', gu: 'ઊંધી હરાજી' },
       speechResponse: {
-        hi: 'किसान सेवाएं खोल दी गई हैं। फसल कैलेंडर, सब्सिडी, मिट्टी स्वास्थ्य, CSC केंद्र, IVR हेल्पलाइन — सब कुछ एक जगह।',
-        en: 'Opening Farmer Services. Crop calendar, subsidy, soil health, CSC centers, IVR helpline — everything in one place.',
-        ta: 'சேவைகள் திறக்கப்பட்டது.',
-        te: 'సేవలు తెరవబడింది.',
-        kn: 'ಸೇವೆಗಳು ತೆರೆಯಲಾಗಿದೆ.',
-      }
+        hi: 'उल्टी बोली खोल दी गई है। खाद का ऑर्डर डालें — गांव के ऑर्डर जुड़ेंगे और पांच दुकानदार सबसे कम दाम की बोली लगाएंगे।',
+        en: 'Opening Reverse Auction. Post your fertilizer order — it pools with your village and five dealers bid down for the whole lot.',
+        ta: 'தலைகீழ் ஏலம் திறக்கப்பட்டது. உர ஆர்டரை போடுங்கள்.',
+        te: 'రివర్స్ వేలం తెరవబడింది. ఎరువుల ఆర్డర్ పెట్టండి.',
+        kn: 'ರಿವರ್ಸ್ ಹರಾಜು ತೆರೆಯಲಾಗಿದೆ. ಗೊಬ್ಬರದ ಆರ್ಡರ್ ಹಾಕಿ.',
+        mr: 'उलटा लिलाव उघडला आहे. खताची ऑर्डर टाका.',
+        pa: 'ਉਲਟੀ ਬੋਲੀ ਖੋਲ੍ਹੀ ਗਈ। ਖਾਦ ਦਾ ਆਰਡਰ ਪਾਓ।',
+        bn: 'বিপরীত নিলাম খোলা হয়েছে। সারের অর্ডার দিন।',
+        gu: 'ઊંધી હરાજી ખોલવામાં આવી છે. ખાતરનો ઓર્ડર મૂકો.',
+      },
     };
   }
 
-  // Mandi / Market / Profit queries
-  if (q.includes('mandi') || q.includes('मंडी') || q.includes('भाव') || q.includes('rate') || q.includes('price') || q.includes('profit') || q.includes('मुनाफा') || q.includes('कमाई') || q.includes('bhav') || q.includes('bazaar')) {
+  // 8) Mandi ROI Simulator — price / profit / mandi / rate
+  if (has('price', 'दाम', 'भाव', 'rate', 'रेट', 'mandi', 'मंडी', 'profit', 'मुनाफ़ा', 'मुनाफा', 'roi', 'बाजार', 'market', 'sell', 'बेच', 'kitna milega', 'कितना मिलेगा')) {
     return {
       targetTab: 'profit',
-      tabLabel: { hi: 'मंडी भाव व मुनाफा', en: 'Mandi & ROI', ta: 'மண்டி & லாபம்', te: 'మండి ధరలు', kn: 'ಮಾರುಕಟ್ಟೆ ದರ', mr: 'मंडी भाव', pa: 'ਮੰਡੀ ਭਾਅ', bn: 'মান্ডি দর', gu: 'મંડી ભાવ' },
+      tabLabel: { hi: 'मुनाफ़ा कैलकुलेटर', en: 'ROI Simulator', ta: 'லாப கணிப்பு', te: 'లాభం లెక్క', kn: 'ಲಾಭ ಲೆಕ್ಕ', mr: 'नफा कॅल्क्युलेटर', pa: 'ਮੁਨਾਫਾ ਕੈਲਕੁਲੇਟਰ', bn: 'লাভ ক্যালকুলেটর', gu: 'નફો કેલ્ક્યુલેટર' },
       speechResponse: {
-        hi: 'मंडी भाव और फसल बचत स्क्रीन खोल दी गई है। आपके राज्य का लाइव भाव, 7 दिन का ट्रेंड, और "अभी बेचें" बटन — सब ऑटो।',
-        en: 'Opening Mandi rates with 7-day trend, auto-detected state, and Sell Now button to call trader.',
-        ta: 'மண்டி விலை திறக்கப்பட்டது.',
-        te: 'మండి ధరలు తెరవబడింది.',
-        kn: 'ಮಾರುಕಟ್ಟೆ ದರ ತೆರೆಯಲಾಗಿದೆ.',
-        mr: 'मंडी भाव उघडला आहे.',
-        pa: 'ਮੰਡੀ ਭਾਅ ਖੋਲ੍ਹਿਆ ਗਿਆ।',
-        bn: 'মান্ডি দর খোলা হয়েছে।',
-        gu: 'મંડી ભાવ ખોલવામાં આવ્યો છે।',
-      }
+        hi: 'मुनाफ़ा कैलकुलेटर खोल दिया गया है। एकड़ और फसल चुनें — भाड़ा, मजदूरी और मंडी फीस काटकर असली मुनाफ़ा दिखेगा।',
+        en: 'Opening Mandi ROI Simulator. Pick your acres and crop — I subtract transport, labor and A P M C fees from live prices to show your true net profit.',
+        ta: 'லாப கணிப்பு திறக்கப்பட்டது. ஏக்கரும் பயிரும் தேர்ந்தெடுங்கள்.',
+        te: 'లాభం లెక్క తెరవబడింది. ఎకరాలు, పంట ఎంచుకోండి.',
+        kn: 'ಲಾಭ ಲೆಕ್ಕ ತೆರೆಯಲಾಗಿದೆ. ಎಕರೆ ಮತ್ತು ಬೆಳೆ ಆರಿಸಿ.',
+        mr: 'नफा कॅल्क्युलेटर उघडला आहे. एकर आणि पीक निवडा.',
+        pa: 'ਮੁਨਾਫਾ ਕੈਲਕੁਲੇਟਰ ਖੋਲ੍ਹਿਆ ਗਿਆ। ਏਕੜ ਅਤੇ ਫਸਲ ਚੁਣੋ।',
+        bn: 'লাভ ক্যালকুলেটর খোলা হয়েছে। একর ও ফসল বাছুন।',
+        gu: 'નફો કેલ્ક્યુલેટર ખોલવામાં આવ્યો છે. એકર અને પાક પસંદ કરો.',
+      },
     };
   }
 
-  // Weather / Spray Time queries
-  if (q.includes('weather') || q.includes('rain') || q.includes('मौसम') || q.includes('बारिश') || q.includes('छिड़काव') || q.includes('रडार') || q.includes('radar') || q.includes('spray')) {
-    return {
-      targetTab: 'radar',
-      tabLabel: { hi: 'मौसम', en: 'Weather', ta: 'வானிலை', te: 'వాతావరణం', kn: 'ಹವಾಮಾನ' },
-      speechResponse: {
-        hi: 'मौसम खोल दिया गया है। सुरक्षित छिड़काव समय सुबह 6:30-10:30, बारिश पुश नोटिफिकेशन, और फसल कैलेंडर — सब ऑटो।',
-        en: 'Opening Weather with safe spray window, rain push notifications, and crop calendar auto-detected for your village.',
-        ta: 'வானிலை திறக்கப்பட்டது.',
-        te: 'వాతావరణం తెరవబడింది.',
-        kn: 'ಹವಾಮಾನ ತೆರೆಯಲಾಗಿದೆ.',
-      }
-    };
-  }
-
-  // Pesticide Verification
-  if (q.includes('fake') || q.includes('verify') || q.includes('असली') || q.includes('नकली') || q.includes('दवा जांच') || q.includes('barcode') || q.includes('qr') || q.includes('pesticide')) {
-    return {
-      targetTab: 'verify',
-      tabLabel: { hi: 'असली दवा जांच', en: 'Verify Pesticide', ta: 'மருந்து சரிபார்ப்பு', te: 'మందుల గుర్తింపు', kn: 'ಔಷಧ ಪರಿಶೀಲನೆ' },
-      speechResponse: {
-        hi: 'दवा जांच खोल दी गई है। QR कैमरा से स्कैन करें या बोतल फोटो अपलोड करें — AI होलोग्राम जांचता है।',
-        en: 'Opening Pesticide Verification with QR auto-scan camera and bottle photo upload — AI checks hologram.',
-        ta: 'மருந்து சரிபார்ப்பு திறக்கப்பட்டது.',
-        te: 'మందుల గుర్తింపు తెరవబడింది.',
-        kn: 'ಔಷಧ ಪರಿಶೀಲನೆ ತೆರೆಯಲಾಗಿದೆ.',
-      }
-    };
-  }
-
-  // Stores
-  if (q.includes('shop') || q.includes('store') || q.includes('dealer') || q.includes('दुकान') || q.includes('विक्रेता')) {
-    return {
-      targetTab: 'stores',
-      tabLabel: { hi: 'सरकारी दुकानें', en: 'Certified Stores', ta: 'அங்கீகரிக்கப்பட்ட கடைகள்', te: 'ప్రభుత్వ దుకాణాలు', kn: 'ಅಧಿಕೃತ ಮಳಿಗೆಗಳು' },
-      speechResponse: {
-        hi: 'प्रमाणित दुकानें खोल दी गई हैं। नियरेस्ट ऑटो-सॉर्ट, लाइव स्टॉक SMS अपडेट, और CSC केंद्र — बिना कॉल के उपलब्धता देखें।',
-        en: 'Opening Certified Stores — auto-sorted nearest, live stock via SMS auto-update, plus CSC centers.',
-        ta: 'கடைகள் திறக்கப்பட்டது.',
-        te: 'దుకాణాలు తెరవబడింది.',
-        kn: 'ಮಳಿಗೆಗಳು ತೆರೆಯಲಾಗಿದೆ.',
-      }
-    };
-  }
-
-  // Group
-  if (q.includes('group') || q.includes('fpo') || q.includes('समूह') || q.includes('छूट') || q.includes('discount')) {
-    return {
-      targetTab: 'group',
-      tabLabel: { hi: 'किसान समूह', en: 'Farmer Group', ta: 'விவசாயிகள் குழு', te: 'రైతు బృందం', kn: 'ರೈತರ ಗುಂಪು' },
-      speechResponse: {
-        hi: 'किसान समूह खोल दिया गया है। नियरेस्ट ग्रुप ऑटो-मैच, 25% फैक्ट्री छूट, एक टैप जॉइन — ट्रांसपोर्ट बचत।',
-        en: 'Opening Farmer Group — auto-matched nearest pool, 25% factory discount, one-tap join saves transport.',
-        ta: 'குழு திறக்கப்பட்டது.',
-        te: 'బృందం తెరవబడింది.',
-        kn: 'ಗುಂಪು ತೆರೆಯಲಾಗಿದೆ.',
-      }
-    };
-  }
-
-  // Default -> Leaf Scan
+  // 7) Disease Diagnosis Scanner — default / scan / leaf / disease
   return {
     targetTab: 'scan',
-    tabLabel: { hi: 'पत्ती जांच', en: 'Leaf Scanner', ta: 'இலை ஸ்கேனர்', te: 'ఆకు స్కానర్', kn: 'ಎಲೆ ಸ್ಕ್ಯಾನರ್', mr: 'पान स्कॅनर', pa: 'ਪੱਤਾ ਸਕੈਨਰ', bn: 'পাতা স্ক্যানার', gu: 'પાન સ્કેનર' },
+    tabLabel: { hi: 'रोग जांच', en: 'Disease Scanner', ta: 'நோய் ஸ்கேனர்', te: 'వ్యాధి స్కానర్', kn: 'ರೋಗ ಸ್ಕ್ಯಾನರ್', mr: 'रोग स्कॅनर', pa: 'ਰੋਗ ਸਕੈਨਰ', bn: 'রোগ স্ক্যানার', gu: 'રોગ સ્કેનર' },
     speechResponse: {
-      hi: 'पत्ती जांच खोल दी गई है। फोटो खींचें — ब्लर चेक, रोग इतिहास, ऑटो जमीन आकार, एक टैप शेयर, मल्टी-क्रॉप स्कैन — सब ऑटो।',
-      en: 'Opening Leaf Scanner with blur check, disease history, auto land size, one-tap WhatsApp share, multi-crop detection — all automated.',
-      ta: 'இலை ஸ்கேனர் திறக்கப்பட்டது.',
-      te: 'ఆకు స్కానర్ తెరవబడింది.',
-      kn: 'ಎಲೆ ಸ್ಕ್ಯಾನರ್ ತೆರೆಯಲಾಗಿದೆ.',
-      mr: 'पान स्कॅनर उघडला आहे.',
-      pa: 'ਪੱਤਾ ਸਕੈਨਰ ਖੋਲ੍ਹਿਆ ਗਿਆ।',
-      bn: 'পাতা স্ক্যানার খোলা হয়েছে।',
-      gu: 'પાન સ્કેનર ખોલવામાં આવ્યું છે।',
-    }
+      hi: 'रोग जांच खोल दी गई है। पत्ती की फोटो खींचें — बावन रोगों में से पहचान होगी और बोतल-ढक्कन में दवा की मात्रा बताई जाएगी।',
+      en: 'Opening Disease Scanner. Photograph the leaf — it identifies among fifty two diseases on-device and gives the dose in bottle caps per tank.',
+      ta: 'நோய் ஸ்கேனர் திறக்கப்பட்டது. இலையின் புகைப்படம் எடுங்கள்.',
+      te: 'వ్యాధి స్కానర్ తెరవబడింది. ఆకు ఫోటో తీయండి.',
+      kn: 'ರೋಗ ಸ್ಕ್ಯಾನರ್ ತೆರೆಯಲಾಗಿದೆ. ಎಲೆಯ ಫೋಟೋ ತೆಗೆಯಿರಿ.',
+      mr: 'रोग स्कॅनर उघडला आहे. पानाचा फोटो काढा.',
+      pa: 'ਰੋਗ ਸਕੈਨਰ ਖੋਲ੍ਹਿਆ ਗਿਆ। ਪੱਤੇ ਦੀ ਫੋਟੋ ਖਿੱਚੋ।',
+      bn: 'রোগ স্ক্যানার খোলা হয়েছে। পাতার ছবি তুলুন।',
+      gu: 'રોગ સ્કેનર ખોલવામાં આવ્યો છે. પાનનો ફોટો લો.',
+    },
   };
 }

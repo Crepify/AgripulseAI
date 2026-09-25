@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Scan, CloudSun, Handshake, TrendingUp, LayoutGrid, X } from 'lucide-react';
+import { Scan, Scale, ReceiptText, TrendingUp, LayoutGrid, X } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
 
@@ -11,17 +11,10 @@ import { T } from '../data/translations';
  */
 
 const MORE_TABS = [
-  { id: 'passbook', label: 'Passbook', emoji: '📗' },
-  { id: 'buyer', label: 'Buyer Market', emoji: '🏭' },
-  { id: 'verify', label: 'Verify Medicine', emoji: '🧴' },
-  { id: 'stores', label: 'Shops', emoji: '🏪' },
-  { id: 'group', label: 'Group Buy', emoji: '👥' },
-  { id: 'marketplace', label: 'Market', emoji: '🛒' },
-  { id: 'community', label: 'Community', emoji: '💬' },
-  { id: 'jobs', label: 'Jobs', emoji: '👷' },
-  { id: 'fuel', label: 'Fuel', emoji: '⛽' },
-  { id: 'chatbot', label: 'AI Chat', emoji: '🤖' },
-  { id: 'services', label: 'Govt Services', emoji: '🏛️' },
+  { id: 'grade', label: 'Proof of Grade', emoji: '📜' },
+  { id: 'exposer', label: 'Price Exposer', emoji: '💊' },
+  { id: 'pool', label: 'Truck Pooling', emoji: '🚚' },
+  { id: 'auction', label: 'Reverse Auction', emoji: '🔨' },
 ];
 
 export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSunlightMode }) {
@@ -29,10 +22,10 @@ export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSun
   const [moreOpen, setMoreOpen] = useState(false);
 
   const primary = [
-    { id: 'scan', label: t.tabs.scan || 'Scan', icon: Scan },
-    { id: 'radar', label: t.tabs.radar || 'Weather', icon: CloudSun },
-    { id: 'saathi', label: t.tabs.saathi || 'Saathi', icon: Handshake },
-    { id: 'profit', label: t.tabs.profit || 'Mandi', icon: TrendingUp },
+    { id: 'scan', label: t.tabs?.scan || 'Scan', icon: Scan },
+    { id: 'weigh', label: t.tabs?.weigh || 'Weigh', icon: Scale },
+    { id: 'patti', label: t.tabs?.patti || 'Patti', icon: ReceiptText },
+    { id: 'profit', label: t.tabs?.profit || 'ROI', icon: TrendingUp },
   ];
 
   const inMore = MORE_TABS.some((m) => m.id === activeTab);
@@ -101,7 +94,7 @@ export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSun
           {primary.map((p) => {
             const Icon = p.icon;
             const active = activeTab === p.id && !moreOpen;
-            const isSaathi = p.id === 'saathi';
+            const isSaathi = p.id === 'patti'; // hero feature gets the raised centre button
             return (
               <button key={p.id} onClick={() => go(p.id)} aria-current={active ? 'page' : undefined}
                 className="min-h-[64px] flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform">

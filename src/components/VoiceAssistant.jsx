@@ -14,16 +14,14 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
   const [navigatedTab, setNavigatedTab] = useState(null);
 
   const sampleQuestions = [
-    { text: 'मंडी भाव बताओ', topic: 'mandi' },
     { text: 'टमाटर में रोग है', topic: 'scan' },
-    { text: 'मौसम बताओ', topic: 'weather' },
-    { text: 'दवा असली है?', topic: 'verify' },
-    { text: 'बीज बेचना है', topic: 'marketplace' },
-    { text: 'किसान से पूछो', topic: 'community' },
-    { text: 'मजदूर चाहिए', topic: 'jobs' },
-    { text: 'डीजल बचत', topic: 'fuel' },
-    { text: 'सब्सिडी बताओ', topic: 'services' },
-    { text: 'CSC केंद्र कहां है?', topic: 'chatbot' },
+    { text: 'पट्टी जांचो', topic: 'patti' },
+    { text: 'वजन में चोरी?', topic: 'weigh' },
+    { text: 'गुणवत्ता प्रमाण चाहिए', topic: 'grade' },
+    { text: 'दवा का असली दाम', topic: 'exposer' },
+    { text: 'ट्रक साझा करो', topic: 'pool' },
+    { text: 'खाद की बोली लगाओ', topic: 'auction' },
+    { text: 'मंडी भाव बताओ', topic: 'mandi' },
   ];
 
   const handleAsk = (userText) => {

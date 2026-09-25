@@ -2,21 +2,14 @@ import React, { useState, useEffect } from 'react';
 
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
-import TabSaathi from './components/TabSaathi';
-import TabPassbook from './components/TabPassbook';
-import TabBuyer from './components/TabBuyer';
 import TabScanner from './components/TabScanner';
-import TabRadar from './components/TabRadar';
-import TabVerify from './components/TabVerify';
-import TabProfit from './components/TabProfit';
-import TabStores from './components/TabStores';
-import TabGroup from './components/TabGroup';
-import TabMarketplace from './components/TabMarketplace';
-import TabCommunity from './components/TabCommunity';
-import TabJobs from './components/TabJobs';
-import TabFuel from './components/TabFuel';
-import TabChatBot from './components/TabChatBot';
-import TabServices from './components/TabServices';
+import TabPatti from './components/TabPatti';
+import TabWeigh from './components/TabWeigh';
+import TabGrade from './components/TabGrade';
+import TabExposer from './components/TabExposer';
+import TabPool from './components/TabPool';
+import TabAuction from './components/TabAuction';
+import TabROI from './components/TabROI';
 import VoiceAssistant from './components/VoiceAssistant';
 import HandsFreeVoiceBanner from './components/HandsFreeVoiceBanner';
 import BackgroundCanvas from './components/BackgroundCanvas';
@@ -299,20 +292,13 @@ export default function App() {
         <AnimatePresence mode="wait">
         <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
         {activeTab === 'scan' && <TabScanner selectedLang={selectedLang} isSunlightMode={isSunlightMode} isLowLiteracy={isLowLiteracy} setIsLowLiteracy={setIsLowLiteracy} />}
-        {activeTab === 'radar' && <TabRadar selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'verify' && <TabVerify selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'profit' && <TabProfit selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'stores' && <TabStores selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'group' && <TabGroup selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'marketplace' && <TabMarketplace selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'community' && <TabCommunity selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'jobs' && <TabJobs selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'fuel' && <TabFuel selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'chatbot' && <TabChatBot selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'services' && <TabServices selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'saathi' && <TabSaathi selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'passbook' && <TabPassbook selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
-        {activeTab === 'buyer' && <TabBuyer selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'patti' && <TabPatti selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'weigh' && <TabWeigh selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'grade' && <TabGrade selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'exposer' && <TabExposer selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'pool' && <TabPool selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'auction' && <TabAuction selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'profit' && <TabROI selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         </motion.div>
         </AnimatePresence>
       </main>

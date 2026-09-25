@@ -25,10 +25,10 @@ export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedL
   }
 
   const features = [
-    { icon: Scan, title: hi ? 'पत्ती स्कैन' : 'Scan a Leaf', desc: hi ? 'फोटो लो, बीमारी + दवा तुरंत' : 'Photo → disease + remedy instantly', color: 'bg-emerald-100 text-emerald-700' },
-    { icon: Handshake, title: hi ? 'किसान साथी' : 'Kisan Saathi', desc: hi ? '₹235/क्विंटल सीधे बैंक में' : '₹235/quintal net, straight to bank', color: 'bg-amber-100 text-amber-700' },
-    { icon: TrendingUp, title: hi ? 'मंडी भाव' : 'Mandi Rates', desc: hi ? 'हर राज्य के लाइव भाव' : 'Live prices for every state', color: 'bg-sky-100 text-sky-700' },
-    { icon: Mic, title: hi ? 'बोलकर चलाओ' : 'Voice Control', desc: hi ? 'गीले हाथ? बस बोलिए' : 'Muddy hands? Just speak', color: 'bg-violet-100 text-violet-700' },
+    { icon: Scan, title: hi ? 'रोग स्कैनर' : 'Disease Scanner', desc: hi ? 'फोटो लो — 52 रोगों की पहचान + दवा' : 'Photo → 52 diseases + exact dose', color: 'bg-emerald-100 text-emerald-700' },
+    { icon: Handshake, title: hi ? 'पट्टी ऑडिट' : 'Patti Auditor', desc: hi ? 'हर कटौती जांचो — चोरी के ₹ पकड़ो' : 'Audit every fee — catch stolen ₹', color: 'bg-amber-100 text-amber-700' },
+    { icon: TrendingUp, title: hi ? 'मुनाफ़ा सिम्युलेटर' : 'ROI Simulator', desc: hi ? 'भाड़ा-फीस काटकर असली मुनाफ़ा' : 'Net profit after transport + fees', color: 'bg-sky-100 text-sky-700' },
+    { icon: Mic, title: hi ? 'बोलकर ट्रक पूल' : 'Voice Truck Pool', desc: hi ? 'बोलो — ट्रक भरो, भाड़ा बांटो' : 'Speak → fill a truck, split freight', color: 'bg-violet-100 text-violet-700' },
   ];
 
   return (
