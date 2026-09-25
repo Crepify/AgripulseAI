@@ -1,0 +1,110 @@
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Scan, CloudSun, Handshake, TrendingUp, LayoutGrid, X } from 'lucide-react';
+import { sound } from '../utils/audio';
+import { T } from '../data/translations';
+
+/*
+ * FULL MOBILE BOTTOM NAVIGATION
+ * 4 primary destinations + "More" sheet with every other service.
+ * All touch targets ≥ 56px (the Bapu Test).
+ */
+
+const MORE_TABS = [
+  { id: 'passbook', label: 'Passbook', emoji: '📗' },
+  { id: 'buyer', label: 'Buyer Market', emoji: '🏭' },
+  { id: 'verify', label: 'Verify Medicine', emoji: '🧴' },
+  { id: 'stores', label: 'Shops', emoji: '🏪' },
+  { id: 'group', label: 'Group Buy', emoji: '👥' },
+  { id: 'marketplace', label: 'Market', emoji: '🛒' },
+  { id: 'community', label: 'Community', emoji: '💬' },
+  { id: 'jobs', label: 'Jobs', emoji: '👷' },
+  { id: 'fuel', label: 'Fuel', emoji: '⛽' },
+  { id: 'chatbot', label: 'AI Chat', emoji: '🤖' },
+  { id: 'services', label: 'Govt Services', emoji: '🏛️' },
+];
+
+export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSunlightMode }) {
+  const t = T[selectedLang] || T['en'];
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  const primary = [
+    { id: 'scan', label: t.tabs.scan || 'Scan', icon: Scan },
+    { id: 'radar', label: t.tabs.radar || 'Weather', icon: CloudSun },
+    { id: 'saathi', label: 'Saathi', icon: Handshake },
+    { id: 'profit', label: t.tabs.profit || 'Mandi', icon: TrendingUp },
+  ];
+
+  const inMore = MORE_TABS.some((m) => m.id === activeTab);
+
+  const go = (id) => { sound.playClick(); setActiveTab(id); setMoreOpen(false); };
+
+  return (
+    <>
+      {/* More sheet */}
+      <AnimatePresence>
+        {moreOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/60" onClick={() => setMoreOpen(false)}>
+            <motion.div initial={{ y: 400 }} animate={{ y: 0 }} exit={{ y: 400 }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className={`absolute bottom-0 inset-x-0 mx-auto max-w-md rounded-t-3xl border-t-2 px-4 pt-4 pb-24 ${
+                isSunlightMode ? 'bg-white border-zinc-200' : 'bg-[#101312] border-zinc-800'
+              }`}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`font-black text-base ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>All Services • सभी सेवाएं</h3>
+                <button onClick={() => setMoreOpen(false)} aria-label="Close" className={`p-2.5 rounded-full ${isSunlightMode ? 'bg-zinc-100 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}><X className="w-5 h-5" /></button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {MORE_TABS.map((m) => {
+                  const active = activeTab === m.id;
+                  return (
+                    <button key={m.id} onClick={() => go(m.id)}
+                      className={`min-h-[84px] rounded-2xl border-2 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform ${
+                        active ? 'bg-emerald-500 text-black border-emerald-400'
+                          : isSunlightMode ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
+                      }`}>
+                      <span className="text-3xl leading-none">{m.emoji}</span>
+                      <span className="text-[11px] font-black text-center leading-tight px-1">{t.tabs?.[m.id] || m.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bottom bar */}
+      <nav aria-label="Main Navigation" className={`fixed bottom-0 inset-x-0 z-40 mx-auto max-w-md border-t-2 pb-safe ${
+        isSunlightMode ? 'bg-white/95 border-zinc-200' : 'bg-[#0c0f0e]/95 border-zinc-800'
+      }`} style={{ backdropFilter: 'blur(12px)' }}>
+        <div className="grid grid-cols-5">
+          {primary.map((p) => {
+            const Icon = p.icon;
+            const active = activeTab === p.id && !moreOpen;
+            const isSaathi = p.id === 'saathi';
+            return (
+              <button key={p.id} onClick={() => go(p.id)} aria-current={active ? 'page' : undefined}
+                className="min-h-[64px] flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform">
+                {isSaathi ? (
+                  <span className={`-mt-5 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg border-2 ${active ? 'bg-emerald-500 border-emerald-300 text-black' : 'bg-emerald-600 border-emerald-500 text-white'}`}>
+                    <Icon className="w-6 h-6" />
+                  </span>
+                ) : (
+                  <Icon className={`w-6 h-6 ${active ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-500' : 'text-zinc-400'}`} />
+                )}
+                <span className={`text-[10px] font-black ${active ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-600' : 'text-zinc-400'}`}>{p.label}</span>
+              </button>
+            );
+          })}
+          <button onClick={() => { sound.playClick(); setMoreOpen(true); }} aria-expanded={moreOpen}
+            className="min-h-[64px] flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform">
+            <LayoutGrid className={`w-6 h-6 ${moreOpen || inMore ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-500' : 'text-zinc-400'}`} />
+            <span className={`text-[10px] font-black ${moreOpen || inMore ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-600' : 'text-zinc-400'}`}>More</span>
+          </button>
+        </div>
+      </nav>
+    </>
+  );
+}

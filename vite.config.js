@@ -34,6 +34,8 @@ function devApiRoutes() {
     '/api/predict': './api/predict.js',
     '/api/otp': './api/otp.js',
     '/api/google': './api/google.js',
+    '/api/whatsapp-webhook': './api/whatsapp-webhook.js',
+    '/api/deals-dispatch': './api/deals-dispatch.js',
   }
   return {
     name: 'agripulse-dev-api',

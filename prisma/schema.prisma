@@ -1,0 +1,186 @@
+// AgriPulse AI — Farmer Commerce OS database schema
+// PostgreSQL via Supabase; run `prisma migrate dev` when the backend goes live.
+// The Vite PWA currently mocks these flows client-side + via /api functions;
+// this schema is the contract for the production Postgres rollout.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Supabase connection string
+}
+
+// ── Actors ─────────────────────────────────────────────────────────────
+
+enum Role {
+  FARMER
+  SAATHI // Kisan Saathi — village youth hub operator
+  BUYER  // verified bulk buyer: retailer / processor / FPO
+  DRIVER // truck fleet driver (dual-QR party)
+}
+
+model User {
+  id            String   @id @default(cuid())
+  role          Role
+  name          String
+  phone         String   @unique // WhatsApp-first identity
+  village       String?
+  // 70% Govt Trust Anchors — verification via govt IDs, stored masked+hashed
+  pmKisanIdHash String?  @unique
+  kccIdHash     String?  @unique
+  govtVerified  Boolean  @default(false)
+  upiVra        String?  // farmer payout VPA (Razorpay Route destination)
+  gstin         String?  // buyers only
+  createdAt     DateTime @default(now())
+
+  hub          PanchayatHub? @relation("HubSaathi", fields: [hubId], references: [id])
+  hubId        String?
+  cropLots     CropLot[]     @relation("FarmerLots")
+  bids         Bid[]
+  transactions Transaction[] @relation("FarmerTxns")
+}
+
+// ── Infrastructure ─────────────────────────────────────────────────────
+
+model PanchayatHub {
+  id           String   @id @default(cuid())
+  name         String
+  village      String
+  district     String
+  state        String
+  lat          Float
+  lng          Float
+  rentPerQ     Decimal  @default(3) @db.Decimal(6, 2) // ₹3/quintal lease
+  razorpayAcct String? // hub rent payout account
+  active       Boolean  @default(true)
+
+  saathis  User[]           @relation("HubSaathi")
+  lots     CropLot[]
+  hardware HardwareDevice[]
+}
+
+// Zero-trust hardware registry — only VERIFIED devices may stream weights
+model HardwareDevice {
+  id          String    @id @default(cuid())
+  hub         PanchayatHub @relation(fields: [hubId], references: [id])
+  hubId       String
+  kind        DeviceKind
+  bluetoothId String    @unique // MAC / GATT device id, pinned at enrolment
+  label       String
+  verified    Boolean   @default(false)
+  lastSeenAt  DateTime?
+
+  weighments Weighment[]
+}
+
+enum DeviceKind {
+  BLUETOOTH_SCALE
+  THERMAL_PRINTER
+}
+
+// ── Trade objects ──────────────────────────────────────────────────────
+
+enum LotStatus {
+  WEIGHING
+  QUALITY_AUDIT
+  LISTED
+  ESCROW_LOCKED
+  LOADED
+  RELEASED
+  DISPUTED
+}
+
+model CropLot {
+  id         String    @id @default(cuid())
+  hub        PanchayatHub @relation(fields: [hubId], references: [id])
+  hubId      String
+  farmer     User      @relation("FarmerLots", fields: [farmerId], references: [id])
+  farmerId   String
+  crop       String
+  // native farmer units — quintal is canonical, crate/bori kept for display
+  quintals   Decimal   @db.Decimal(10, 2)
+  unitShown  String    @default("QUINTAL") // QUINTAL | CRATE | BORI
+  declaredGrade String
+  // Computer-vision audit (3 frames required)
+  cvGrade    String?
+  cvColorPct Int?
+  cvSizePct  Int?
+  cvRotPct   Decimal?  @db.Decimal(5, 2)
+  moisturePct Decimal? @db.Decimal(5, 2)
+  framesUrls String[]  // exactly 3 camera frames
+  status     LotStatus @default(WEIGHING)
+  createdAt  DateTime  @default(now())
+
+  weighments  Weighment[]
+  bids        Bid[]
+  transaction Transaction?
+}
+
+// Every scale reading is an immutable event from a VERIFIED device —
+// manual weight entry does not exist anywhere in this schema.
+model Weighment {
+  id        String   @id @default(cuid())
+  lot       CropLot  @relation(fields: [lotId], references: [id])
+  lotId     String
+  device    HardwareDevice @relation(fields: [deviceId], references: [id])
+  deviceId  String
+  kg        Decimal  @db.Decimal(10, 2)
+  stable    Boolean
+  streamedAt DateTime @default(now())
+}
+
+enum BidStatus {
+  OPEN
+  ESCROWED
+  WON
+  LOST
+  REFUNDED
+}
+
+model Bid {
+  id             String    @id @default(cuid())
+  lot            CropLot   @relation(fields: [lotId], references: [id])
+  lotId          String
+  buyer          User      @relation(fields: [buyerId], references: [id])
+  buyerId        String
+  pricePerQ      Decimal   @db.Decimal(8, 2) // buyer side, e.g. 300.00
+  razorpayOrderId String?  // 100% escrow order
+  status         BidStatus @default(OPEN)
+  createdAt      DateTime  @default(now())
+}
+
+enum TxnStatus {
+  ESCROW_LOCKED
+  AWAITING_DUAL_QR
+  RELEASED
+  REFUNDED
+}
+
+// The financial loop — one row per truckload deal
+model Transaction {
+  id       String  @id @default(cuid())
+  lot      CropLot @relation(fields: [lotId], references: [id])
+  lotId    String  @unique
+  farmer   User    @relation("FarmerTxns", fields: [farmerId], references: [id])
+  farmerId String
+
+  buyerPaysPerQ   Decimal @default(300) @db.Decimal(8, 2)
+  farmerNetPerQ   Decimal @default(235) @db.Decimal(8, 2) // NET IN HAND
+  saathiFeePerQ   Decimal @default(25) @db.Decimal(8, 2)
+  logisticsPerQ   Decimal @default(20) @db.Decimal(8, 2)
+  hubRentPerQ     Decimal @default(3) @db.Decimal(8, 2)
+  platformPerQ    Decimal @default(17) @db.Decimal(8, 2)
+
+  razorpayEscrowId    String? @unique
+  razorpayTransferGrp String?
+
+  // Dual-QR zero-trust release — both must be non-null before payout
+  saathiScanAt DateTime?
+  driverScanAt DateTime?
+
+  status    TxnStatus @default(ESCROW_LOCKED)
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+}

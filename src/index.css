@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/*
+  FULL MOBILE MODE — AgriPulse is a phone-first farmer app.
+  Every responsive desktop variant (sm:/md:/lg:/xl:) is pushed beyond any real
+  screen, so the app ALWAYS renders its mobile layout — on desktop it lives
+  inside a centered phone frame (see #ap-phone-frame in App.jsx).
+*/
+@theme {
+  --breakpoint-sm: 400rem;
+  --breakpoint-md: 401rem;
+  --breakpoint-lg: 402rem;
+  --breakpoint-xl: 403rem;
+  --breakpoint-2xl: 404rem;
+}
+
+
 *, ::before, ::after {
   box-sizing: border-box;
 }

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
 import Header from './components/Header';
-import TabNav from './components/TabNav';
+import BottomNav from './components/BottomNav';
+import TabSaathi from './components/TabSaathi';
+import TabPassbook from './components/TabPassbook';
+import TabBuyer from './components/TabBuyer';
 import TabScanner from './components/TabScanner';
 import TabRadar from './components/TabRadar';
 import TabVerify from './components/TabVerify';
@@ -165,16 +168,23 @@ export default function App() {
 
   if (!user) {
     return (
-      <LandingPage
-        onLoginSuccess={(session) => setUser(session)}
-        selectedLang={selectedLang}
-        setSelectedLang={setSelectedLang}
-      />
+      <div className="min-h-dvh w-full bg-black">
+        {/* FULL MOBILE MODE — login also lives in the centered phone frame */}
+        <div className="relative mx-auto min-h-dvh w-full max-w-md shadow-2xl overflow-x-hidden">
+          <LandingPage
+            onLoginSuccess={(session) => setUser(session)}
+            selectedLang={selectedLang}
+            setSelectedLang={setSelectedLang}
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className={`min-h-dvh flex flex-col font-sans selection:bg-emerald-500 selection:text-black transition-colors ${
+    <div className={`min-h-dvh w-full transition-colors ${isSunlightMode ? 'bg-zinc-300' : 'bg-black'}`}>
+    {/* FULL MOBILE MODE — the whole app lives in a centered phone frame */}
+    <div id="ap-phone-frame" className={`relative mx-auto flex min-h-dvh w-full max-w-md flex-col font-sans shadow-2xl selection:bg-emerald-500 selection:text-black transition-colors ${
       isSunlightMode ? 'bg-[#f4f7f5] text-zinc-900' : 'bg-[#090a09] text-white'
     }`}>
       {/* Background Bio-Aura Canvas (Dark mode only) */}
@@ -219,7 +229,7 @@ export default function App() {
         />
 
         {/* Voice guide companion — replay the service tour or stop it */}
-        <div className="fixed bottom-20 right-3 z-40 flex flex-col items-end gap-2">
+        <div className="fixed bottom-[148px] inset-x-0 z-30 mx-auto max-w-md flex flex-col items-end gap-2 px-3 pointer-events-none [&>button]:pointer-events-auto">
           {guideActive ? (
             <button
               onClick={() => { sound.playClick(); voiceGuide.stopTour(); }}
@@ -245,18 +255,10 @@ export default function App() {
           onNavigate={handleAutoNavigate}
         />
 
-        {/* Tab Navigation (scroll-snap row on mobile, always reachable) */}
-        <TabNav
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          selectedLang={selectedLang}
-          isSunlightMode={isSunlightMode}
-          isLowLiteracy={isLowLiteracy}
-        />
       </div>
 
       {/* Main Tab Stage (Full Natural Scroll) */}
-      <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-5 pb-28 sm:pb-12 relative z-10">
+      <main className="flex-1 w-full px-3 py-4 pb-28 relative z-10">
         {activeTab === 'scan' && <TabScanner selectedLang={selectedLang} isSunlightMode={isSunlightMode} isLowLiteracy={isLowLiteracy} setIsLowLiteracy={setIsLowLiteracy} />}
         {activeTab === 'radar' && <TabRadar selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'verify' && <TabVerify selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
@@ -269,10 +271,21 @@ export default function App() {
         {activeTab === 'fuel' && <TabFuel selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'chatbot' && <TabChatBot selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'services' && <TabServices selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'saathi' && <TabSaathi selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'passbook' && <TabPassbook selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'buyer' && <TabBuyer selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
       </main>
 
+      {/* Bottom mobile navigation — primary tabs + More sheet */}
+      <BottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        selectedLang={selectedLang}
+        isSunlightMode={isSunlightMode}
+      />
+
       {/* Floating 1-Tap Voice Assistant — round icon on phones, labeled pill on larger screens */}
-      <div className="fixed right-3 sm:right-5 bottom-safe z-30">
+      <div className="fixed bottom-[88px] inset-x-0 z-30 mx-auto max-w-md flex justify-end px-3 pointer-events-none [&>button]:pointer-events-auto">
         <button
           onClick={() => { sound.playClick(); setIsVoiceOpen(true); }}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-400 hover:bg-emerald-300 text-black border-2 border-emerald-300 shadow-[0_0_25px_rgba(52,211,153,0.6)] transition-transform hover:scale-105 active:scale-95 sm:h-auto sm:w-auto sm:gap-2 sm:px-5 sm:py-3"
@@ -284,7 +297,7 @@ export default function App() {
       </div>
 
       {/* Clean Minimalist Footer */}
-      <footer className={`border-t px-4 lg:px-8 py-3 pb-safe flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs transition-colors relative z-10 ${
+      <footer className={`border-t px-4 lg:px-8 py-3 pb-24 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs transition-colors relative z-10 ${
         isSunlightMode ? 'bg-zinc-200 border-zinc-300 text-zinc-700 font-bold' : 'bg-zinc-950 border-zinc-800 text-zinc-400 font-medium'
       }`}>
         <div className="min-w-0 truncate">{t.footerText}</div>
@@ -308,6 +321,7 @@ export default function App() {
         deferredPrompt={deferredPrompt}
         selectedLang={selectedLang}
       />
+    </div>
     </div>
   );
 }

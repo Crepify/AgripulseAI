@@ -60,6 +60,23 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 
 ---
 
+## 🤝 NEW: Kisan Saathi — Farmer Commerce Operating System
+
+AgriPulse now ships the full farmer-to-buyer commerce loop (mobile-first PWA):
+
+| Module | Where | What it does |
+|---|---|---|
+| **Kisan Saathi Aggregation Console** | `src/components/TabSaathi.jsx` | PM-KISAN/KCC onboarding, **read-only Web Bluetooth scale** (manual weight entry hard-disabled — anti weighbridge fraud), Hindi TTS weight broadcast, 3-frame AI quality audit, 58mm thermal receipt, escrow + **dual-QR release** |
+| **Farmer WhatsApp Passbook** | `src/components/TabPassbook.jsx` + `api/whatsapp-webhook.js` | Voice-note → structured deal (Whisper/Sarvam mock), NET-IN-HAND passbook, step tracker (Weighed → Escrow → Loaded → UPI Paid), zero-deduction mandi comparison |
+| **Buyer Bidding & Supply Map** | `src/components/TabBuyer.jsx` | Live village-hub supply map, aggregated lots with CV quality scores, "Lock Lot & Pay 100% to Escrow" (Razorpay mock) |
+| **Payments & Schema** | `api/deals-dispatch.js` + `prisma/schema.prisma` | Dual-QR zero-trust split payout (Farmer ₹235/q • Saathi ₹25 • Fleet ₹20 • Hub ₹3 • Platform ₹17) + production Postgres contract |
+
+**Unit economics per quintal:** Buyer pays ₹300 → Farmer takes home **₹235 NET** (10%+ over mandi, zero hidden cuts) → ₹65 platform fee funds the Saathi, fleet, Panchayat hub and AgriPulse. Every screen shows live **MSP & e-NAM govt benchmarks** (70/30 Rural Trust Engine).
+
+The whole app now runs in **full mobile style** — a phone-frame layout with bottom navigation, ≥56px touch targets and big-number NET pricing ("the Bapu Test").
+
+---
+
 ## ✨ Key Features & Innovations
 
 ### 1. 🌿 Hybrid Cloud + On-Device Leaf Scanner
