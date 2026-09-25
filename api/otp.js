@@ -137,20 +137,36 @@ async function sendSms(mobile, code, provider) {
   }
 
   if (provider === 'fast2sms') {
-    // Dedicated OTP route — delivers to DND numbers too (the promotional
-    // 'q' route gets rejected with "Number blocked in Fast2SMS DND list").
-    // The SMS arrives as "Your OTP: 123456".
-    const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+    const base = {
       method: 'POST',
       headers: {
         authorization: process.env.FAST2SMS_API_KEY,
         'content-type': 'application/x-www-form-urlencoded',
       },
+    };
+    // 1) Dedicated OTP route — reaches DND numbers, but requires account KYC
+    //    (PAN/Aadhaar/website verification) which many hackathon teams skip.
+    const otpRes = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+      ...base,
       body: new URLSearchParams({ route: 'otp', variables_values: code, numbers: mobile }),
     });
-    const data = await res.json().catch(() => null);
-    if (!res.ok || data?.return === false) {
-      throw new Error(`fast2sms ${res.status}: ${JSON.stringify(data || {}).slice(0, 180)}`);
+    const otpData = await otpRes.json().catch(() => null);
+    if (otpRes.ok && otpData?.return !== false) return;
+
+    // 2) KYC locked (status 996) → promotional quick route still works
+    //    WITHOUT any KYC. Delivers to non-DND numbers, 9am–9pm — fine for a
+    //    daytime demo. Any other error is a real failure.
+    const kycLocked = otpData?.status_code === 996 || /verification|kyc/i.test(otpData?.message || '');
+    if (!kycLocked) {
+      throw new Error(`fast2sms ${otpRes.status}: ${JSON.stringify(otpData || {}).slice(0, 180)}`);
+    }
+    const qRes = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+      ...base,
+      body: new URLSearchParams({ route: 'q', message: text, numbers: mobile }),
+    });
+    const qData = await qRes.json().catch(() => null);
+    if (!qRes.ok || qData?.return === false) {
+      throw new Error(`fast2sms ${qRes.status}: ${JSON.stringify(qData || {}).slice(0, 180)}`);
     }
     return;
   }
