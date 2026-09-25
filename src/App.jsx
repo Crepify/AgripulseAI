@@ -116,7 +116,9 @@ export default function App() {
 
   // ── Voice guide: run the service tour once the farmer logs in ──────────
   useEffect(() => {
-    voiceGuide.onStateChange = () => setGuideActive(voiceGuide.active);
+    // subscribe (not a single callback slot) so the login page's subscription
+    // is never stolen and both components stay in sync
+    const unsubscribe = voiceGuide.subscribe(() => setGuideActive(voiceGuide.active));
     if (user && voiceGuide.tourPending) {
       voiceGuide.tourPending = false;
       // While the guide waits for an answer, the farmer can just SAY an
@@ -138,6 +140,7 @@ export default function App() {
     if (!user) {
       voiceGuide.onCommand = null;
     }
+    return unsubscribe;
   }, [user, selectedLang]);
 
   // The modal assistant / hands-free mode own the mic — pause the guide then.
