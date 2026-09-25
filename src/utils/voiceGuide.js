@@ -614,6 +614,7 @@ export class VoiceGuide {
     this.lang = 'hi';
     this.lastLine = '';
     this.lastHeard = '';   // most recent thing the farmer said
+    this._lastSpeechAt = 0; // when the farmer last spoke (in-flow language lock)
     this.onCommand = null;     // (transcript) => boolean — app-level commands
     this._subscribers = new Set(); // UI subscribers (multiple components safely)
     this._ackWaiter = null;
@@ -974,8 +975,19 @@ export class VoiceGuide {
     const foreign = ['en', 'hi', 'ta', 'te', 'kn']
       .filter((l) => l !== this.lang)
       .map((l) => `${l}-IN`);
-    if (this._listenCycle % 2 === 1 || foreign.length === 0) return own;
-    return foreign[(this._earIdx++) % foreign.length];
+    // Mid-conversation: the farmer spoke recently or owes an answer — keep
+    // the mic locked on the conversation's own language (plus an occasional
+    // English ear). This is when registration matters most, and a foreign
+    // recognizer here mangled half of everything the farmer said.
+    const inFlow = (Date.now() - this._lastSpeechAt) < 15000 || !!this._ackWaiter || this._askPending;
+    if (inFlow) {
+      if (this.lang !== 'en' && (this._listenCycle % 4 === 0)) return 'en-IN';
+      return own;
+    }
+    // Idle: rotate a foreign ear in every 3rd cycle so speaking ANY language
+    // still gets auto-detected within seconds.
+    if (this._listenCycle % 3 === 0 && foreign.length) return foreign[(this._earIdx++) % foreign.length];
+    return own;
   }
 
   // Keep the mic hot between instructions AND while the guide itself speaks
@@ -1049,6 +1061,8 @@ export class VoiceGuide {
     const q = String(transcript || '').trim();
     if (!q) return;
     if (this._similarToSpeech(q)) return; // echo of our own line — ignore
+    this.lastHeard = q;
+    this._lastSpeechAt = Date.now(); // real interruption — conversation is live
     this._speechGen += 1;                 // cancel every line queued before this moment
     this._speaking = false;
     try { this.engine.stopSpeaking(); } catch { /* noop */ }
@@ -1066,6 +1080,7 @@ export class VoiceGuide {
     const q = String(transcript || '').trim();
     if (!q) return;
     this.lastHeard = q;
+    this._lastSpeechAt = Date.now(); // keep the mic locked to this language
     const intent = matchIntent(this.lang, q);
 
     if (intent === 'repeat') {

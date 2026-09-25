@@ -7,6 +7,8 @@ class SpeechEngine {
     this.recognition = null;
     this.isListening = false;
     this.voices = [];
+    this._finalText = '';   // accumulated final transcript of the utterance
+    this._finalIdx = 0;     // results[0.._finalIdx) already appended
     // Languages the cloud TTS endpoint can speak — every device gets these
     // regardless of installed voices (farmers can't install voice packs).
     this.cloudLangs = ['hi', 'en', 'ta', 'te', 'kn', 'mr'];
@@ -182,27 +184,37 @@ class SpeechEngine {
     }
 
     try {
+      this._finalText = '';
+      this._finalIdx = 0;
       this.recognition.lang = langCode;
+      this.recognition.maxAlternatives = 2;
       this.recognition.onstart = () => {
         this.isListening = true;
+        this._finalText = '';
+        this._finalIdx = 0;
       };
 
       this.recognition.onresult = (event) => {
-        let final = '';
+        // Accumulate the WHOLE utterance across events: Chrome finalizes a
+        // long sentence segment by segment, and acting on only the last
+        // segment truncated everything the farmer said before it.
         let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        for (let i = this._finalIdx; i < event.results.length; ++i) {
           const r = event.results[i];
-          if (r.isFinal) final += r[0].transcript;
+          if (r.isFinal) { this._finalText += r[0].transcript; this._finalIdx = i + 1; }
           else interim += r[0].transcript;
         }
+        const final = (this._finalText || '').trim();
         // FINAL results are the ones to act on — interim fragments from
-        // noise/echo used to phantom-trigger the guide (stray 'no' that
-        // killed the tour). Interim text still flows for live UI display.
+        // noise/echo used to phantom-trigger the guide. Interim still flows
+        // for live UI display.
         if (onResult) onResult(final || interim, { final: !!final });
       };
 
       this.recognition.onend = () => {
         this.isListening = false;
+        this._finalText = '';
+        this._finalIdx = 0;
         if (onEnd) onEnd();
       };
 
