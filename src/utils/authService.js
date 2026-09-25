@@ -8,8 +8,13 @@
 //   • OTP is "delivered" through a simulated SMS push notification in the UI
 //     (and console.log for developers) since no SMS backend exists
 //   • Google demo sign-in is a local dummy profile; it never contacts Google.
+//   • Optional Google Authenticator 2FA — REAL RFC 6238 TOTP codes verified
+//     on-device (works offline with any authenticator app). Secret storage is
+//     device-local, so it is still demo-grade, not production-grade.
 //   • Farmer profiles + demo sessions are persisted in localStorage for 30 days.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { verifyTotpCode } from './totp.js';
 
 const USERS_KEY = 'ap_users_v1';
 const SESSION_KEY = 'ap_session_v1';
@@ -159,6 +164,57 @@ export function verifyOtp(mobile, code) {
   return { ok: false, error: 'wrong_code', attemptsLeft };
 }
 
+// ── TOTP two-factor (Google Authenticator) ───────────────────────────────────
+//
+// Enrollment: a fresh base32 secret is generated per user, shown as a QR
+// (otpauth:// URI) and only persisted AFTER the farmer confirms with a live
+// code — so a half-finished setup never locks them out.
+// The secret itself stays on-device (demo); codes are real RFC 6238 TOTP.
+
+export function isTotpEnabled(user) {
+  return Boolean(user?.totp?.secret);
+}
+
+// Persist the secret once the setup code has been verified
+export function enableTotp(mobile, secret) {
+  const users = readJson(USERS_KEY, {});
+  const user = users[mobile];
+  if (!user) return null;
+  user.totp = {
+    secret: String(secret || '').replace(/\s/g, '').toUpperCase(),
+    enabledAt: Date.now(),
+    lastCounter: 0, // replay guard: highest accepted time-step
+  };
+  delete user.totpSkipped;
+  users[mobile] = user;
+  writeJson(USERS_KEY, users);
+  return user;
+}
+
+// User declined the 2FA offer — stop asking on future logins
+export function setTotpSkipped(mobile) {
+  const users = readJson(USERS_KEY, {});
+  if (!users[mobile]) return null;
+  users[mobile].totpSkipped = true;
+  writeJson(USERS_KEY, users);
+  return users[mobile];
+}
+
+// Verify a code from the authenticator app against the stored secret.
+// Updates the replay guard on success.
+export function verifyUserTotp(mobile, code) {
+  const users = readJson(USERS_KEY, {});
+  const user = users[mobile];
+  if (!isTotpEnabled(user)) return { ok: false, error: 'not_enabled' };
+  const res = verifyTotpCode(user.totp.secret, code, { lastCounter: user.totp.lastCounter || 0 });
+  if (res.ok) {
+    user.totp.lastCounter = res.counter;
+    users[mobile] = user;
+    writeJson(USERS_KEY, users);
+  }
+  return res;
+}
+
 // ── sessions ─────────────────────────────────────────────────────────────────
 
 export function saveSession(user) {
@@ -167,6 +223,7 @@ export function saveSession(user) {
     mobile: user.mobile || '',
     email: user.email || '',
     authProvider: user.authProvider || 'phone-demo',
+    twoFactor: user.totp?.secret ? 'totp' : '',
     village: user.village || '',
     state: user.state || 'Karnataka',
     loginAt: Date.now(),
