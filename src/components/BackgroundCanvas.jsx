@@ -7,6 +7,7 @@ export default function BackgroundCanvas() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
     let animationFrameId;
 
     let width = (canvas.width = window.innerWidth);
@@ -84,14 +85,16 @@ export default function BackgroundCanvas() {
         ctx.fill();
       });
 
-      animationFrameId = requestAnimationFrame(render);
+      if (!reduceMotion) {
+        animationFrameId = requestAnimationFrame(render);
+      }
     };
 
     render();
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationFrameId);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
     };
   }, []);
 

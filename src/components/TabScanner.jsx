@@ -37,7 +37,7 @@ function compressImage(dataUrl, maxSize = 1024) {
   });
 }
 
-export default function TabScanner({ selectedLang, isSunlightMode }) {
+export default function TabScanner({ selectedLang, isSunlightMode, isLowLiteracy, setIsLowLiteracy }) {
   const t = T[selectedLang] || T.en;
   const scannerText = { ...T.en.scanner, ...(t.scanner || {}) };
   const [selectedCrop, setSelectedCrop] = useState(CROPS[0]);
@@ -58,9 +58,17 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   const [diseaseHistory, setDiseaseHistory] = useState(() => getDiseaseHistory());
   const [showHistory, setShowHistory] = useState(false);
   const [multiCropMode, setMultiCropMode] = useState(false);
-  const [isLowLiteracy, setIsLowLiteracy] = useState(() => {
+  // Low-literacy mode is owned by App (header toggle). This local copy is only a
+  // fallback if the prop is ever absent, so both entry points stay in sync.
+  const [localLowLit, setLocalLowLit] = useState(() => {
     try { return localStorage.getItem('ap_low_literacy') === 'true'; } catch { return false; }
   });
+  const lowLit = isLowLiteracy !== undefined ? isLowLiteracy : localLowLit;
+  const setLowLit = (v) => {
+    try { localStorage.setItem('ap_low_literacy', String(v)); } catch {}
+    if (typeof setIsLowLiteracy === 'function') setIsLowLiteracy(v);
+    else setLocalLowLit(v);
+  };
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -85,10 +93,6 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   useEffect(() => {
     saveLandSize(mixingAcres);
   }, [mixingAcres]);
-
-  useEffect(() => {
-    try { localStorage.setItem('ap_low_literacy', String(isLowLiteracy)); } catch {}
-  }, [isLowLiteracy]);
 
   const startCamera = async () => {
     sound.playClick();
@@ -329,12 +333,12 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   const displayImage = customImage || (hasScanResult ? selectedCrop.image : scannerPlaceholder);
   const isCustom = Boolean(customImage);
 
-  if (isLowLiteracy) {
+  if (lowLit) {
     return (
       <div className="w-full space-y-4">
         <div className={`p-3 rounded-xl flex items-center justify-between ${isSunlightMode ? 'bg-amber-50 border border-amber-200' : 'bg-amber-950/30 border border-amber-800/50'}`}>
           <span className="text-xs font-black flex items-center gap-1"><Eye className="w-4 h-4" /> Low-Literacy Mode — Big Buttons</span>
-          <button onClick={()=>setIsLowLiteracy(false)} className="text-xs px-2 py-1 rounded bg-zinc-800 text-white">Exit</button>
+          <button onClick={()=>setLowLit(false)} className="text-xs px-2 py-1 rounded bg-zinc-800 text-white">Exit</button>
         </div>
         <div className="grid grid-cols-1 gap-4">
           <button onClick={startCamera} className="h-32 rounded-2xl bg-emerald-500 text-black font-black text-2xl flex flex-col items-center justify-center gap-2 shadow-xl">
@@ -373,8 +377,8 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
           {stats && <span className="px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold border">{stats.count}x {stats.crop}</span>}
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={()=>setIsLowLiteracy(true)} title="Big buttons" className="w-8 h-8 rounded-full bg-amber-400 text-black flex items-center justify-center"><Eye className="w-4 h-4" /></button>
-          <button onClick={()=>setShowHistory(!showHistory)} className="w-8 h-8 rounded-full bg-zinc-800 text-white flex items-center justify-center"><History className="w-4 h-4" /></button>
+          <button onClick={()=>setLowLit(true)} title="Big buttons" aria-label="Big buttons mode" className="w-9 h-9 rounded-full bg-amber-400 text-black flex items-center justify-center active:scale-95"><Eye className="w-4 h-4" /></button>
+          <button onClick={()=>setShowHistory(!showHistory)} aria-label="Disease history" className="w-9 h-9 rounded-full bg-zinc-800 text-white flex items-center justify-center active:scale-95"><History className="w-4 h-4" /></button>
         </div>
       </div>
 

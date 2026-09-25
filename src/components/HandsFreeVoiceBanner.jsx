@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Mic, MicOff, Sparkles, Navigation, X } from 'lucide-react';
+import { Mic, X } from 'lucide-react';
 import { speechEngine } from '../utils/speech';
 import { classifyVoiceIntent } from '../utils/voiceNavigator';
 import { sound } from '../utils/audio';
@@ -55,32 +55,32 @@ export default function HandsFreeVoiceBanner({ isHandsFree, onToggle, selectedLa
   if (!isHandsFree) return null;
 
   return (
-    <div className="bg-gradient-to-r from-emerald-950 via-zinc-900 to-black border-b border-emerald-500/30 px-4 py-2 text-xs font-mono text-white flex flex-wrap items-center justify-between gap-2 shadow-lg sticky top-[57px] z-20">
-      <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-full bg-emerald-500 text-black flex items-center justify-center animate-pulse">
-          <Mic className="w-3.5 h-3.5 fill-black" />
-        </div>
-        <div>
-          <div className="font-bold text-emerald-300 flex items-center gap-1.5">
-            <span>🖐️ गीले हाथ / Hands-Free Voice Mode Active:</span>
-          </div>
-          <p className="text-[11px] text-zinc-300 font-light leading-tight">
-            Say: <strong>"स्कैन"</strong> • <strong>"मंडी भाव"</strong> • <strong>"मौसम"</strong> • <strong>"दवा"</strong> • <strong>"दुकान"</strong> • <strong>"समूह"</strong> • <strong>"बाजार"</strong> • <strong>"समुदाय"</strong> • <strong>"मजदूर"</strong> • <strong>"डीजल"</strong> • <strong>"सहायक"</strong> • <strong>"सेवा"</strong> • All 22 languages
-          </p>
-        </div>
-      </div>
+    <div className="w-full border-b border-emerald-500/30 bg-gradient-to-r from-emerald-950 via-zinc-900 to-black text-white shadow-lg">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 sm:px-6">
+        <span className="flex items-center gap-1.5 text-[11px] font-black text-emerald-300">
+          <span className={`flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-black ${isListening ? 'animate-pulse' : ''}`}>
+            <Mic className="w-3 h-3 fill-black" />
+          </span>
+          <span className="whitespace-nowrap">🖐️ Hands-Free Active</span>
+        </span>
 
-      <div className="flex items-center gap-3">
+        <span className="min-w-0 flex-1 text-[10px] font-mono leading-snug text-zinc-300">
+          Say: <strong>"स्कैन"</strong> • <strong>"मंडी भाव"</strong> • <strong>"मौसम"</strong> • <strong>"दवा"</strong> • <strong>"दुकान"</strong> • <strong>"समूह"</strong> • <strong>"बाजार"</strong> • <strong>"समुदाय"</strong> • <strong>"मजदूर"</strong> • <strong>"डीजल"</strong> • <strong>"सहायक"</strong> • <strong>"सेवा"</strong> • All 22 languages
+        </span>
+
         {lastHeard && (
-          <span className="text-amber-300 italic text-[11px] bg-black/60 px-2 py-0.5 rounded border border-white/10">
+          <span className="order-last basis-full sm:order-none sm:basis-auto text-[10px] italic text-amber-300 bg-black/60 px-2 py-0.5 rounded border border-white/10 truncate max-w-full">
             Heard: "{lastHeard}"
           </span>
         )}
+
         <button
           onClick={onToggle}
-          className="text-zinc-400 hover:text-white px-2 py-1 rounded bg-white/5 border border-white/10 text-[11px]"
+          className="order-last ml-auto flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] font-bold text-zinc-300 hover:text-white active:scale-95 sm:order-none"
+          aria-label="Turn off hands-free mode"
         >
-          ✕ Turn Off
+          <X className="w-3 h-3" />
+          {selectedLang === 'hi' ? 'बंद करें' : 'Turn Off'}
         </button>
       </div>
     </div>
