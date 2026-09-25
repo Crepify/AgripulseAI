@@ -397,7 +397,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
       voiceGuide.onStateChange = () => setGuideActive(voiceGuide.active);
       Promise.all([
         voiceGuide.sayKey('greet'),
-        voiceGuide.sayKey('phone'),
+        voiceGuide.guideStep('phone'),
       ]).then(([ok]) => {
         if (cancelled) return;
         if (!ok && voiceGuide.blocked) {
@@ -428,7 +428,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
       located.then(() => {
         if (cancelled || !voiceGuide.active) return;
         if (step === 'phone' && phone.length === 0) {
-          voiceGuide.sayKey('greet').then(() => voiceGuide.sayKey('phone'));
+          voiceGuide.sayKey('greet').then(() => voiceGuide.guideStep('phone'));
         }
       });
     });
@@ -454,10 +454,11 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     if (step === 'phone') { guideSpokeComplete.current = false; return; }
     if (step === 'success') {
       voiceGuide.requestTour(); // App picks this up after login
+      voiceGuide.clearReminder();
       voiceGuide.sayKey('success', { listenAfter: false });
       return;
     }
-    if (lines[step]) voiceGuide.sayKey(step);
+    if (lines[step]) voiceGuide.guideStep(step); // with patient reminders
   }, [step, guideActive]);
 
   // "Very good! Now press the green button" — once the number is complete
@@ -465,7 +466,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     if (!guideActive || step !== 'phone') return;
     if (phone.length === 10 && !guideSpokeComplete.current) {
       guideSpokeComplete.current = true;
-      voiceGuide.sayKey('phoneComplete');
+      voiceGuide.guideStep('phoneComplete');
     }
     if (phone.length < 10) guideSpokeComplete.current = false;
   }, [phone, step, guideActive]);
@@ -946,7 +947,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                   voiceGuide.start(voiceGuide.lang);
                   Promise.all([
                     voiceGuide.sayKey('greet'),
-                    voiceGuide.sayKey('phone'),
+                    voiceGuide.guideStep('phone'),
                   ]);
                 }}
                 className="px-3 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black"
