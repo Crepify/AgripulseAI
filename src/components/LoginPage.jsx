@@ -382,6 +382,12 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   };
 
   // ── Voice guide: speak the LOCAL language of wherever the farmer is ──
+  // Subscribed separately so narration works no matter when the guide starts.
+  useEffect(() => {
+    const unsubscribe = voiceGuide.subscribe(() => setGuideActive(voiceGuide.active));
+    return unsubscribe;
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -392,9 +398,9 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     };
 
     const startGuide = () => {
-      if (cancelled || voiceGuide.active) return;
+      if (cancelled || voiceGuide.active) return null;
       voiceGuide.start(voiceGuide.lang);
-      voiceGuide.onStateChange = () => setGuideActive(voiceGuide.active);
+      const startedLang = voiceGuide.lang;
       Promise.all([
         voiceGuide.sayKey('greet'),
         voiceGuide.guideStep('phone'),
@@ -407,6 +413,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
           setGuideOffer(false);
         }
       });
+      return startedLang;
     };
 
     // Provisional: browser language (instant)
@@ -415,19 +422,21 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
 
     // Real location (GPS → reverse-geocoded state → IP fallback), cached a
     // week. A Delhi farmer on an English phone hears Hindi, not English.
+    let locatedLang = null;
     const located = detectLanguageByLocation()
-      .then((loc) => { if (!cancelled && loc) { voiceGuide.lang = loc; syncUi(loc); } })
+      .then((loc) => { locatedLang = loc; if (!cancelled && loc) { voiceGuide.lang = loc; syncUi(loc); } })
       .catch(() => {});
 
-    // Don't make them wait on the GPS prompt forever — 2.5s cap, then start;
-    // if the location lands later and we're still on step one, restart in the
-    // right language (speech cuts over cleanly).
+    // Don't make them wait on the GPS prompt forever — 2.5s cap, then start.
+    // If the location lands AFTER we started speaking and turns out to be a
+    // DIFFERENT language, cut over cleanly; if it's the same language, never
+    // repeat ourselves.
     Promise.race([located, new Promise((r) => setTimeout(r, 2500))]).then(() => {
       if (cancelled) return;
-      startGuide();
+      const startedLang = startGuide();
       located.then(() => {
-        if (cancelled || !voiceGuide.active) return;
-        if (step === 'phone' && phone.length === 0) {
+        if (cancelled || !voiceGuide.active || startedLang == null) return;
+        if (locatedLang && locatedLang !== startedLang && step === 'phone' && phone.length === 0) {
           voiceGuide.sayKey('greet').then(() => voiceGuide.guideStep('phone'));
         }
       });

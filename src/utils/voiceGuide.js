@@ -456,7 +456,7 @@ export class VoiceGuide {
     this.lang = 'hi';
     this.lastLine = '';
     this.onCommand = null;     // (transcript) => boolean — app-level commands
-    this.onStateChange = null; // () => {} — UI subscribes
+    this._subscribers = new Set(); // UI subscribers (multiple components safely)
     this._ackWaiter = null;
     this._listenToken = 0;
     this._tourRunning = false;
@@ -465,7 +465,17 @@ export class VoiceGuide {
     this._reminderTimers = [];             // patient step reminders
   }
 
-  _emit() { if (this.onStateChange) this.onStateChange(); }
+  _emit() {
+    this._subscribers.forEach((fn) => { try { fn(); } catch { /* subscriber error */ } });
+  }
+
+  // Multiple components can watch the guide at once (login page + app shell)
+  // without stealing each other's callback. Returns an unsubscribe function.
+  subscribe(fn) {
+    this._subscribers.add(fn);
+    try { fn(); } catch { /* immediate sync */ }
+    return () => { this._subscribers.delete(fn); };
+  }
 
   script() { return S[this.lang] || S.hi; }
 
