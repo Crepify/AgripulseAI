@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, AlertOctagon, QrCode, Check, Upload, Camera, X, Image as ImageIcon, Sparkles, Scan, RefreshCw } from 'lucide-react';
+import { ShieldCheck, AlertOctagon, QrCode, Check, Upload, Camera, X, Image as ImageIcon, Sparkles, Scan, RefreshCw, ShoppingBag } from 'lucide-react';
 import { PESTICIDE_SAMPLES } from '../data/agriData';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
