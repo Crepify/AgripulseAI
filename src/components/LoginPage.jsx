@@ -71,6 +71,7 @@ const L = {
     loading: 'Please wait…',
     secNote: 'Your data never leaves this device — login works fully offline.',
     // Google Authenticator (TOTP 2FA)
+    totpBadge: 'Google Authenticator 2FA supported',
     totp2faTag: 'Two-Factor Security',
     totpSetupTitle: 'Add Google Authenticator',
     totpSetupSub: 'Extra protection for your account. Codes are generated on your phone — no internet needed.',
@@ -663,6 +664,11 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 {busy ? l.loading : l.sendOtp}
               </button>
               <p className="text-[11px] text-zinc-500 mt-4">{l.newHere}</p>
+
+              {/* Visible 2FA indicator — enrollment happens after OTP verification */}
+              <div className="mt-3 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-black text-emerald-700">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> {l.totpBadge}
+              </div>
             </>
           )}
 
