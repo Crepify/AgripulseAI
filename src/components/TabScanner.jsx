@@ -90,13 +90,19 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   };
 
   const capturePhoto = async () => {
-    sound.playClick();
+    try { sound.playClick(); } catch {}
     if (!videoRef.current) return;
+    scanIdRef.current += 1;
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth || 640;
     canvas.height = videoRef.current.videoHeight || 480;
-    canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
-    const dataUrl = canvas.toDataURL('image/jpeg');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      setScanError('Could not capture photo. Please try upload.');
+      return;
+    }
+    ctx.drawImage(videoRef.current, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     setCustomImage(dataUrl);
     stopCamera();
     await runScan(dataUrl);
@@ -104,6 +110,21 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
 
   // Reads a chosen/dropped image file and runs the same scan path for both entry points.
   const startScanFromFile = (file) => {
+    if (!file) {
+      setScanError('No file selected.');
+      return;
+    }
+    const isImage = file.type?.startsWith('image/') || /\.(jpe?g|png|webp|bmp|gif)$/i.test(file.name || '');
+    if (!isImage) {
+      setHasScanResult(false);
+      setScanError('Please choose an image file (JPG, PNG, WEBP).');
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      setHasScanResult(false);
+      setScanError('Image too large. Please choose an image under 15MB.');
+      return;
+    }
     scanIdRef.current += 1;
     setIsAnalyzing(false);
     setHasScanResult(false);
@@ -111,17 +132,24 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
     setLastScan(null);
     const reader = new FileReader();
     reader.onload = async (loadEvent) => {
-      const dataUrl = loadEvent.target?.result;
-      if (typeof dataUrl !== 'string') {
+      try {
+        const dataUrl = loadEvent.target?.result;
+        if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
+          setHasScanResult(false);
+          setScanError('The selected image could not be read. Please try another photo.');
+          return;
+        }
+        setCustomImage(dataUrl);
+        stopCamera();
+        await runScan(dataUrl);
+      } catch (e) {
+        console.error('[AgriPulse] startScanFromFile error', e);
         setHasScanResult(false);
-        setScanError('The selected image could not be read. Please try again.');
-        return;
+        setScanError('Failed to process image: ' + (e?.message || 'unknown'));
       }
-      setCustomImage(dataUrl);
-      stopCamera();
-      await runScan(dataUrl);
     };
     reader.onerror = () => {
+      console.error('[AgriPulse] FileReader error');
       setHasScanResult(false);
       setScanError('The selected image could not be read. Please try again.');
     };
@@ -129,32 +157,31 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   };
 
   const handleFileUpload = (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setHasScanResult(false);
-      setScanError('Please choose an image file to scan.');
-      return;
+    try {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) return;
+      startScanFromFile(file);
+    } catch (e) {
+      console.error('[AgriPulse] handleFileUpload error', e);
+      setScanError('Upload failed: ' + (e?.message || 'unknown'));
     }
-    startScanFromFile(file);
   };
 
   const runScan = async (imgSrc) => {
-    const scanId = ++scanIdRef.current;
+    const scanId = scanIdRef.current;
     setHasScanResult(false);
     setScanError('');
     setIsAnalyzing(true);
     setLastScan(null);
-    clearOverlay(canvasRef.current);
-    sound.playTransition();
+    try { clearOverlay(canvasRef.current); } catch {}
+    try { sound.playTransition(); } catch {}
 
     try {
       const image = await loadImage(imgSrc);
-      // On-device YOLO26/LiteRT first; the model service uses /api/predict only as an online fallback.
       const result = await analyzeLeafOnDevice(image, canvasRef.current);
       if (scanId !== scanIdRef.current) return;
-      const remaining = Math.max(0, 700 - (result.latencyMs || 0));
+      const remaining = Math.max(0, 400 - (result.latencyMs || 0));
       if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
       if (scanId !== scanIdRef.current) return;
 
@@ -165,12 +192,12 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
         count: result.detections?.length ?? 0,
       });
       setHasScanResult(true);
-      sound.playSuccess();
+      try { sound.playSuccess(); } catch {}
     } catch (error) {
+      console.error('[AgriPulse] runScan error:', error);
       if (scanId === scanIdRef.current) {
-        console.error('Could not analyze the selected crop image:', error);
-        clearOverlay(canvasRef.current);
-        setScanError('Analysis could not be completed. Try another photo or check your connection.');
+        try { clearOverlay(canvasRef.current); } catch {}
+        setScanError('Analysis could not be completed: ' + (error?.message || 'unknown') + '. Try another photo.');
       }
     } finally {
       if (scanId === scanIdRef.current) setIsAnalyzing(false);
@@ -211,12 +238,7 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
     setIsDragging(false);
     const file = event.dataTransfer?.files?.[0];
     if (!file) return;
-    sound.playClick();
-    if (!file.type.startsWith('image/')) {
-      setHasScanResult(false);
-      setScanError('Please choose an image file to scan.');
-      return;
-    }
+    try { sound.playClick(); } catch {}
     startScanFromFile(file);
   };
 
@@ -362,24 +384,26 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
             )}
 
             <input
+              id="leaf-upload-input"
               type="file"
               ref={fileInputRef}
               onChange={handleFileUpload}
               accept="image/*"
-              className="hidden"
+              style={{ display: 'none' }}
             />
-            <button
-              onClick={() => fileInputRef.current.click()}
+            <label
+              htmlFor="leaf-upload-input"
               style={{
                 backgroundColor: isSunlightMode ? '#ffffff' : '#1f2937',
                 color: isSunlightMode ? '#111827' : '#ffffff',
                 borderColor: isSunlightMode ? '#9ca3af' : '#4b5563',
               }}
-              className="flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all border-2 shadow-sm"
+              className="flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all border-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-95"
+              onClick={() => { try { if (fileInputRef.current) fileInputRef.current.value = ''; } catch {} }}
             >
               <Upload className="w-4 h-4" />
               <span>{t.scanner.uploadPhoto}</span>
-            </button>
+            </label>
           </div>
 
           {/* On-device model status */}
@@ -551,6 +575,41 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
               <div className="text-xs text-zinc-300 font-medium">
                 🛡️ {selectedCrop.dosage[dosageType].safety}
               </div>
+
+              {/* Detailed Pesticide Info from 52-class database */}
+              {selectedCrop.pesticideInfo && (
+                <div className={`p-3.5 rounded-xl border-2 space-y-2.5 text-xs ${isSunlightMode ? 'bg-white border-zinc-300' : 'bg-zinc-900 border-zinc-700'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-emerald-400">🧪 {dosageType === 'bio' ? 'Organic' : 'Chemical'} Details</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${dosageType === 'bio' ? 'bg-emerald-400 text-black' : 'bg-amber-400 text-black'}`}>
+                      {dosageType === 'bio' ? selectedCrop.pesticideInfo.organic.efficiency : selectedCrop.pesticideInfo.chemical.efficiency} Efficient
+                    </span>
+                  </div>
+                  <div className={`p-2.5 rounded-lg ${isSunlightMode ? 'bg-zinc-50' : 'bg-zinc-950'}`}>
+                    <div className="font-bold text-[11px] text-zinc-400">Active Ingredient</div>
+                    <div className={`font-black ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{dosageType === 'bio' ? selectedCrop.pesticideInfo.organic.active : selectedCrop.pesticideInfo.chemical.active}</div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className={`p-2.5 rounded-lg ${isSunlightMode ? 'bg-red-50 border border-red-200' : 'bg-red-950/30 border border-red-800/50'}`}>
+                      <div className="font-black text-[10px] text-red-400">⚠️ Side Effects</div>
+                      <div className={`mt-1 font-medium leading-relaxed ${isSunlightMode ? 'text-zinc-700' : 'text-zinc-300'}`}>{dosageType === 'bio' ? selectedCrop.pesticideInfo.organic.sideEffects : selectedCrop.pesticideInfo.chemical.sideEffects}</div>
+                    </div>
+                    <div className={`p-2.5 rounded-lg ${isSunlightMode ? 'bg-amber-50 border border-amber-200' : 'bg-amber-950/30 border border-amber-800/50'}`}>
+                      <div className="font-black text-[10px] text-amber-500">🌱 Soil Suitability</div>
+                      <div className={`mt-1 font-bold ${isSunlightMode ? 'text-zinc-800' : 'text-zinc-200'}`}>{selectedCrop.pesticideInfo.soilTypes.join(', ')}</div>
+                    </div>
+                  </div>
+                  <div className={`p-2.5 rounded-lg ${isSunlightMode ? 'bg-emerald-50 border border-emerald-200' : 'bg-emerald-950/30 border border-emerald-800/50'}`}>
+                    <div className="font-black text-[10px] text-emerald-600">✅ Verification (Genuine Check)</div>
+                    <div className={`mt-1 font-mono text-[11px] leading-relaxed ${isSunlightMode ? 'text-zinc-700' : 'text-zinc-300'}`}>{dosageType === 'bio' ? selectedCrop.pesticideInfo.organic.verification : selectedCrop.pesticideInfo.chemical.verification}</div>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500">
+                    <span>🔬 Pathogen: {selectedCrop.pesticideInfo.pathogen}</span>
+                    <span>•</span>
+                    <span>Severity: {selectedCrop.pesticideInfo.severity}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Field Size Mixing Multiplier Tool */}
