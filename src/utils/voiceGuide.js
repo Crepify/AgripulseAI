@@ -50,6 +50,8 @@ const S = {
     didntCatch: 'माफ़ कीजिए, फिर से बोलिए।',
     askNext: 'आगे की सेवा सुनेंगे? हाँ बोलिए।',
     langSwitched: 'ठीक है, अब मैं हिंदी में बात करूँगा।',
+    tourStopAsk: 'क्या मैं सेवाएँ बंद कर दूँ? हाँ या नहीं बोलिए।',
+    langUnavailable: 'माफ़ कीजिए, वह भाषा इस फ़ोन पर उपलब्ध नहीं है। मैं इसी भाषा में बात करता हूँ।',
     askResume: 'क्या मैं जारी रखूँ?',
     tourIntro: 'तो सुनिए, इस ऐप में क्या-क्या है। हर सेवा के बाद मैं पूछूँगा, तब तक आराम से सुनते रहिए।',
     tourBye: 'जब भी ज़रूरत हो, माइक दबाकर मुझे बुला लीजिए। आपका दिन शुभ हो!',
@@ -86,6 +88,8 @@ const S = {
     didntCatch: 'Sorry, please say that again.',
     askNext: 'Want to hear the next service? Just say yes.',
     langSwitched: 'Alright — from now on I will speak in English.',
+    tourStopAsk: 'Should I stop explaining the services? Say yes or no.',
+    langUnavailable: 'Sorry, that language is not available on this phone. I will keep speaking this language.',
     askResume: 'Shall I continue?',
     tourIntro: 'Listen — here is what is inside this app. After each one I will ask, so relax and listen.',
     tourBye: 'Whenever you need me, press the mic and call me. Have a good day!',
@@ -122,6 +126,8 @@ const S = {
     didntCatch: 'மன்னிக்கவும், மீண்டும் சொல்லுங்கள்.',
     askNext: 'அடுத்த சேவையைப் பற்றி கேக்க விரும்புகிறீர்களா?',
     langSwitched: 'சரி — இனிமேல் நான் தமிழில் பேசுவேன்.',
+    tourStopAsk: 'சேவைகளை நிறுத்தவா? ஆம் அல்லது இல்லை சொல்லுங்கள்.',
+    langUnavailable: 'மன்னிக்கவும், அந்த மொழி இந்த போனில் இல்லை. இதே மொழியில் பேசுகிறேன்.',
     askResume: 'தொடரலாமா?',
     tourIntro: 'இந்த செயலியில் என்னென்ன இருக்கிறது என்று ஒவ்வொன்றாக சொல்கிறேன். ஒவ்வொன்றுக்குப் பிறகு கேட்பேன்.',
     tourBye: 'தேவைப்படும்போது மைக்கை அழுத்தி என்னை அழையுங்கள். இனிய நாள்!',
@@ -158,6 +164,8 @@ const S = {
     didntCatch: 'క్షమించండి, మళ్ళీ చెప్పండి.',
     askNext: 'తర్వాత సేవ గురించి వినాలా?',
     langSwitched: 'సరే — ఇకపై నేను తెలుగులో మాట్లాడతాను.',
+    tourStopAsk: 'సేవలు ఆపిదామా? అవును లేదా కాదు చెప్పండి.',
+    langUnavailable: 'క్షమించండి, ఆ భాష ఈ ఫోన్‌లో లేదు. ఇదే భాషలో మాట్లాడతాను.',
     askResume: 'కొనసాగించమంటారా?',
     tourIntro: 'ఈ యాప్‌లో ఏముందో ఒక్కొక్కటి చెబుతాను. ఒక్కో దాని తర్వాత నేను అడుగుతాను.',
     tourBye: 'ఎప్పుడు కావాలంటే మైక్ నొక్కి నన్ను పిలవండి. శుభ దినం!',
@@ -194,6 +202,8 @@ const S = {
     didntCatch: 'ಕ್ಷಮಿಸಿ, ಇನ್ನೊಮ್ಮೆ ಹೇಳಿ.',
     askNext: 'ಮುಂದಿನ ಸೇವೆಯ ಬಗ್ಗೆ ಕೇಳಲು ಬಯಸುವಿರಾ?',
     langSwitched: 'ಸರಿ — ಈಗ ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
+    tourStopAsk: 'ಸೇವೆಗಳನ್ನು ನಿಲ್ಲಿಸಬೇಕೆ? ಹೌದು ಇಲ್ಲವೆ ಹೇಳಿ.',
+    langUnavailable: 'ಕ್ಷಮಿಸಿ, ಆ ಭಾಷೆ ಈ ಫೋನ್‌ನಲ್ಲಿ ಇಲ್ಲ. ಇದೇ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
     askResume: 'ಮುಂದುವರಿಸಲಿಯಾ?',
     tourIntro: 'ಈ ಆ್ಯಪ್‌ನಲ್ಲಿ ಏನೇನಿದೆ ಎಂದು ಒಂದೊಂದಾಗಿ ಹೇಳುತ್ತೇನೆ. ಪ್ರತಿಯೊಂದರ ನಂತರ ಕೇಳುತ್ತೇನೆ.',
     tourBye: 'ಬೇಕಾದಾಗ ಮೈಕ್ ಒತ್ತಿ ನನ್ನನ್ನು ಕರೆಯಿರಿ. ಶುಭ ದಿನ!',
@@ -230,6 +240,8 @@ const S = {
     didntCatch: 'क्षमस्व, पुन्हा सांगा.',
     askNext: 'पुढच्या सेवेबद्दल ऐकू इच्छिता?',
     langSwitched: 'ठीक आहे — आता मी मराठीत बोलेन.',
+    tourStopAsk: 'सेवा सांगणे बंद करू का? हो किंवा नाही म्हणा.',
+    langUnavailable: 'क्षमस्व, ती भाषा या फोनवर नाही. मी याच भाषेत बोलतो.',
     askResume: 'सुरू ठेवू का?',
     tourIntro: 'या ॲपमध्ये काय काय आहे ते एकेक सांगतो. प्रत्येकानंतर मी विचारीन.',
     tourBye: 'गरज असल्यास मायक दाबून मला बोलावा. शुभ दिवस!',
@@ -267,6 +279,8 @@ const PHON = {
     didntCatch: 'Maaf kijiye, phir se boliye.',
     askNext: 'Aage ki seva sunenge? Haan boliye.',
     langSwitched: 'Theek hai, ab main Hindi mein baat karunga.',
+    tourStopAsk: 'Kya main sevaayein band kar doon? Haan ya nahin boliye.',
+    langUnavailable: 'Maaf kijiye, woh bhaasha is phone par uplabdh nahin hai. Main isi bhaasha mein baat karta hoon.',
     askResume: 'Kya main jaari rakhun?',
     tourIntro: 'To suniye, is app mein kya-kya hai. Har seva ke baad main poochhoonga, tab tak aaraam se sunte rahiye.',
     tourBye: 'Jab bhi zaroorat ho, mic dabakar mujhe bulaa lijiye. Aapka din shubh ho!',
@@ -480,6 +494,7 @@ const LANG_SWITCH_VERBS = [
   'kaho', 'कहो', 'samjhao', 'समझाओ', 'explain', 'பேசு', 'சொல்லு',
   'చెప్పు', 'చెప్పండి', 'ಹೇಳು', 'ಹೇಳಿ',
   'चेंज', 'स्विच', 'बदल', 'बोलिए', 'switch to', 'change to',
+  'टॉक', 'टॉकिंग', 'स्पीक', 'बताओ', 'बोलना', 'talk in', 'speak in',
 ];
 
 export function matchLangSwitch(q, currentLang) {
@@ -502,10 +517,12 @@ export function matchLangSwitch(q, currentLang) {
 // English words (and no romanized Hindi) switches to English. Weak words
 // ("yes"/"ok" — used by everyone) never trigger a switch on their own.
 const STRONG_ENGLISH = new Set([
-  'stop', 'continue', 'skip', 'repeat', 'again', 'english', 'speak', 'talk',
-  'change', 'switch', 'please', 'want', 'hear', 'listen', 'show', 'open',
-  'tell', 'what', 'how', 'when', 'where', 'which', 'why', 'next', 'service',
-  'read', 'start', 'explain', 'another', 'app', 'price', 'prices',
+  // NOTE: no 'talk'/'speak'/'change'/'switch' — those words usually ride a
+  // language REQUEST ("talk in tamil"); matchLangSwitch owns those.
+  'stop', 'continue', 'skip', 'repeat', 'again', 'english', 'please', 'want',
+  'hear', 'listen', 'show', 'open', 'tell', 'what', 'how', 'when', 'where',
+  'which', 'why', 'next', 'service', 'read', 'start', 'explain', 'another',
+  'app', 'price', 'prices',
 ]);
 const ROMANIZED_HINDI = new Set([
   'haan', 'han', 'nahi', 'nahin', 'bas', 'ruk', 'rukho', 'bolo', 'bol',
@@ -562,6 +579,8 @@ export class VoiceGuide {
     this.tourAskMs = 5000;                 // tour pace: silence → keep going
     this._speaking = false;                // our own TTS is playing — mic MUST stay off
     this._listenCycle = 0;                 // rotates an English ear in while asking
+    this._confirmGate = null;              // tour pauses while a stop-confirmation pends
+    this._confirmGateResolve = null;
   }
 
   _emit() {
@@ -636,6 +655,17 @@ export class VoiceGuide {
     return undefined;
   }
 
+  // Can this device actually SPEAK a language? Switching to Tamil on a phone
+  // without a Tamil voice would silently fall back to English — confusing.
+  _canSpeak(lang) {
+    if (lang === 'en') return true;
+    if (PHON[lang]) return true; // romanized fallback exists (Hindi)
+    try {
+      const vi = this.engine.getBestVoice ? this.engine.getBestVoice(`${lang}-IN`) : null;
+      return !!(vi && vi.isNative);
+    } catch { return false; }
+  }
+
   // Farmer asked for another language ("English mein bolo") — switch now and
   // remember it: next visit it outranks browser + location detection.
   setLanguage(lang) {
@@ -656,6 +686,8 @@ export class VoiceGuide {
   stop() {
     this.active = false;
     this._tourRunning = false;
+    if (this._confirmGateResolve) { this._confirmGateResolve(); this._confirmGateResolve = null; }
+    this._confirmGate = null;
     this.clearReminder();
     this._listenToken += 1;
     this._resolveAck(null);
@@ -770,6 +802,15 @@ export class VoiceGuide {
   ask(text, timeoutMs = 16000) {
     return this.say(text).then(() => new Promise((resolve) => {
       if (!this.active) { resolve(null); return; }
+      // A previous question may still be pending (language switch re-ask,
+      // barge-in resume…) — retire it cleanly so its stale 5s/16s timer can
+      // never fire later and prematurely resolve THIS question's waiter.
+      if (this._ackWaiter) {
+        const stale = this._ackWaiter;
+        this._ackWaiter = null;
+        if (stale.cancel) stale.cancel();
+        stale.resolve('timeout');
+      }
       const timer = setTimeout(() => this._resolveAck('timeout'), timeoutMs);
       this._ackWaiter = {
         resolve: (v) => {
@@ -777,6 +818,7 @@ export class VoiceGuide {
           this._ackWaiter = null;
           resolve(v);
         },
+        cancel: () => clearTimeout(timer),
       };
     }));
   }
@@ -804,7 +846,7 @@ export class VoiceGuide {
     try {
       this.engine.startListening(
         langCode,
-        (transcript) => { latest = transcript; },
+        (transcript, meta) => { if (!meta || meta.final) latest = transcript; },
         () => {
           if (token !== this._listenToken) return;
           if (latest && latest.trim()) this._handleSpeech(latest);
@@ -827,10 +869,6 @@ export class VoiceGuide {
     if (!q) return;
     const intent = matchIntent(this.lang, q);
 
-    if (intent === 'stop') {
-      this.stop();
-      return;
-    }
     if (intent === 'repeat') {
       this.say(this.lastLine);
       return;
@@ -842,13 +880,40 @@ export class VoiceGuide {
     const switchTo = matchLangSwitch(q, this.lang) || detectSpokenLanguage(q, this.lang);
     if (switchTo) {
       const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
-      this._ackWaiter = null;
+      if (this._ackWaiter) { this._ackWaiter.cancel(); this._ackWaiter = null; }
+      if (!this._canSpeak(switchTo)) {
+        // Asked for e.g. Tamil on a phone with no Tamil voice — say so
+        // honestly and carry on in the current language. No fake switch
+        // that silently becomes English.
+        this.sayKey('langUnavailable');
+        if (outer) outer('yes'); // whatever was pending keeps moving
+        return;
+      }
       this.setLanguage(switchTo);
       this.sayKey('langSwitched').then(() => {
         if (outer) {
-          // re-ask the pending question in the new language
-          this.askKey('askResume').then((ans) => outer(ans === 'no' ? 'no' : 'yes'));
+          // re-ask the pending question in the new language, snappily
+          this.askKey('askResume', 6000).then((ans) => outer(ans === 'no' ? 'no' : 'yes'));
         }
+      });
+      return;
+    }
+
+    // During the tour with NO question pending, 'no'/'stop' must be CONFIRMED
+    // first — a stray word (noise, a bystander) must never kill the tour and
+    // leave the farmer with a silent, deaf guide.
+    if (this._tourRunning && !this._ackWaiter && (intent === 'no' || intent === 'stop')) {
+      // The tour WAITS on this gate — it must not race ahead into the next
+      // service (and retire this question) before the farmer answers.
+      this._confirmGate = new Promise((res) => { this._confirmGateResolve = res; });
+      this.askKey('tourStopAsk', 8000).then((ans) => {
+        if (this._confirmGateResolve) { this._confirmGateResolve(); this._confirmGateResolve = null; }
+        this._confirmGate = null;
+        if (ans === 'yes') {
+          this._tourRunning = false;
+          this.sayKey('tourBye', { listenAfter: false }).then(() => this.stop());
+        }
+        // 'no' / timeout → the tour simply carries on
       });
       return;
     }
@@ -856,14 +921,14 @@ export class VoiceGuide {
     // If we asked a question ("continue?"), the answer decides the flow.
     if (this._ackWaiter) {
       if (intent === 'yes' || intent === 'skip') { this._resolveAck('yes'); return; }
-      if (intent === 'no') { this._resolveAck('no'); return; }
+      if (intent === 'no' || intent === 'stop') { this._resolveAck('no'); return; }
       // They said something else — let the app try to act on it…
       if (this.onCommand && this.onCommand(q)) {
         // …then politely ask whether to continue. Hand the outer question's
         // waiter over explicitly — the inner ask() owns the ack slot meanwhile.
         const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
-        this._ackWaiter = null;
-        this.askKey('askResume').then((ans) => {
+        if (this._ackWaiter) { this._ackWaiter.cancel(); this._ackWaiter = null; }
+        this.askKey('askResume', 8000).then((ans) => {
           if (outer) outer(ans === 'no' ? 'no' : 'yes');
         });
         return;
@@ -872,11 +937,9 @@ export class VoiceGuide {
       return;
     }
 
-    // During the tour, a clear "no / bas / enough" stops it politely even
-    // when no question is pending (the farmer answered a beat late).
-    if (this._tourRunning && intent === 'no') {
-      this._tourRunning = false;
-      this.sayKey('tourBye', { listenAfter: false }).then(() => this.stop());
+    // Outside the tour, an explicit 'stop' still quits immediately.
+    if (intent === 'stop') {
+      this.stop();
       return;
     }
 
@@ -894,6 +957,7 @@ export class VoiceGuide {
 
     await this.sayKey('tourIntro');
     for (let i = 0; i < this.script().services.length; i++) {
+      if (this._confirmGate) await this._confirmGate;
       if (!this._tourRunning) return;
       // re-read per iteration — the farmer may switch language mid-tour
       const L = this.script();
@@ -909,13 +973,16 @@ export class VoiceGuide {
       // The option's NAME first — clearly, unhurried — then a natural beat,
       // then its explanation. One run-on sentence was hard to follow.
       await this.say(name);
+      if (this._confirmGate) await this._confirmGate;
       if (!this._tourRunning) return;
       await this.say(desc);
+      if (this._confirmGate) await this._confirmGate;
       if (!this._tourRunning) return;
       // Silence or anything unclear → continue at their pace; the 5s cap
       // keeps the tour alive instead of 16s of dead air that feels like
       // "the guide is done" after every single service.
       const ans = await this.askKey('askNext', this.tourAskMs);
+      if (this._confirmGate) await this._confirmGate;
       if (!this._tourRunning) return;
       if (ans === 'no') {
         await this.sayKey('tourBye', { listenAfter: false });

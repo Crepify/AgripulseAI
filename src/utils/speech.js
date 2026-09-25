@@ -130,11 +130,17 @@ class SpeechEngine {
       };
 
       this.recognition.onresult = (event) => {
-        let transcript = '';
+        let final = '';
+        let interim = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          transcript += event.results[i][0].transcript;
+          const r = event.results[i];
+          if (r.isFinal) final += r[0].transcript;
+          else interim += r[0].transcript;
         }
-        if (onResult) onResult(transcript);
+        // FINAL results are the ones to act on — interim fragments from
+        // noise/echo used to phantom-trigger the guide (stray 'no' that
+        // killed the tour). Interim text still flows for live UI display.
+        if (onResult) onResult(final || interim, { final: !!final });
       };
 
       this.recognition.onend = () => {
