@@ -210,20 +210,20 @@ const NO_DETECTION = {
   id: 'det-none',
   name: 'Leaf',
   localName: 'पत्ता',
-  disease: 'No disease detected',
+  disease: 'Uncertain - No clear pattern',
   pathogen: 'Not identified',
   confidence: 0,
   severity: 'Unknown',
-  symptoms: 'The model did not find a known disease pattern. Fill the frame with a single leaf in daylight and scan again, or ask a KVK expert if the crop looks unwell.',
+  symptoms: 'The AI could not confidently identify a disease (low confidence). This happens with blurry photos, blue/sky backgrounds, or leaves not in the 52 trained classes. Try: 1) Place leaf on white paper, 2) Fill 80% of frame with single leaf, 3) Daylight, no shadow, 4) Focus on spots. If spots persist, ask a KVK expert.',
   image: TEMPLATE.blight.image,
   audio: {
     en: {
-      devanagari: 'No disease could be identified in this photo. Please take a closer photo of one leaf in daylight and scan again.',
-      phonetic: 'No disease could be identified in this photo. Please take a closer photo of one leaf in daylight and scan again.',
+      devanagari: 'The AI could not confidently identify a disease in this photo. Please place the leaf on white paper, fill the frame, and retake in daylight.',
+      phonetic: 'The AI could not confidently identify a disease in this photo. Please place the leaf on white paper, fill the frame, and retake in daylight.',
     },
     hi: {
-      devanagari: 'इस फ़ोटो में कोई रोग पहचाना नहीं जा सका। कृपया दिन की रोशनी में एक पत्ते की पास से फ़ोटो लेकर दोबारा स्कैन करें।',
-      phonetic: 'Is photo mein koi rog pehchana nahin ja saka. Kripya din ki roshni mein ek patte ki paas se photo lekar dobara scan karein.',
+      devanagari: 'इस फ़ोटो में रोग स्पष्ट नहीं है। कृपया पत्ते को सफेद कागज पर रखकर, पास से, दिन की रोशनी में दोबारा फोटो लें।',
+      phonetic: 'Is photo mein rog spasht nahin hai. Kripya patte ko safed kagaz par rakhkar, paas se, din ki roshni mein dobara photo lein.',
     },
   },
   dosage: NO_SPRAY,
@@ -355,7 +355,7 @@ function buildMatchedCrop(detections) {
 // Perform 100% local on-device leaf analysis (cloud fallback when model can't run OR finds nothing).
 // Adaptive thresholds: tries 0.25 -> 0.15 -> 0.10 -> 0.05 -> 0.01 to improve recall on difficult images
 // (user's apple scab photo was 0 detections at 0.25 but 1 at 0.15).
-const ADAPTIVE_THRESHOLDS = [0.25, 0.15, 0.10, 0.05];
+const ADAPTIVE_THRESHOLDS = [0.25, 0.15, 0.10, 0.05, 0.02, 0.01, 0.005];
 
 async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) {
   const tried = new Set();
@@ -372,12 +372,14 @@ async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) 
       lastResult = r;
     } catch {}
   }
-  // final ultra-low recall attempt
-  try {
-    const r = await detectFn(imageElement, { conf: 0.01 });
-    if (r?.detections?.length) return r;
-    lastResult = lastResult || r;
-  } catch {}
+  // final ultra-low recall attempts - even 0.001
+  for (const conf of [0.001, 0.0001, 0]) {
+    try {
+      const r = await detectFn(imageElement, { conf });
+      if (r?.detections?.length) return r;
+      lastResult = lastResult || r;
+    } catch {}
+  }
   return lastResult;
 }
 
