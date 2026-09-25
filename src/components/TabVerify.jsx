@@ -21,6 +21,25 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
   const [livePrices, setLivePrices] = useState(null);
   const [isFetchingPrices, setIsFetchingPrices] = useState(false);
 
+  // Static shopping list for instant display - matches Google Shopping screenshot
+  const STATIC_SHOPPING = {
+    'upl-saaf': [
+      { store: 'BigHaat', price: '₹102', variant: '100 Gms', url: 'https://www.bighaat.com/products/saaf-fungicide', delivery: 'Free delivery', rating: '4.5 ★', inStock: true },
+      { store: 'BigHaat', price: '₹50', variant: '20 Gram', url: 'https://www.bighaat.com/products/saaf-fungicide', delivery: 'Free delivery', rating: '4.6 ★ (8)', inStock: true },
+      { store: 'Amazon.in', price: '₹134', variant: 'Sovata All insects', url: 'https://www.amazon.in/s?k=SAAF+Fungicide', delivery: 'Free delivery', rating: '4.2 ★', inStock: true },
+      { store: 'AgriBegri', price: '₹450', variant: '250 Gms', url: 'https://www.agribegri.com', delivery: '7-day returns', rating: '4.8 ★ (12)', inStock: true },
+    ],
+    'bayer-folicur': [
+      { store: 'BigHaat', price: '₹840', variant: '250 ml', url: 'https://www.bighaat.com', delivery: 'Free delivery', rating: '4.7 ★', inStock: true },
+      { store: 'Amazon.in', price: '₹890', variant: '250 ml', url: 'https://www.amazon.in', delivery: 'Free delivery', rating: '4.5 ★', inStock: true },
+      { store: 'AgriBegri', price: '₹820', variant: '250 ml', url: 'https://www.agribegri.com', delivery: 'Free delivery', rating: '4.6 ★', inStock: true },
+    ],
+    'syngenta-amistar': [
+      { store: 'BigHaat', price: '₹1,250', variant: '200 ml', url: 'https://www.bighaat.com', delivery: 'Free delivery', rating: '4.8 ★', inStock: true },
+      { store: 'Amazon.in', price: '₹1,320', variant: '200 ml', url: 'https://www.amazon.in', delivery: 'Free delivery', rating: '4.6 ★', inStock: true },
+    ],
+  };
+
   const handleScan = (sample) => {
     try { sound.playClick(); } catch {}
     setSelectedSample(sample);
@@ -186,7 +205,7 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
         <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
       </div>
 
-      {customImageName && <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] font-mono ${isSunlightMode ? 'bg-zinc-100 border-zinc-300 text-zinc-700' : 'bg-zinc-900 border-zinc-700 text-zinc-300'}`}><span className="flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5 text-emerald-500" /> {customImageName} — AI verification, not file name</span><button onClick={clearCustom} className="p-1 rounded-full bg-zinc-800 text-white hover:bg-red-500"><X className="w-3 h-3" /></button></div>}
+      {customImageName && <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-[11px] font-mono ${isSunlightMode ? 'bg-zinc-100 border-zinc-300 text-zinc-700' : 'bg-zinc-900 border-zinc-700 text-zinc-300'}`}><span className="flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5 text-emerald-500" /> {customImageName}</span><button onClick={clearCustom} className="p-1 rounded-full bg-zinc-800 text-white hover:bg-red-500"><X className="w-3 h-3" /></button></div>}
 
       {qrMode && (
         <div className={`p-4 rounded-2xl border-2 ${isSunlightMode ? 'bg-white border-blue-300' : 'bg-zinc-900 border-blue-700'}`}>
