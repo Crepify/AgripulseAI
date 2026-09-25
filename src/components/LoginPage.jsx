@@ -1,15 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import QRCode from 'qrcode';
 import {
   ArrowLeft, KeyRound, ShieldCheck, Smartphone, MessageSquareText,
-  RefreshCw, Timer, User, MapPin, AlertTriangle, CheckCircle2, Leaf,
+  RefreshCw, Timer, User, MapPin, AlertTriangle, CheckCircle2, Leaf, QrCode,
 } from 'lucide-react';
 import { sound } from '../utils/audio';
 import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
+  enableTotp, setTotpSkipped, verifyUserTotp, isTotpEnabled,
   OTP_RESEND_COOLDOWN_S,
 } from '../utils/authService';
+import {
+  generateSecret, buildOtpAuthUri, verifyTotpCode, formatSecretForHumans,
+  totpSecondsRemaining, totpNow, TOTP_PERIOD_S,
+} from '../utils/totp';
 
 const INDIAN_STATES = [
   'Andhra Pradesh', 'Bihar', 'Chhattisgarh', 'Gujarat', 'Haryana', 'Himachal Pradesh',
@@ -64,6 +70,25 @@ const L = {
     verified: 'Demo OTP accepted · not verified by a carrier',
     loading: 'Please wait…',
     secNote: 'Your data never leaves this device — login works fully offline.',
+    // Google Authenticator (TOTP 2FA)
+    totpBadge: 'Google Authenticator 2FA supported',
+    totp2faTag: 'Two-Factor Security',
+    totpSetupTitle: 'Add Google Authenticator',
+    totpSetupSub: 'Extra protection for your account. Codes are generated on your phone — no internet needed.',
+    totpStep1: 'Install Google Authenticator (free, works offline)',
+    totpStep2: 'Tap “+” → “Scan a QR code”',
+    totpStep3: 'Enter the 6-digit code below to confirm',
+    totpManualKey: 'Can’t scan? Enter this key in the app',
+    totpConfirmHint: 'Enter the code shown in the app',
+    totpConfirmBtn: 'Verify & Enable',
+    totpSkip: 'Skip for now',
+    totpSkippedNote: 'You can enable it after your next login.',
+    totpWrongCode: 'That code didn’t match. Check your phone’s clock and try again.',
+    totpVerifyTitle: 'Authenticator code',
+    totpVerifySub: 'Open Google Authenticator and enter the current 6-digit code for',
+    totpNewCodeIn: 'New code in {s}s',
+    totp2faOn: 'Google Authenticator verified · 2FA active',
+    totpMaxAttempts: 'Too many wrong codes. Please restart login.',
   },
   hi: {
     tagline: 'डेमो किसान लॉगिन',
@@ -109,8 +134,101 @@ const L = {
     verified: 'डेमो OTP स्वीकार · मोबाइल नेटवर्क से सत्यापित नहीं',
     loading: 'कृपया प्रतीक्षा करें…',
     secNote: 'आपका डेटा इसी डिवाइस पर रहता है — लॉगिन पूरी तरह ऑफलाइन चलता है।',
+    // Google Authenticator (TOTP 2FA)
+    totp2faTag: 'दो-चरणीय सुरक्षा',
+    totpSetupTitle: 'Google Authenticator जोड़ें',
+    totpSetupSub: 'आपके खाते के लिए अतिरिक्त सुरक्षा। कोड आपके फोन पर बनते हैं — इंटरनेट की ज़रूरत नहीं।',
+    totpStep1: 'Google Authenticator इंस्टॉल करें (मुफ़्त, ऑफलाइन चलता है)',
+    totpStep2: '“+” दबाएं → “QR कोड स्कैन करें”',
+    totpStep3: 'पुष्टि के लिए नीचे 6-अंकों का कोड डालें',
+    totpManualKey: 'स्कैन नहीं हो पा रहा? ऐप में यह कुंजी दर्ज करें',
+    totpConfirmHint: 'ऐप में दिख रहा कोड दर्ज करें',
+    totpConfirmBtn: 'सत्यापित करें और चालू करें',
+    totpSkip: 'अभी छोड़ें',
+    totpSkippedNote: 'अगले लॉगिन के बाद भी चालू कर सकते हैं।',
+    totpWrongCode: 'कोड मेल नहीं खाया। फोन का समय जांचकर दोबारा कोशिश करें।',
+    totpVerifyTitle: 'प्रमाणीकरण कोड',
+    totpVerifySub: 'Google Authenticator खोलें और इसके लिए मौजूदा 6-अंकों का कोड दर्ज करें:',
+    totpNewCodeIn: 'नया कोड {s} सेकंड में',
+    totp2faOn: 'Google Authenticator सत्यापित · 2FA सक्रिय',
+    totpMaxAttempts: 'बहुत गलत कोड। लॉगिन फिर से शुरू करें।',
   },
 };
+
+// ── Reusable 6-digit code input (used by the authenticator screens) ──────────
+// The parent remounts this via `key` to clear the boxes (e.g. after a wrong
+// code) — remount resets the state and autoFocus re-focuses the first box.
+function CodeBoxes({ onComplete, disabled = false }) {
+  const [digits, setDigits] = useState(['', '', '', '', '', '']);
+  const refs = useRef([]);
+
+  const handleChange = (i, value) => {
+    const digit = value.replace(/\D/g, '').slice(-1);
+    const next = [...digits];
+    next[i] = digit;
+    setDigits(next);
+    sound.playClick();
+    if (digit && i < 5) refs.current[i + 1]?.focus();
+    if (digit && i === 5 && next.every((d) => d !== '')) onComplete(next.join(''));
+  };
+
+  const handleKeyDown = (i, e) => {
+    if (e.key === 'Backspace' && !digits[i] && i > 0) refs.current[i - 1]?.focus();
+  };
+
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      const next = pasted.split('');
+      setDigits(next);
+      onComplete(next.join(''));
+      e.preventDefault();
+    }
+  };
+
+  return (
+    <div className="flex w-full min-w-0 gap-1 sm:gap-2 justify-center" onPaste={handlePaste}>
+      {digits.map((digit, i) => (
+        <input
+          key={i}
+          ref={(el) => { refs.current[i] = el; }}
+          type="tel"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={1}
+          value={digit}
+          disabled={disabled}
+          autoFocus={i === 0}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          className="box-border w-10 max-w-11 min-w-0 flex-1 h-12 sm:h-13 bg-white text-zinc-900 py-2 px-0 text-center text-xl font-black border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-colors disabled:opacity-60"
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── QR code canvas for the otpauth:// provisioning URI ───────────────────────
+function TotpQr({ uri, size = 208 }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !uri) return undefined;
+    QRCode.toCanvas(canvasRef.current, uri, {
+      width: size,
+      margin: 2,                 // quiet zone — required for reliable scanning
+      errorCorrectionLevel: 'M',
+      color: { dark: '#090a09', light: '#ffffff' },
+    }).catch(() => {});           // non-fatal: manual key entry remains available
+    return undefined;
+  }, [uri, size]);
+
+  return (
+    <div className="p-3 bg-white rounded-2xl border-2 border-zinc-200 shadow-inner">
+      <canvas ref={canvasRef} className="block rounded-lg" style={{ width: size, height: size }} />
+    </div>
+  );
+}
 
 export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', setSelectedLang }) {
   const l = L[selectedLang] || L.en;
@@ -133,7 +251,34 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [isDemoLogin, setIsDemoLogin] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
 
+  // ── Google Authenticator (TOTP 2FA) state ──────────────────────────────
+  const [pendingProfile, setPendingProfile] = useState(null); // authenticated, awaiting 2FA
+  const [totpSecret, setTotpSecret] = useState('');           // not yet persisted (enrollment)
+  const [totpResetKey, setTotpResetKey] = useState(0);         // clears the code boxes
+  const [totpAttempts, setTotpAttempts] = useState(5);
+  const [totpVerified, setTotpVerified] = useState(false);
+  const [totpSecLeft, setTotpSecLeft] = useState(totpSecondsRemaining());
+
   const otpRefs = useRef([]);
+
+  // 30-second code-rotation ticker (authenticator apps rotate codes)
+  useEffect(() => {
+    const id = setInterval(() => setTotpSecLeft(totpSecondsRemaining()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // DEV ONLY: print the current authenticator code so the team can demo the
+  // 2FA screen without a phone. Stripped from production builds by the bundler.
+  useEffect(() => {
+    if (step !== 'totp' || !import.meta.env.DEV) return;
+    const secret = pendingProfile?.totp?.secret;
+    if (secret) {
+      console.log(
+        `%c[AgriPulse DEV] current authenticator code: ${totpNow(secret)}`,
+        'background:#10b981;color:#000;padding:4px 8px;border-radius:4px;font-weight:bold',
+      );
+    }
+  }, [step, pendingProfile]);
 
   // Resend cooldown ticker
   useEffect(() => {
@@ -232,6 +377,17 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }, 700);
   };
 
+  // Common success path — persists the session and hands off to the app
+  const finalizeLogin = (profile) => {
+    const mobile = normalizeMobile(phone);
+    const finalProfile = (isReturning ? updateLastLogin(mobile) : null) || profile;
+    const session = saveSession(finalProfile);
+    setWelcomeName(finalProfile.name);
+    sound.playSuccess();
+    setStep('success');
+    setTimeout(() => onSuccess(session), 1500);
+  };
+
   const handleVerify = (digits) => {
     const code = (digits || otpDigits).join('');
     if (code.length !== 6) return;
@@ -242,13 +398,31 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
       const res = verifyOtp(mobile, code);
       if (res.ok) {
         const profile = isReturning
-          ? updateLastLogin(mobile)
+          ? getUser(mobile)
           : registerUser({ name, mobile, village, state: stateName });
-        const session = saveSession(profile);
-        setWelcomeName(profile.name);
-        sound.playSuccess();
-        setStep('success');
-        setTimeout(() => onSuccess(session), 1500);
+        if (!profile) {
+          setError(l.maxAttempts);
+          return;
+        }
+        // 2FA routing: enrolled users must present an authenticator code;
+        // everyone else is offered a one-time enrollment (Skip is remembered).
+        if (isTotpEnabled(profile)) {
+          setPendingProfile(profile);
+          setTotpAttempts(5);
+          setTotpResetKey((k) => k + 1);
+          setError('');
+          setStep('totp');
+          return;
+        }
+        if (profile.totpSkipped) {
+          finalizeLogin(profile);
+          return;
+        }
+        setPendingProfile(profile);
+        setTotpSecret(generateSecret());
+        setTotpResetKey((k) => k + 1);
+        setError('');
+        setStep('totp-setup');
         return;
       }
       sound.playTransition();
@@ -263,6 +437,72 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
         setError(l.maxAttempts);
       }
     }, 600);
+  };
+
+  // ── Google Authenticator (TOTP 2FA) handlers ───────────────────────────
+
+  const handleTotpFail = () => {
+    const left = totpAttempts - 1;
+    setTotpAttempts(left);
+    if (left <= 0) {
+      setError(l.totpMaxAttempts);
+      setTimeout(() => {
+        setStep('phone');
+        setError('');
+        setTotpAttempts(5);
+        setPendingProfile(null);
+        setTotpSecret('');
+      }, 1600);
+      return false;
+    }
+    setError(`${l.totpWrongCode} ${left} ${l.attemptsLeft}.`);
+    setTotpResetKey((k) => k + 1);
+    return false;
+  };
+
+  // Enrollment: the secret is only persisted after a live code matches
+  const handleTotpSetupConfirm = (code) => {
+    if (busy) return;
+    setBusy(true);
+    setTimeout(() => {
+      setBusy(false);
+      const res = verifyTotpCode(totpSecret, code);
+      if (res.ok) {
+        const mobile = normalizeMobile(phone);
+        const profile = enableTotp(mobile, totpSecret) || pendingProfile;
+        setTotpVerified(true);
+        finalizeLogin(profile);
+        return;
+      }
+      sound.playTransition();
+      handleTotpFail();
+    }, 450);
+  };
+
+  const handleTotpSkip = () => {
+    sound.playClick();
+    const mobile = normalizeMobile(phone);
+    const profile = setTotpSkipped(mobile) || pendingProfile;
+    setTotpVerified(false);
+    finalizeLogin(profile);
+  };
+
+  // Login: verify the code from the authenticator app against the stored secret
+  const handleTotpVerify = (code) => {
+    if (busy) return;
+    setBusy(true);
+    setTimeout(() => {
+      setBusy(false);
+      const mobile = normalizeMobile(phone);
+      const res = verifyUserTotp(mobile, code);
+      if (res.ok) {
+        setTotpVerified(true);
+        finalizeLogin(pendingProfile);
+        return;
+      }
+      sound.playTransition();
+      handleTotpFail();
+    }, 450);
   };
 
   const handleOtpChange = (i, value) => {
@@ -329,6 +569,14 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
             sound.playClick();
             if (step === 'otp') { setStep(isReturning ? 'phone' : 'register'); setOtpDigits(['', '', '', '', '', '']); setError(''); }
             else if (step === 'register') { setStep('phone'); setError(''); }
+            else if (step === 'totp' || step === 'totp-setup') {
+              setStep('phone');
+              setError('');
+              setBusy(false);
+              setTotpAttempts(5);
+              setPendingProfile(null);
+              setTotpSecret('');
+            }
             else onCancel();
           }}
           className="absolute top-4 left-4 p-2 text-zinc-500 hover:text-zinc-600 rounded-full hover:bg-zinc-100 z-10"
@@ -416,6 +664,11 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 {busy ? l.loading : l.sendOtp}
               </button>
               <p className="text-[11px] text-zinc-500 mt-4">{l.newHere}</p>
+
+              {/* Visible 2FA indicator — enrollment happens after OTP verification */}
+              <div className="mt-3 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-black text-emerald-700">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> {l.totpBadge}
+              </div>
             </>
           )}
 
@@ -561,6 +814,89 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
             </>
           )}
 
+          {/* ── STEP: totp-setup (enroll Google Authenticator) ── */}
+          {step === 'totp-setup' && (
+            <>
+              <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
+                <QrCode className="w-8 h-8 text-emerald-600" />
+              </div>
+              <div className="text-[10px] font-black tracking-[0.2em] text-emerald-600 uppercase mb-1">{l.totp2faTag}</div>
+              <h2 className="text-2xl font-black text-zinc-900 mb-1">{l.totpSetupTitle}</h2>
+              <p className="text-xs text-zinc-500 mb-4">{l.totpSetupSub}</p>
+
+              <TotpQr uri={totpSecret ? buildOtpAuthUri({ secret: totpSecret, account: `+91${normalizeMobile(phone)}` }) : ''} />
+
+              <ol className="w-full text-left text-[11px] font-bold text-zinc-600 space-y-1.5 my-4 list-none">
+                {[l.totpStep1, l.totpStep2, l.totpStep3].map((s, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="shrink-0 w-4 h-4 mt-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black flex items-center justify-center">{i + 1}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+
+              <div className="w-full mb-4">
+                <div className="text-[10px] font-black text-zinc-500 mb-1">{l.totpManualKey}</div>
+                <div className="font-mono text-[11px] leading-relaxed tracking-wider bg-zinc-100 border border-zinc-200 rounded-lg px-2.5 py-2 break-all text-zinc-700 select-all cursor-text">
+                  {formatSecretForHumans(totpSecret)}
+                </div>
+              </div>
+
+              <div className="w-full text-xs font-black text-zinc-700 mb-2">{l.totpConfirmHint}</div>
+              <CodeBoxes key={`setup-${totpResetKey}`} onComplete={handleTotpSetupConfirm} disabled={busy} />
+
+              {error && (
+                <div className="w-full flex items-center gap-2 p-2.5 mt-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
+                  <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+                </div>
+              )}
+
+              <button
+                onClick={handleTotpSkip}
+                disabled={busy}
+                className="mt-4 w-full py-3 rounded-xl bg-white border-2 border-zinc-200 hover:bg-zinc-50 disabled:opacity-60 text-zinc-500 font-black text-xs transition-colors"
+              >
+                {l.totpSkip}
+              </button>
+              <p className="text-[10px] text-zinc-400 mt-1.5">{l.totpSkippedNote}</p>
+            </>
+          )}
+
+          {/* ── STEP: totp (verify authenticator code) ─────── */}
+          {step === 'totp' && (
+            <>
+              <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
+                <Smartphone className="w-8 h-8 text-emerald-600" />
+              </div>
+              <div className="text-[10px] font-black tracking-[0.2em] text-emerald-600 uppercase mb-1">{l.totp2faTag}</div>
+              <h2 className="text-2xl font-black text-zinc-900 mb-1">{l.totpVerifyTitle}</h2>
+              <p className="text-xs text-zinc-500 mb-1">{l.totpVerifySub}</p>
+              <p className="text-xs font-mono font-bold text-zinc-800 mb-5">{maskedPhone}</p>
+
+              <CodeBoxes key={`verify-${totpResetKey}`} onComplete={handleTotpVerify} disabled={busy} />
+
+              {error && (
+                <div className="w-full flex items-center gap-2 p-2.5 mt-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
+                  <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+                </div>
+              )}
+
+              {/* Code rotation countdown — matches the authenticator app */}
+              <div className="w-full flex items-center justify-between text-[11px] font-bold text-zinc-500 mt-4 mb-1.5">
+                <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5" /> {l.totpNewCodeIn.replace('{s}', totpSecLeft)}</span>
+                <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck className="w-3.5 h-3.5" /> 2FA</span>
+              </div>
+              <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden" aria-hidden="true">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-1000 ease-linear"
+                  style={{ width: `${(totpSecLeft / TOTP_PERIOD_S) * 100}%` }}
+                />
+              </div>
+
+              <p className="text-[10px] text-zinc-400 mt-4">{l.secNote}</p>
+            </>
+          )}
+
           {/* ── STEP: success ───────────────────────────── */}
           {step === 'success' && (
             <motion.div
@@ -584,6 +920,11 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                   : <ShieldCheck className="w-3.5 h-3.5" />}
                 {isDemoLogin ? l.demoStatus : l.verified}
               </p>
+              {totpVerified && (
+                <p className="mt-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-black text-emerald-700 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" /> {l.totp2faOn}
+                </p>
+              )}
             </motion.div>
           )}
         </div>
