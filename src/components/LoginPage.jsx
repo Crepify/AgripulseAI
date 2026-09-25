@@ -4,7 +4,8 @@ import QRCode from 'qrcode';
 import {
   ArrowLeft, KeyRound, ShieldCheck, Smartphone, MessageSquareText,
   RefreshCw, Timer, User, MapPin, AlertTriangle, CheckCircle2, Leaf, QrCode,
-  Fingerprint, BadgeCheck, LocateFixed, Mic, MicOff,} from 'lucide-react';
+  Fingerprint, BadgeCheck, LocateFixed, Mic, MicOff, Volume2, HelpCircle,
+  ChevronDown, ArrowRight, X,} from 'lucide-react';
 import { sound } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
 import {
@@ -21,6 +22,29 @@ import {
   generateSecret, buildOtpAuthUri, verifyTotpCode, formatSecretForHumans,
   totpSecondsRemaining, totpNow, TOTP_PERIOD_S,
 } from '../utils/totp';
+
+// Voice guidance per step — Hindi carries a phonetic fallback so devices
+// without a native Devanagari voice still speak clearly.
+const VOICE = {
+  en: {
+    phone: 'Welcome to AgriPulse. Type your ten digit mobile number and press the green button. A six digit code will come on your phone.',
+    register: 'Please type your name and village. Then press continue.',
+    otp: 'Open the SMS on your phone and type the six digit code here.',
+    aadhaar: 'Type your twelve digit Aadhaar number, then verify with the OTP.',
+    totp_setup: 'Scan this code with the Google Authenticator app, then type the number the app shows.',
+    totp: 'Open the Google Authenticator app and type the number it is showing now.',
+    success: 'You are logged in. Welcome!',
+  },
+  hi: {
+    phone: { devanagari: 'अग्रीपल्स में आपका स्वागत है। अपना दस अंकों का मोबाइल नंबर लिखें और हरे बटन को दबाएं। छह अंकों का कोड आपके फोन पर आ जाएगा।', phonetic: 'Agripulse mein aapka swagat hai. Apna das ankon ka mobile number likhein aur hare button ko dabayein. Chhah ankon ka code aapke phone par aa jayega.' },
+    register: { devanagari: 'कृपया अपना नाम और गांव लिखें। फिर आगे बढ़ें दबाएं।', phonetic: 'Kripya apna naam aur gaon likhein. Phir aage badhein dabayein.' },
+    otp: { devanagari: 'अपने फोन का SMS खोलें और छह अंकों का कोड यहां लिखें।', phonetic: 'Apne phone ka SMS kholein aur chhah ankon ka code yahan likhein.' },
+    aadhaar: { devanagari: 'अपना बारह अंकों का आधार नंबर लिखें, फिर OTP से सत्यापित करें।', phonetic: 'Apna barah ankon ka Aadhaar number likhein, phir OTP se satyapit karein.' },
+    totp_setup: { devanagari: 'इस कोड को Google Authenticator ऐप से स्कैन करें, फिर ऐप में दिखा नंबर लिखें।', phonetic: 'Is code ko Google Authenticator app se scan karein, phir app mein dikha number likhein.' },
+    totp: { devanagari: 'Google Authenticator ऐप खोलें और उसमें अभी दिख रहा नंबर लिखें।', phonetic: 'Google Authenticator app kholein aur usmein abhi dikh raha number likhein.' },
+    success: { devanagari: 'आप लॉगिन हो गए हैं। स्वागत है!', phonetic: 'Aap login ho gaye hain. Swagat hai!' },
+  },
+};
 
 const INDIAN_STATES = [
   'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh',
@@ -41,6 +65,19 @@ const L = {
     googleRealNote: 'Verified by Google — no password needed.',
     googleVerified: 'Google account verified',
     googleFailed: 'Google sign-in failed. Please try again.',
+    // Farmer guidance (voice + pictured help)
+    howTitle: 'How to login — 3 steps',
+    how1: 'Type your mobile number',
+    how2: 'Enter the 6-digit code from SMS',
+    how3: 'Add name & village — done!',
+    listenBtn: 'Listen',
+    helpBtn: 'How to use?',
+    helpTitle: 'Step-by-step help',
+    moreOptions: 'Other ways to sign in',
+    helpOtp: 'Type the 6-digit code you received by SMS.',
+    helpReg: 'Type your name and village — that is all we need.',
+    helpTotp: 'Open the Google Authenticator app and type the number it shows.',
+    helpAadhaar: 'Type your 12-digit Aadhaar number and verify with the OTP.',
     orMobile: 'or continue with mobile / Aadhaar',    phoneLabel: 'Mobile Number',
     phonePlaceholder: '98765 43210',
     phoneHint: '10-digit Indian mobile number',
@@ -131,6 +168,19 @@ const L = {
     googleRealNote: 'Google द्वारा सत्यापित — पासवर्ड की ज़रूरत नहीं।',
     googleVerified: 'Google खाता सत्यापित',
     googleFailed: 'Google साइन-इन विफल। दोबारा कोशिश करें।',
+    // किसान मार्गदर्शन (आवाज़ + चित्र सहायता)
+    howTitle: 'लॉगिन कैसे करें — 3 कदम',
+    how1: 'अपना मोबाइल नंबर लिखें',
+    how2: 'SMS में आया 6-अंकों का कोड भरें',
+    how3: 'नाम और गांव भरें — बस!',
+    listenBtn: 'सुनें',
+    helpBtn: 'कैसे इस्तेमाल करें?',
+    helpTitle: 'कदम-दर-कदम मदद',
+    moreOptions: 'साइन-इन के और तरीके',
+    helpOtp: 'SMS पर आया 6-अंकों का कोड नीचे लिखें।',
+    helpReg: 'अपना नाम और गांव लिखें — बस इतना ही।',
+    helpTotp: 'Google Authenticator ऐप खोलें और उसमें दिखा नंबर लिखें।',
+    helpAadhaar: 'अपना 12-अंकों का आधार नंबर लिखें और OTP से सत्यापित करें।',
     orMobile: 'या मोबाइल / आधार से जारी रखें',    phoneLabel: 'मोबाइल नंबर',
     phonePlaceholder: '98765 43210',
     phoneHint: '10 अंकों का भारतीय मोबाइल नंबर',
@@ -314,6 +364,8 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [step, setStep] = useState('phone'); // phone | register | aadhaar_login | aadhaar_otp | otp | success
   const [phone, setPhone] = useState('');
   const [loginMethod, setLoginMethod] = useState('sms'); // 'sms' | 'totp' (Google Authenticator)
+  const [showMore, setShowMore] = useState(false); // advanced sign-in options
+  const [showHelp, setShowHelp] = useState(false);     // pictured help sheet
   const [name, setName] = useState('');
   const [village, setVillage] = useState('');
   const [stateName, setStateName] = useState('Karnataka');
@@ -528,6 +580,29 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, googleCfg]);
+
+  // ── Farmer guidance: voice + pictured help ─────────────────────────────
+  const speakHelp = () => {
+    sound.playClick();
+    const lang = selectedLang === 'hi' ? 'hi' : 'en';
+    const keyMap = {
+      phone: 'phone', register: 'register', otp: 'otp', aadhaar_login: 'aadhaar',
+      aadhaar_otp: 'otp', 'totp-setup': 'totp_setup', totp: 'totp', success: 'success',
+    };
+    const script = VOICE[lang][keyMap[step] || 'phone'];
+    speechEngine.speak(script, selectedLang === 'hi' ? 'hi-IN' : 'en-IN');
+  };
+
+  const HELP = {
+    phone: [l.how1, l.how2, l.how3],
+    register: [l.helpReg],
+    otp: [l.helpOtp],
+    aadhaar_login: [l.helpAadhaar],
+    aadhaar_otp: [l.helpOtp],
+    'totp-setup': [l.helpTotp],
+    totp: [l.helpTotp],
+    success: [l.how3],
+  };
 
   const handleGoogleDemoLogin = () => {
     sound.playClick();
@@ -1055,6 +1130,24 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
         )}
 
         <div className="min-w-0 px-5 py-8 pt-14 sm:px-8 flex flex-col items-center text-center">
+
+          {/* Farmer help bar — voice guide + pictured steps (on every screen) */}
+          <div className="w-full flex items-center justify-center gap-2 mb-3">
+            <button
+              type="button"
+              onClick={speakHelp}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black shadow-sm transition-colors"
+            >
+              <Volume2 className="w-3.5 h-3.5" /> {l.listenBtn}
+            </button>
+            <button
+              type="button"
+              onClick={() => { sound.playClick(); setShowHelp(true); }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border-2 border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[11px] font-black transition-colors"
+            >
+              <HelpCircle className="w-3.5 h-3.5" /> {l.helpBtn}
+            </button>
+          </div>
           {/* ── STEP: phone ─────────────────────────────── */}
           {step === 'phone' && (
             <>
@@ -1065,30 +1158,31 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <h2 className="text-2xl font-black text-zinc-900 mb-2">{l.phoneTitle}</h2>
               <p className="text-sm text-zinc-500 mb-5">{l.phoneSub}</p>
 
-              {googleCfg?.configured ? (
-                <>
-                  <div ref={googleBtnRef} className="w-full min-h-11 flex justify-center" />
-                  <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleRealNote}</p>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleGoogleDemoLogin}
-                    disabled={busy}
-                    className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
-                  >
-                    <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
-                    <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
-                  </button>
-                  <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleDemoNote}</p>
-                </>
-              )}
-
-              <div className="w-full flex items-center gap-3 my-5" aria-hidden="true">
-                <span className="h-px flex-1 bg-zinc-200" />
-                <span className="text-[10px] font-bold text-zinc-500">{l.orMobile}</span>
-                <span className="h-px flex-1 bg-zinc-200" />
+              {/* Pictured 3-step guide — what will happen */}
+              <div className="w-full mb-5 p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-left">
+                <div className="text-[10px] font-black tracking-[0.15em] text-emerald-700 uppercase mb-2.5">{l.howTitle}</div>
+                <div className="flex items-start justify-between gap-0.5">
+                  <div className="flex-1 flex flex-col items-center text-center gap-1.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center shrink-0">
+                      <Smartphone className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 leading-tight">{l.how1}</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400 mt-3 shrink-0" />
+                  <div className="flex-1 flex flex-col items-center text-center gap-1.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center shrink-0">
+                      <KeyRound className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 leading-tight">{l.how2}</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400 mt-3 shrink-0" />
+                  <div className="flex-1 flex flex-col items-center text-center gap-1.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center shrink-0">
+                      <User className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 leading-tight">{l.how3}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="w-full text-left mb-1.5">
@@ -1113,24 +1207,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               </div>
               <div className="w-full text-left text-[11px] text-zinc-500 mb-3">{l.phoneHint} · {phone.length}/10</div>
 
-              {/* Verification method — pick SMS or Google Authenticator */}
-              <div className="w-full grid grid-cols-2 gap-1 p-1 mb-4 bg-zinc-100 rounded-xl border border-zinc-200" role="tablist" aria-label="Verification method">
-                {['sms', 'totp'].map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    role="tab"
-                    aria-selected={loginMethod === m}
-                    onClick={() => { sound.playClick(); setLoginMethod(m); setError(''); }}
-                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-black transition-colors ${loginMethod === m ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-                  >
-                    {m === 'sms'
-                      ? <Smartphone className="w-4 h-4 shrink-0" />
-                      : <QrCode className="w-4 h-4 shrink-0" />}
-                    {m === 'sms' ? l.methodSms : l.methodTotp}
-                  </button>
-                ))}
-              </div>
               {error && (
                 <div className="w-full flex items-center gap-2 p-2.5 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
                   <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
@@ -1140,19 +1216,69 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <button
                 onClick={handlePhoneSubmit}
                 disabled={busy}
-                className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-sm shadow-md transition-colors"
+                className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-base shadow-md transition-colors"
               >
                 {busy ? l.loading : loginMethod === 'totp' ? l.totpContinueBtn : l.sendOtp}
               </button>
               <p className="text-[11px] text-zinc-500 mt-4">{loginMethod === 'totp' ? l.totpMethodHint : l.newHere}</p>
 
-
+              {/* Advanced options — collapsed by default. The mobile+SMS path above
+                  is the one every farmer already knows from UPI, so it stays alone. */}
               <button
-                onClick={() => { sound.playClick(); setStep('aadhaar_login'); setError(''); }}
-                className="mt-3 w-full py-3 rounded-xl bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 text-blue-700 font-black text-sm flex items-center justify-center gap-2"
+                type="button"
+                onClick={() => { sound.playClick(); setShowMore(!showMore); }}
+                className="mt-4 flex items-center gap-1 text-[11px] font-black text-zinc-500 hover:text-zinc-700"
               >
-                <Fingerprint className="w-4 h-4" /> {l.aadhaarLoginTitle}
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMore ? 'rotate-180' : ''}`} /> {l.moreOptions}
               </button>
+              {showMore && (
+                <div className="w-full mt-3 pt-4 border-t border-zinc-100 space-y-3">
+                  {googleCfg?.configured ? (
+                    <>
+                      <div ref={googleBtnRef} className="w-full min-h-11 flex justify-center" />
+                      <p className="w-full text-center text-[10px] text-zinc-500">{l.googleRealNote}</p>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleGoogleDemoLogin}
+                        disabled={busy}
+                        className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
+                      >
+                        <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
+                        <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
+                      </button>
+                      <p className="w-full text-center text-[10px] text-zinc-500">{l.googleDemoNote}</p>
+                    </>
+                  )}
+
+                  <div className="w-full grid grid-cols-2 gap-1 p-1 bg-zinc-100 rounded-xl border border-zinc-200" role="tablist" aria-label="Verification method">
+                    {['sms', 'totp'].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        role="tab"
+                        aria-selected={loginMethod === m}
+                        onClick={() => { sound.playClick(); setLoginMethod(m); setError(''); }}
+                        className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-black transition-colors ${loginMethod === m ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                      >
+                        {m === 'sms'
+                          ? <Smartphone className="w-4 h-4 shrink-0" />
+                          : <QrCode className="w-4 h-4 shrink-0" />}
+                        {m === 'sms' ? l.methodSms : l.methodTotp}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => { sound.playClick(); setStep('aadhaar_login'); setError(''); }}
+                    className="w-full py-3 rounded-xl bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 text-blue-700 font-black text-sm flex items-center justify-center gap-2"
+                  >
+                    <Fingerprint className="w-4 h-4" /> {l.aadhaarLoginTitle}
+                  </button>
+                </div>
+              )}
             </>
           )}
 
@@ -1644,6 +1770,51 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
             </motion.div>
           )}
         </div>
+
+        {/* Farmer help sheet — pictured, bilingual, voice-enabled */}
+        <AnimatePresence>
+          {showHelp && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4"
+              onClick={() => { setShowHelp(false); speechEngine.stopSpeaking(); }}
+            >
+              <motion.div
+                initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                className="w-full max-w-sm bg-white rounded-2xl p-5 text-left shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-black text-zinc-900 flex items-center gap-1.5">
+                    <HelpCircle className="w-4 h-4 text-emerald-600" /> {l.helpTitle}
+                  </h3>
+                  <button
+                    onClick={() => { sound.playClick(); setShowHelp(false); speechEngine.stopSpeaking(); }}
+                    className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-500"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-2.5">
+                  {(HELP[step] || HELP.phone).map((s, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-black flex items-center justify-center">{i + 1}</span>
+                      <p className="text-xs font-bold text-zinc-700 leading-relaxed">{s}</p>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => { setShowHelp(false); speakHelp(); }}
+                  className="mt-4 w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-1.5"
+                >
+                  <Volume2 className="w-3.5 h-3.5" /> {l.listenBtn}
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="px-6 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-center gap-1.5 text-[10px] font-bold text-zinc-600">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> {l.secNote}
