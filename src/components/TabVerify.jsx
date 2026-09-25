@@ -66,7 +66,7 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
     ],
   };
 
-  // FIX: fetchLivePrices was missing causing "fetchLivePrices is not defined" crash
+  // Offline-first: static instantly, live Google Shopping when online, cached for offline
   const fetchLivePrices = async (productKey = 'upl-saaf') => {
     try {
       const raw = (productKey || 'upl-saaf').toLowerCase();
@@ -77,29 +77,63 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
       else if (STATIC_SHOPPING[raw]) key = raw;
       else if (raw === 'generic' || raw === 'unknown') key = 'generic';
 
-      // Instant static shopping list — only shopping_results
+      // 1) Try cached live result from last online fetch (localStorage) for offline mode
+      try {
+        const cached = localStorage.getItem(`ap_pesticide_${key}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          // Show cached if it's less than 7 days old, else still show but mark as cached
+          setLivePrices(parsed);
+        }
+      } catch {}
+
+      // 2) Instant static shopping list — only shopping_results, works 100% offline
       if (STATIC_SHOPPING[key]) {
-        setLivePrices(prev => ({
-          ...(prev || {}),
-          name: key === 'bayer-folicur' ? 'Bayer Folicur Fungicide' : key === 'syngenta-amistar' ? 'Syngenta Amistar Top' : key === 'supercrop-500' ? 'SuperCrop 500 (FAKE TRAP)' : key === 'generic' ? 'Generic Pesticide' : 'UPL SAAF Fungicide',
-          composition: key === 'bayer-folicur' ? 'Tebuconazole 25.9% EC' : key === 'syngenta-amistar' ? 'Azoxystrobin 18.2% + Difenoconazole 11.4% SC' : key === 'supercrop-500' ? 'Unregistered - No CIB&RC' : 'Carbendazim 12% + Mancozeb 63% WP',
-          prices: STATIC_SHOPPING[key],
-          mrp: key === 'bayer-folicur' ? '₹840' : key === 'syngenta-amistar' ? '₹1,250' : key === 'supercrop-500' ? '₹350 (FAKE)' : '₹480',
-          mrpRange: key === 'bayer-folicur' ? '₹800-₹890' : key === 'syngenta-amistar' ? '₹1,200-₹1,320' : key === 'supercrop-500' ? 'Fake trap' : '₹50-₹450',
-          source: 'BigHaat • Amazon • AgriBegri • Live Market (static)',
-          productKey: key,
-          live: false,
-        }));
+        setLivePrices(prev => {
+          // If we already have cached live data, keep it, otherwise show static
+          if (prev?.live && prev?.prices?.length) return prev;
+          return {
+            ...(prev || {}),
+            name: key === 'bayer-folicur' ? 'Bayer Folicur Fungicide' : key === 'syngenta-amistar' ? 'Syngenta Amistar Top' : key === 'supercrop-500' ? 'SuperCrop 500 (FAKE TRAP)' : key === 'generic' ? 'Generic Pesticide' : 'UPL SAAF Fungicide',
+            composition: key === 'bayer-folicur' ? 'Tebuconazole 25.9% EC' : key === 'syngenta-amistar' ? 'Azoxystrobin 18.2% + Difenoconazole 11.4% SC' : key === 'supercrop-500' ? 'Unregistered - No CIB&RC' : 'Carbendazim 12% + Mancozeb 63% WP',
+            prices: STATIC_SHOPPING[key],
+            mrp: key === 'bayer-folicur' ? '₹840' : key === 'syngenta-amistar' ? '₹1,250' : key === 'supercrop-500' ? '₹350 (FAKE)' : '₹480',
+            mrpRange: key === 'bayer-folicur' ? '₹800-₹890' : key === 'syngenta-amistar' ? '₹1,200-₹1,320' : key === 'supercrop-500' ? 'Fake trap' : '₹50-₹450',
+            source: prev?.source?.includes('Google Shopping') ? prev.source : 'BigHaat • Amazon • AgriBegri • Live Market (static - offline ready)',
+            productKey: key,
+            live: prev?.live || false,
+            offline: !navigator.onLine,
+          };
+        });
       }
 
+      // 3) If offline, stop here — static + cached is all we have (Google needs internet)
+      if (!navigator.onLine) {
+        console.log('[AgriPulse] Offline - showing static + cached shopping list');
+        return;
+      }
+
+      // 4) Online: try live Google Shopping via /api/pesticide-prices (uses SerpAPI if SERPAPI_KEY set)
       setIsFetchingPrices(true);
       const res = await fetch(`/api/pesticide-prices?product=${encodeURIComponent(key)}`);
       if (res.ok) {
         const data = await res.json();
         setLivePrices(data);
+        // Cache for offline use (7 days)
+        try {
+          localStorage.setItem(`ap_pesticide_${key}`, JSON.stringify({ ...data, cachedAt: Date.now() }));
+          // Also cache in IndexedDB mandiCache if available
+          const { openDB } = await import('idb').catch(() => ({ openDB: null }));
+          if (openDB) {
+            const db = await openDB('agripulse_db', 1);
+            if (db.objectStoreNames.contains('mandiCache')) {
+              await db.put('mandiCache', { crop: `pesticide_${key}`, data, timestamp: Date.now() });
+            }
+          }
+        } catch {}
       }
     } catch (e) {
-      console.warn('fetchLivePrices failed', e);
+      console.warn('fetchLivePrices failed (offline?)', e);
     } finally {
       setIsFetchingPrices(false);
     }
@@ -107,10 +141,17 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
 
   const fetchMandiRates = async () => {
     try {
+      // Try cached mandi rates first for offline
+      try {
+        const cached = localStorage.getItem('ap_mandi_pesticide');
+        if (cached) setMandiRates(JSON.parse(cached));
+      } catch {}
+      if (!navigator.onLine) return;
       const res = await fetch('/api/mandi-prices?commodity=pesticide');
       if (res.ok) {
         const data = await res.json();
         setMandiRates(data);
+        try { localStorage.setItem('ap_mandi_pesticide', JSON.stringify(data)); } catch {}
       }
     } catch {}
   };
@@ -367,7 +408,7 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
             <div className="mt-2 text-[10px] text-zinc-500">Source: BigHaat Mandi + AgriBegri + Amazon | Updated: Today | Check Certified Stores tab for dealer prices</div>
           </div>
 
-          <div className={`mt-4 p-3 rounded-xl border text-[11px] font-mono ${isSunlightMode ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-blue-950/20 border-blue-800/50 text-blue-300'}`}><strong>Farmer Tip:</strong> Instant verification — no scanning animation. Prices from BigHaat, Amazon, AgriBegri (shopping only, no organic videos). Always verify MRP, hologram, and buy from certified stores.</div>
+          <div className={`mt-4 p-3 rounded-xl border text-[11px] font-mono ${isSunlightMode ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-blue-950/20 border-blue-800/50 text-blue-300'}`}><strong>Farmer Tip:</strong> Works offline: static BigHaat/Amazon/AgriBegri prices always visible. When online, live Google Shopping prices (only shopping_results) auto-update and are cached for 7 days offline. Google search needs internet — offline shows last cached + static.</div>
         </div>
       </div>
     </div>
