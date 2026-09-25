@@ -5,7 +5,7 @@
 
 import { CROPS } from '../data/agriData';
 import { PESTICIDE_DB } from '../data/pesticideDatabase.js';
-import { loadDetector, detectDisease } from '../vision/detector';
+import { loadDetector, detectDisease, forceCPU } from '../vision/detector';
 import { detectDiseaseCloud } from '../vision/cloud-detector';
 
 /* ------------------------------------------------------------------ */
@@ -422,9 +422,14 @@ async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) 
       console.warn('[AgriPulse] detect failed at conf', conf, e?.message);
       if (e?.message?.includes('timeout')) {
         consecutiveTimeouts++;
+        if (consecutiveTimeouts >= 1 && detectFn.name === 'detectDisease') {
+          // WebGPU hang detected - force CPU and retry
+          console.warn('[AgriPulse] WebGPU timeout, forcing CPU backend');
+          try { forceCPU(); } catch {}
+        }
         if (consecutiveTimeouts >= 2) {
           console.warn('[AgriPulse] 2 consecutive timeouts, aborting on-device attempts');
-          break; // Stop trying on-device, fallback to cloud
+          break;
         }
       }
     }
@@ -462,25 +467,28 @@ export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { 
   }
 
   // If on-device found nothing, timed out, or we're online, try cloud as fallback
-  const shouldTryCloud = (!result || !result.detections?.length) && (typeof navigator === 'undefined' || navigator.onLine);
+  const shouldTryCloud = (typeof navigator === 'undefined' || navigator.onLine);
   if (shouldTryCloud) {
-    console.log('[AgriPulse] trying cloud fallback');
-    try {
-      const cloudResult = await withTimeout(
-        detectWithAdaptiveThreshold(detectDiseaseCloud, imageElement, conf),
-        15000,
-        'cloud detect'
-      );
-      console.log('[AgriPulse] cloud result', cloudResult?.detections?.length);
-      if (cloudResult?.detections?.length) {
-        result = cloudResult;
-        backend = 'cloud';
-      } else if (!result && cloudResult) {
-        result = cloudResult;
-        backend = 'cloud';
+    // If on-device failed or found nothing, try cloud
+    if (!result || !result.detections?.length) {
+      console.log('[AgriPulse] trying cloud fallback');
+      try {
+        const cloudResult = await withTimeout(
+          detectWithAdaptiveThreshold(detectDiseaseCloud, imageElement, conf),
+          20000,
+          'cloud detect'
+        );
+        console.log('[AgriPulse] cloud result', cloudResult?.detections?.length);
+        if (cloudResult?.detections?.length) {
+          result = cloudResult;
+          backend = 'cloud';
+        } else if (!result && cloudResult) {
+          result = cloudResult;
+          backend = 'cloud';
+        }
+      } catch (cloudErr) {
+        console.warn('Cloud fallback failed or found nothing:', cloudErr);
       }
-    } catch (cloudErr) {
-      console.warn('Cloud fallback failed or found nothing:', cloudErr);
     }
   }
 
