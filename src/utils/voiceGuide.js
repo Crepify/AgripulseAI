@@ -50,6 +50,7 @@ const S = {
     didntCatch: 'माफ़ कीजिए, फिर से बोलिए।',
     askNext: 'आगे की सेवा सुनेंगे? हाँ बोलिए।',
     langSwitched: 'ठीक है, अब मैं हिंदी में बात करूँगा।',
+    ready: 'मैं तैयार हूँ। बोलिए।',
     tourStopAsk: 'क्या मैं सेवाएँ बंद कर दूँ? हाँ या नहीं बोलिए।',
     langUnavailable: 'माफ़ कीजिए, वह भाषा इस फ़ोन पर उपलब्ध नहीं है। मैं इसी भाषा में बात करता हूँ।',
     langFallbackAsk: 'माफ़ कीजिए, यह फ़ोन उस भाषा में नहीं बोल सकता। क्या मैं अंग्रेज़ी में बात करूँ?',
@@ -90,6 +91,7 @@ const S = {
     askNext: 'Want to hear the next service? Just say yes.',
     langSwitched: 'Alright — from now on I will speak in English.',
     langSwitchedFallback: 'Alright, I have switched the language.',
+    ready: 'I am ready. Go ahead.',
     tourStopAsk: 'Should I stop explaining the services? Say yes or no.',
     langUnavailable: 'Sorry, that language is not available on this phone. I will keep speaking this language.',
     langFallbackAsk: 'Sorry, this phone cannot speak that language. Shall I talk in English instead?',
@@ -129,6 +131,7 @@ const S = {
     didntCatch: 'மன்னிக்கவும், மீண்டும் சொல்லுங்கள்.',
     askNext: 'அடுத்த சேவையைப் பற்றி கேக்க விரும்புகிறீர்களா?',
     langSwitched: 'சரி — இனிமேல் நான் தமிழில் பேசுவேன்.',
+    ready: 'நான் தயார். சொல்லுங்கள்.',
     tourStopAsk: 'சேவைகளை நிறுத்தவா? ஆம் அல்லது இல்லை சொல்லுங்கள்.',
     langUnavailable: 'மன்னிக்கவும், அந்த மொழி இந்த போனில் இல்லை. இதே மொழியில் பேசுகிறேன்.',
     langFallbackAsk: 'மன்னிக்கவும், இந்த போன் அந்த மொழியில் பேச முடியாது. ஆங்கிலத்தில் பேசலாமா?',
@@ -168,6 +171,7 @@ const S = {
     didntCatch: 'క్షమించండి, మళ్ళీ చెప్పండి.',
     askNext: 'తర్వాత సేవ గురించి వినాలా?',
     langSwitched: 'సరే — ఇకపై నేను తెలుగులో మాట్లాడతాను.',
+    ready: 'నేను సిద్ధంగా ఉన్నాను. చెప్పండి.',
     tourStopAsk: 'సేవలు ఆపిదామా? అవును లేదా కాదు చెప్పండి.',
     langUnavailable: 'క్షమించండి, ఆ భాష ఈ ఫోన్‌లో లేదు. ఇదే భాషలో మాట్లాడతాను.',
     langFallbackAsk: 'క్షమించండి, ఈ ఫోన్ ఆ భాషలో మాట్లాడలేదు. ఇంగ్లీషులో మాట్లాడనా?',
@@ -207,6 +211,7 @@ const S = {
     didntCatch: 'ಕ್ಷಮಿಸಿ, ಇನ್ನೊಮ್ಮೆ ಹೇಳಿ.',
     askNext: 'ಮುಂದಿನ ಸೇವೆಯ ಬಗ್ಗೆ ಕೇಳಲು ಬಯಸುವಿರಾ?',
     langSwitched: 'ಸರಿ — ಈಗ ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
+    ready: 'ನಾನು ಸಿದ್ಧ. ಹೇಳಿ.',
     tourStopAsk: 'ಸೇವೆಗಳನ್ನು ನಿಲ್ಲಿಸಬೇಕೆ? ಹೌದು ಇಲ್ಲವೆ ಹೇಳಿ.',
     langUnavailable: 'ಕ್ಷಮಿಸಿ, ಆ ಭಾಷೆ ಈ ಫೋನ್‌ನಲ್ಲಿ ಇಲ್ಲ. ಇದೇ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
     langFallbackAsk: 'ಕ್ಷಮಿಸಿ, ಈ ಫೋನ್ ಆ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡಲಾರದು. ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಮಾತನಾಡಲಾಮಾ?',
@@ -246,6 +251,7 @@ const S = {
     didntCatch: 'क्षमस्व, पुन्हा सांगा.',
     askNext: 'पुढच्या सेवेबद्दल ऐकू इच्छिता?',
     langSwitched: 'ठीक आहे — आता मी मराठीत बोलेन.',
+    ready: 'मी तयार आहे. सांगा.',
     tourStopAsk: 'सेवा सांगणे बंद करू का? हो किंवा नाही म्हणा.',
     langUnavailable: 'क्षमस्व, ती भाषा या फोनवर नाही. मी याच भाषेत बोलतो.',
     langFallbackAsk: 'क्षमस्व, हा फोन त्या भाषेत बोलू शकत नाही. मी इंग्रजीत बोलू का?',
@@ -286,6 +292,7 @@ const PHON = {
     didntCatch: 'Maaf kijiye, phir se boliye.',
     askNext: 'Aage ki seva sunenge? Haan boliye.',
     langSwitched: 'Theek hai, ab main Hindi mein baat karunga.',
+    ready: 'Main taiyaar hoon. Boliye.',
     tourStopAsk: 'Kya main sevaayein band kar doon? Haan ya nahin boliye.',
     langUnavailable: 'Maaf kijiye, woh bhaasha is phone par uplabdh nahin hai. Main isi bhaasha mein baat karta hoon.',
     langFallbackAsk: 'Maaf kijiye, yeh phone us bhaasha mein nahin bol sakta. Kya main angrezi mein baat karoon?',
@@ -606,6 +613,7 @@ export class VoiceGuide {
     this.tourPending = false;  // login finished → App should start the tour
     this.lang = 'hi';
     this.lastLine = '';
+    this.lastHeard = '';   // most recent thing the farmer said
     this.onCommand = null;     // (transcript) => boolean — app-level commands
     this._subscribers = new Set(); // UI subscribers (multiple components safely)
     this._ackWaiter = null;
@@ -638,6 +646,19 @@ export class VoiceGuide {
   }
 
   script() { return S[this.lang] || S.hi; }
+
+  // Live UI state — off | paused | idle | listening | speaking | asking
+  getState() {
+    if (!this.active) return 'off';
+    if (this.suspended) return 'paused';
+    let playing = false;
+    try { playing = !!(this.engine.isPlaying && this.engine.isPlaying()); } catch { /* noop */ }
+    if (this._speaking || playing) return 'speaking';
+    if (this._ackWaiter) return 'asking';
+    let listening = false;
+    try { listening = !!this.engine.isListening || !!this.engine._h; } catch { /* noop */ }
+    return listening ? 'listening' : 'idle';
+  }
 
   _hasCloud(lang) {
     return !!(this.engine.cloudLangs && this.engine.cloudLangs.includes(lang));
@@ -968,6 +989,7 @@ export class VoiceGuide {
   _handleSpeech(transcript) {
     const q = String(transcript || '').trim();
     if (!q) return;
+    this.lastHeard = q;
     const intent = matchIntent(this.lang, q);
 
     if (intent === 'repeat') {

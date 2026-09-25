@@ -16,6 +16,7 @@ import TabChatBot from './components/TabChatBot';
 import TabServices from './components/TabServices';
 import VoiceAssistant from './components/VoiceAssistant';
 import HandsFreeVoiceBanner from './components/HandsFreeVoiceBanner';
+import VoiceOrb from './components/VoiceOrb';
 import BackgroundCanvas from './components/BackgroundCanvas';
 import InstallAppModal from './components/InstallAppModal';
 import LandingPage from './components/LandingPage';
@@ -218,24 +219,11 @@ export default function App() {
           setIsLowLiteracy={setIsLowLiteracy}
         />
 
-        {/* Voice guide companion — replay the service tour or stop it */}
-        <div className="fixed bottom-20 right-3 z-40 flex flex-col items-end gap-2">
-          {guideActive ? (
-            <button
-              onClick={() => { sound.playClick(); voiceGuide.stopTour(); }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-[11px] font-black shadow-lg animate-pulse"
-            >
-              ⏹ {t.voiceGuideStop || 'Stop guide'}
-            </button>
-          ) : (
-            <button
-              onClick={() => { sound.playClick(); voiceGuide.runServiceTour(); }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black shadow-lg"
-            >
-              🔊 {t.voiceGuideReplay || 'सेवाएँ सुनें'}
-            </button>
-          )}
-        </div>
+        {/* Voice guide — Gemini-style live orb (tap to pause/resume, ✕ to stop) */}
+        <VoiceOrb
+          offsetBottom={96}
+          onRestart={() => { voiceGuide.runServiceTour(); }}
+        />
 
         {/* Wet-Hands / Hands-Free Voice Navigation Banner */}
         <HandsFreeVoiceBanner

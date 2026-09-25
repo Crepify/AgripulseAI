@@ -8,6 +8,7 @@ import {
 import { sound } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
 import { voiceGuide, detectGuideLanguage, detectLanguageByLocation, savedLangPref } from '../utils/voiceGuide';
+import VoiceOrb from './VoiceOrb';
 import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, getUserByAadhaar, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
@@ -976,15 +977,10 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               </button>
             </div>
           )}
-          {guideActive && (
-            <button
-              type="button"
-              onClick={() => { sound.playClick(); voiceGuide.stop(); }}
-              className="mb-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-600 text-[10px] font-black animate-pulse"
-            >
-              🎙️ {voiceGuide.script().activeLabel} · {voiceGuide.script().stopGuide}
-            </button>
-          )}
+          <VoiceOrb
+            offsetBottom={18}
+            onRestart={() => { voiceGuide.start(voiceGuide.lang); voiceGuide.sayKey('ready'); }}
+          />
 
           {/* Farmer help bar — voice guide + pictured steps (on every screen) */}
           <div className="w-full flex items-center justify-center gap-2 mb-3">
