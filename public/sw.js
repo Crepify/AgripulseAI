@@ -13,8 +13,26 @@ const MODEL_CACHE = 'agripulse-models-v1';
 const SHELL_PRECACHE = ['/', '/index.html', '/manifest.json'];
 const SHELL_OPTIONAL = ['/icon.svg', '/favicon.svg', '/icons.svg'];
 const MODEL_PREFIXES = ['/models/', '/litert/', '/yolo/'];
-// Small runtime files the page requests before this worker controls it on a first visit.
-const MODEL_PRECACHE = ['/litert/core.js', '/litert/wasm-utils.js', '/yolo/ultralytics_inference_web_bg.wasm'];
+// All files needed for 100% offline inference after ONE online visit.
+// Previously only 3 files were precached, so going offline quickly left the wasm runtime missing.
+const MODEL_PRECACHE = [
+  // LiteRT runtime (self-hosted, no CDN)
+  '/litert/core.js',
+  '/litert/wasm-utils.js',
+  '/litert/litert_wasm_internal.js',
+  '/litert/litert_wasm_internal.wasm',
+  '/litert/litert_wasm_compat_internal.js',
+  '/litert/litert_wasm_compat_internal.wasm',
+  '/litert/litert_wasm_jspi_internal.js',
+  '/litert/litert_wasm_jspi_internal.wasm',
+  '/litert/litert_wasm_threaded_internal.js',
+  '/litert/litert_wasm_threaded_internal.wasm',
+  // YOLO pre/post-processing
+  '/yolo/ultralytics_inference_web_bg.wasm',
+  // Model + labels
+  '/models/agripulse.tflite',
+  '/models/classes.json',
+];
 
 const isModelPath = (pathname) => MODEL_PREFIXES.some((p) => pathname.startsWith(p));
 
@@ -70,29 +88,43 @@ async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request, { ignoreVary: true });
   if (cached) return cached;
-  const response = await fetch(request);
-  if (response && response.status === 200 && response.type === 'basic') {
-    cache.put(request, response.clone());
+  try {
+    const response = await fetch(request);
+    if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
+      cache.put(request, response.clone()).catch(() => {});
+    }
+    return response;
+  } catch {
+    // Offline and not cached -> return cached if we got it after a race, else a 503 so the page can handle it
+    const fallback = await cache.match(request, { ignoreVary: true });
+    if (fallback) return fallback;
+    return new Response('', { status: 503, statusText: 'Offline and not cached' });
   }
-  return response;
 }
 
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(SHELL_CACHE);
   const cached = await cache.match(request, { ignoreVary: true });
-  const network = fetch(request).then((response) => {
-    if (response && response.status === 200 && response.type === 'basic') {
-      cache.put(request, response.clone());
+  const networkPromise = fetch(request).then((response) => {
+    if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
+      cache.put(request, response.clone()).catch(() => {});
     }
     return response;
   }).catch(() => undefined);
 
-  if (cached) return cached;
-  const response = await network;
+  if (cached) {
+    // update in background
+    networkPromise.catch(() => {});
+    return cached;
+  }
+  const response = await networkPromise;
   if (response) return response;
   // Offline navigation fallback
-  if (request.mode === 'navigate') return cache.match('/index.html', { ignoreVary: true });
-  return Response.error();
+  if (request.mode === 'navigate') {
+    const fallback = await cache.match('/index.html', { ignoreVary: true });
+    if (fallback) return fallback;
+  }
+  return new Response('', { status: 503, statusText: 'Offline' });
 }
 
 self.addEventListener('fetch', (event) => {

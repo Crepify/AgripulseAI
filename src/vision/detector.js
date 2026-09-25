@@ -24,14 +24,17 @@ export function splitLabel(name) {
 export function loadDetector(onProgress) {
   if (!modelPromise) {
     onProgress?.("Loading model…");
+    // Defensive: location may be undefined in some test envs
+    const base = typeof location !== 'undefined' ? location.href : 'http://localhost/';
     modelPromise = YOLO.load(MODEL_URL, {
       device: "auto",                                        // WebGPU if available, else CPU/wasm
-      litertWasmUrl: new URL("/litert/", location.href),     // self-hosted LiteRT.js runtime (absolute URL, trailing slash)
-      wasmUrl: new URL("/yolo/ultralytics_inference_web_bg.wasm", location.href), // self-hosted pre/post-processing wasm
+      litertWasmUrl: new URL("/litert/", base),     // self-hosted LiteRT.js runtime (absolute URL, trailing slash)
+      wasmUrl: new URL("/yolo/ultralytics_inference_web_bg.wasm", base), // self-hosted pre/post-processing wasm
     }).then((m) => {
       console.info(`[AgriPulse] model ready on "${m.device}" — ${Object.keys(m.names).length} classes`);
       return m;
     }).catch((err) => {
+      console.error('[AgriPulse] YOLO.load failed:', err);
       modelPromise = null; // allow a retry after a transient failure
       throw err;
     });

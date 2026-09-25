@@ -41,13 +41,17 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   // Warm the on-device model as soon as the scanner opens; the runtime and model are cached for later scans.
   useEffect(() => {
     const unsubscribe = subscribeModelStatus(setModelStatus);
-    const videoElement = videoRef.current;
     initOnDeviceAI();
     return () => {
       unsubscribe();
       scanIdRef.current += 1;
-      const stream = videoElement?.srcObject;
-      stream?.getTracks().forEach((track) => track.stop());
+      try {
+        const stream = videoRef.current?.srcObject;
+        stream?.getTracks().forEach((track) => track.stop());
+        if (videoRef.current) videoRef.current.srcObject = null;
+      } catch {
+        // ignore cleanup errors
+      }
     };
   }, []);
 

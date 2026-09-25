@@ -30,6 +30,23 @@ function setStatus(patch) {
 
 const MODEL_CACHE = 'agripulse-models-v1'; // must match public/sw.js
 
+// Explicit list must stay in sync with public/sw.js MODEL_PRECACHE (but we also scan performance entries)
+const KNOWN_MODEL_ASSETS = [
+  '/models/agripulse.tflite',
+  '/models/classes.json',
+  '/litert/core.js',
+  '/litert/wasm-utils.js',
+  '/litert/litert_wasm_internal.js',
+  '/litert/litert_wasm_internal.wasm',
+  '/litert/litert_wasm_compat_internal.js',
+  '/litert/litert_wasm_compat_internal.wasm',
+  '/litert/litert_wasm_jspi_internal.js',
+  '/litert/litert_wasm_jspi_internal.wasm',
+  '/litert/litert_wasm_threaded_internal.js',
+  '/litert/litert_wasm_threaded_internal.wasm',
+  '/yolo/ultralytics_inference_web_bg.wasm',
+];
+
 // Make sure every model/runtime file this page actually loaded is in the offline cache.
 // On a first visit some requests happen before the service worker controls the page; cache.add()
 // re-requests them with a conditional GET, which the browser's HTTP cache answers without re-downloading.
@@ -37,15 +54,23 @@ async function ensureOfflineCache() {
   if (typeof caches === 'undefined' || navigator.connection?.saveData) return;
   try {
     const cache = await caches.open(MODEL_CACHE);
-    const paths = new Set(
+    const perfPaths = new Set(
       performance.getEntriesByType('resource')
         .map((e) => e.name)
         .filter((u) => u.startsWith(location.origin))
-        .map((u) => new URL(u).pathname)
+        .map((u) => {
+          try { return new URL(u).pathname; } catch { return ''; }
+        })
         .filter((p) => /^\/(models|litert|yolo)\//.test(p)),
     );
-    for (const p of paths) {
-      if (!(await cache.match(p, { ignoreVary: true }))) await cache.add(p);
+    // Union of known assets + anything we saw in performance timing
+    const all = new Set([...KNOWN_MODEL_ASSETS, ...perfPaths]);
+    for (const p of all) {
+      try {
+        if (!(await cache.match(p, { ignoreVary: true }))) await cache.add(p);
+      } catch {
+        // best effort - individual file may 404 or be offline
+      }
     }
   } catch (err) {
     console.warn('Offline cache top-up skipped:', err);
@@ -59,7 +84,10 @@ export async function initOnDeviceAI() {
   try {
     const model = await loadDetector();
     setStatus({ state: 'ready', device: model.device });
+    // Top-up offline cache now and again after 2s to catch late-loaded wasm chunks
+    ensureOfflineCache();
     setTimeout(ensureOfflineCache, 2000);
+    setTimeout(ensureOfflineCache, 8000);
     return true;
   } catch (err) {
     console.error('AgriPulse on-device model failed to load:', err);
@@ -72,11 +100,13 @@ export async function initOnDeviceAI() {
 /* Label helpers                                                       */
 /* ------------------------------------------------------------------ */
 const byId = Object.fromEntries(CROPS.map((c) => [c.id, c]));
+// Fallback to first crop if a curated id is missing (prevents crash if agriData is filtered)
+const FALLBACK_CROP = CROPS[0];
 const TEMPLATE = {
-  blast: byId['rice-blast'],
-  blight: byId['tomato-blight'],
-  virus: byId['cotton-curl'],
-  rust: byId['wheat-rust'],
+  blast: byId['rice-blast'] || FALLBACK_CROP,
+  blight: byId['tomato-blight'] || FALLBACK_CROP,
+  virus: byId['cotton-curl'] || FALLBACK_CROP,
+  rust: byId['wheat-rust'] || FALLBACK_CROP,
 };
 
 // Which curated advisory (dosage / spray window / voice) fits each detector class.
@@ -285,9 +315,9 @@ function buildMatchedCrop(detections) {
     };
   }
 
-  const tpl = TEMPLATE[FAMILY_OVERRIDES[top.label] || 'blight'];
+  const tpl = TEMPLATE[FAMILY_OVERRIDES[top.label] || 'blight'] || TEMPLATE.blight || FALLBACK_CROP;
   const lowConf = top.confidence < 0.5;
-  const name = crop || tpl.name;
+  const name = crop || tpl?.name || 'Leaf';
   const regions = detections.filter((d) => d.label === top.label).length;
   const others = [...new Set(
     detections.filter((d) => d.label !== top.label && !isHealthyLabel(d.label)).map((d) => d.label),
