@@ -32,6 +32,7 @@ function devApiRoutes() {
     '/api/weather': './api/weather.js',
     '/api/mandi': './api/mandi.js',
     '/api/predict': './api/predict.js',
+    '/api/otp': './api/otp.js',
   }
   return {
     name: 'agripulse-dev-api',

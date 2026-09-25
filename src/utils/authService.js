@@ -164,6 +164,39 @@ export function verifyOtp(mobile, code) {
   return { ok: false, error: 'wrong_code', attemptsLeft };
 }
 
+// ── real SMS OTP (server route /api/otp) ─────────────────────────────────────
+//
+// When the deployment has an SMS provider configured (Twilio / MSG91 /
+// Fast2SMS), the code is sent to the farmer's actual phone and NEVER shown
+// on the website. Without a provider the route answers not_configured and
+// the caller falls back to the on-screen demo OTP above.
+
+export async function serverSendOtp(mobile, token) {
+  try {
+    const res = await fetch('/api/otp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'send', mobile, token }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'offline' };
+  }
+}
+
+export async function serverVerifyOtp(mobile, code, token) {
+  try {
+    const res = await fetch('/api/otp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'verify', mobile, code, token }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'offline' };
+  }
+}
+
 // ── TOTP two-factor (Google Authenticator) ───────────────────────────────────
 //
 // Enrollment: a fresh base32 secret is generated per user, shown as a QR
