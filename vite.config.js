@@ -33,6 +33,7 @@ function devApiRoutes() {
     '/api/mandi': './api/mandi.js',
     '/api/predict': './api/predict.js',
     '/api/otp': './api/otp.js',
+    '/api/google': './api/google.js',
   }
   return {
     name: 'agripulse-dev-api',

@@ -10,7 +10,8 @@ import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
   enableTotp, setTotpSkipped, verifyUserTotp, isTotpEnabled,
-  serverSendOtp, serverVerifyOtp,
+  serverSendOtp, serverVerifyOtp, fetchGoogleConfig, serverVerifyGoogle,
+  upsertGoogleUser,
   OTP_RESEND_COOLDOWN_S,
 } from '../utils/authService';
 import {
@@ -33,6 +34,9 @@ const L = {
     phoneSub: 'Google and mobile OTP are demo-only in this prototype; no external account or SMS service is used.',
     googleDemo: 'Continue with Google (Demo)',
     googleDemoNote: 'Demo only — no Google account is contacted.',
+    googleRealNote: 'Verified by Google — no password needed.',
+    googleVerified: 'Google account verified',
+    googleFailed: 'Google sign-in failed. Please try again.',
     orMobile: 'or continue with mobile number',
     phoneLabel: 'Mobile Number',
     phonePlaceholder: '98765 43210',
@@ -105,6 +109,9 @@ const L = {
     phoneSub: 'इस प्रोटोटाइप में Google और मोबाइल OTP दोनों डेमो हैं; कोई बाहरी खाता या SMS सेवा उपयोग नहीं होती।',
     googleDemo: 'Google से जारी रखें (डेमो)',
     googleDemoNote: 'सिर्फ डेमो — कोई Google खाता उपयोग नहीं होगा।',
+    googleRealNote: 'Google द्वारा सत्यापित — पासवर्ड की ज़रूरत नहीं।',
+    googleVerified: 'Google खाता सत्यापित',
+    googleFailed: 'Google साइन-इन विफल। दोबारा कोशिश करें।',
     orMobile: 'या मोबाइल नंबर से जारी रखें',
     phoneLabel: 'मोबाइल नंबर',
     phonePlaceholder: '98765 43210',
@@ -248,6 +255,25 @@ function TotpQr({ uri, size = 208 }) {
   );
 }
 
+// ── Google Identity Services script loader (module-level cache) ──────────────
+let gsiPromise = null;
+function loadGsiScript() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('no_window'));
+  if (window.google?.accounts?.id) return Promise.resolve();
+  if (!gsiPromise) {
+    gsiPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true;
+      s.defer = true;
+      s.onload = () => resolve();
+      s.onerror = () => { gsiPromise = null; reject(new Error('gsi_load_failed')); };
+      document.head.appendChild(s);
+    });
+  }
+  return gsiPromise;
+}
+
 export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', setSelectedLang }) {
   const l = L[selectedLang] || L.en;
 
@@ -269,6 +295,9 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [welcomeName, setWelcomeName] = useState('');
   const [welcomeEmail, setWelcomeEmail] = useState('');
   const [isDemoLogin, setIsDemoLogin] = useState(false);
+  const [googleCfg, setGoogleCfg] = useState(null);   // null=loading, {configured,clientId}
+  const [loginProvider, setLoginProvider] = useState('phone'); // 'phone' | 'google' | 'google-demo'
+  const googleBtnRef = useRef(null);
   const [isReturning, setIsReturning] = useState(false);
 
   // ── Google Authenticator (TOTP 2FA) state ──────────────────────────────
@@ -358,11 +387,73 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     return true;
   };
 
+  // ── REAL Google sign-in (GIS button → server-verified ID token) ────────
+
+  const handleGoogleCredential = async (credential) => {
+    setBusy(true);
+    setError('');
+    const res = await serverVerifyGoogle(credential);
+    setBusy(false);
+    if (res.ok && res.profile) {
+      const profile = upsertGoogleUser(res.profile);
+      const session = saveSession({ ...profile, authProvider: 'google' });
+      setLoginProvider('google');
+      setIsDemoLogin(false);
+      setTotpVerified(false);
+      setWelcomeName(profile.name);
+      setWelcomeEmail(profile.email);
+      setIsReturning(true);
+      sound.playSuccess();
+      setStep('success');
+      setTimeout(() => onSuccess(session), 1400);
+      return;
+    }
+    sound.playTransition();
+    setError(res.error === 'offline' ? l.otpOffline : l.googleFailed);
+  };
+
+  // Probe /api/google once: with GOOGLE_CLIENT_ID set we render the real
+  // "Continue with Google" button; otherwise we keep the demo button.
+  useEffect(() => {
+    let alive = true;
+    fetchGoogleConfig().then((cfg) => { if (alive) setGoogleCfg(cfg); });
+    return () => { alive = false; };
+  }, []);
+
+  // Render the official GIS button once the script + client id are ready
+  useEffect(() => {
+    if (step !== 'phone' || !googleCfg?.configured) return undefined;
+    let cancelled = false;
+    loadGsiScript().then(() => {
+      if (cancelled || !googleBtnRef.current || !window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({
+        client_id: googleCfg.clientId,
+        callback: (resp) => handleGoogleCredential(resp.credential),
+        cancel_on_tap_outside: true,
+      });
+      googleBtnRef.current.innerHTML = '';
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'pill',
+        logo_alignment: 'left',
+        width: 320,
+      });
+    }).catch(() => {
+      // GIS script unreachable (offline) → fall back to the demo button
+      setGoogleCfg({ configured: false });
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, googleCfg]);
+
   const handleGoogleDemoLogin = () => {
     sound.playClick();
     setError('');
     setBusy(true);
     setIsDemoLogin(true);
+    setLoginProvider('google-demo');
 
     // Deliberately local demo identity: this does not contact Google or verify an account.
     setTimeout(() => {
@@ -455,6 +546,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
 
   // Common success path — persists the session and hands off to the app
   const finalizeLogin = (profile) => {
+    setLoginProvider('phone');
     const mobile = normalizeMobile(phone);
     const finalProfile = (isReturning ? updateLastLogin(mobile) : null) || profile;
     const session = saveSession(finalProfile);
@@ -715,16 +807,25 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <h2 className="text-2xl font-black text-zinc-900 mb-2">{l.phoneTitle}</h2>
               <p className="text-sm text-zinc-500 mb-5">{l.phoneSub}</p>
 
-              <button
-                type="button"
-                onClick={handleGoogleDemoLogin}
-                disabled={busy}
-                className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
-              >
-                <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
-                <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
-              </button>
-              <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleDemoNote}</p>
+              {googleCfg?.configured ? (
+                <>
+                  <div ref={googleBtnRef} className="w-full min-h-11 flex justify-center" />
+                  <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleRealNote}</p>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleGoogleDemoLogin}
+                    disabled={busy}
+                    className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
+                  >
+                    <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
+                    <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
+                  </button>
+                  <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleDemoNote}</p>
+                </>
+              )}
 
               <div className="w-full flex items-center gap-3 my-5" aria-hidden="true">
                 <span className="h-px flex-1 bg-zinc-200" />
@@ -1056,13 +1157,17 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 <Leaf className="w-4 h-4 text-emerald-500" /> {welcomeName}
               </p>
               {welcomeEmail && (
-                <p className="text-xs font-mono text-zinc-600 mt-1">{welcomeEmail} · DEMO</p>
+                <p className="text-xs font-mono text-zinc-600 mt-1">
+                  {welcomeEmail}{loginProvider === 'google' ? '' : ' · DEMO'}
+                </p>
               )}
               <p className="text-xs font-mono text-zinc-500 mt-2 flex items-center gap-1">
                 {isDemoLogin
                   ? <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
                   : <ShieldCheck className="w-3.5 h-3.5" />}
-                {isDemoLogin ? l.demoStatus : l.verified}
+                {isDemoLogin
+                  ? l.demoStatus
+                  : loginProvider === 'google' ? l.googleVerified : l.verified}
               </p>
               {totpVerified && (
                 <p className="mt-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-black text-emerald-700 flex items-center gap-1.5">
