@@ -9,8 +9,13 @@
 //   • OTP is "delivered" through a simulated SMS push notification in the UI
 //     (and console.log for developers) since no SMS backend exists
 //   • Google demo sign-in is a local dummy profile; it never contacts Google.
+//   • Optional Google Authenticator 2FA — REAL RFC 6238 TOTP codes verified
+//     on-device (works offline with any authenticator app). Secret storage is
+//     device-local, so it is still demo-grade, not production-grade.
 //   • Farmer profiles + demo sessions are persisted in localStorage for 30 days.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { verifyTotpCode } from './totp.js';
 
 const USERS_KEY = 'ap_users_v1';
 const SESSION_KEY = 'ap_session_v1';
@@ -252,6 +257,141 @@ export function verifyOtp(mobile, code) {
   return { ok: false, error: 'wrong_code', attemptsLeft };
 }
 
+// ── real SMS OTP (server route /api/otp) ─────────────────────────────────────
+//
+// When the deployment has an SMS provider configured (Twilio / MSG91 /
+// Fast2SMS), the code is sent to the farmer's actual phone and NEVER shown
+// on the website. Without a provider the route answers not_configured and
+// the caller falls back to the on-screen demo OTP above.
+
+export async function serverSendOtp(mobile, token) {
+  try {
+    const res = await fetch('/api/otp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'send', mobile, token }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'offline' };
+  }
+}
+
+export async function serverVerifyOtp(mobile, code, token) {
+  try {
+    const res = await fetch('/api/otp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'verify', mobile, code, token }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'offline' };
+  }
+}
+
+// ── real Google sign-in (server route /api/google) ───────────────────────────
+//
+// Google Identity Services returns an RS256 ID-token JWT in the browser; it is
+// verified SERVER-SIDE (/api/google) against Google's public keys. Only the
+// verified profile reaches the app. Without GOOGLE_CLIENT_ID configured the
+// route answers configured:false and the login keeps the demo button.
+
+export async function fetchGoogleConfig() {
+  try {
+    const res = await fetch('/api/google');
+    return await res.json();
+  } catch {
+    return { ok: false, configured: false };
+  }
+}
+
+export async function serverVerifyGoogle(credential) {
+  try {
+    const res = await fetch('/api/google', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ credential }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'offline' };
+  }
+}
+
+// Google profiles are keyed by the stable Google subject id (payload.sub),
+// independent of the mobile-number-keyed farmer records.
+export function upsertGoogleUser({ sub, name, email, picture }) {
+  const users = readJson(USERS_KEY, {});
+  const key = `google:${sub}`;
+  const prev = users[key] || {};
+  users[key] = {
+    ...prev,
+    name: name || prev.name || 'Google User',
+    email: email || prev.email || '',
+    picture: picture || prev.picture || '',
+    googleSub: sub,
+    mobile: prev.mobile || '',
+    village: prev.village || '',
+    state: prev.state || 'Karnataka',
+    createdAt: prev.createdAt || Date.now(),
+    lastLoginAt: Date.now(),
+  };
+  writeJson(USERS_KEY, users);
+  return users[key];
+}
+
+// ── TOTP two-factor (Google Authenticator) ───────────────────────────────────
+//
+// Enrollment: a fresh base32 secret is generated per user, shown as a QR
+// (otpauth:// URI) and only persisted AFTER the farmer confirms with a live
+// code — so a half-finished setup never locks them out.
+// The secret itself stays on-device (demo); codes are real RFC 6238 TOTP.
+
+export function isTotpEnabled(user) {
+  return Boolean(user?.totp?.secret);
+}
+
+// Persist the secret once the setup code has been verified
+export function enableTotp(mobile, secret) {
+  const users = readJson(USERS_KEY, {});
+  const user = users[mobile];
+  if (!user) return null;
+  user.totp = {
+    secret: String(secret || '').replace(/\s/g, '').toUpperCase(),
+    enabledAt: Date.now(),
+    lastCounter: 0, // replay guard: highest accepted time-step
+  };
+  delete user.totpSkipped;
+  users[mobile] = user;
+  writeJson(USERS_KEY, users);
+  return user;
+}
+
+// User declined the 2FA offer — stop asking on future logins
+export function setTotpSkipped(mobile) {
+  const users = readJson(USERS_KEY, {});
+  if (!users[mobile]) return null;
+  users[mobile].totpSkipped = true;
+  writeJson(USERS_KEY, users);
+  return users[mobile];
+}
+
+// Verify a code from the authenticator app against the stored secret.
+// Updates the replay guard on success.
+export function verifyUserTotp(mobile, code) {
+  const users = readJson(USERS_KEY, {});
+  const user = users[mobile];
+  if (!isTotpEnabled(user)) return { ok: false, error: 'not_enabled' };
+  const res = verifyTotpCode(user.totp.secret, code, { lastCounter: user.totp.lastCounter || 0 });
+  if (res.ok) {
+    user.totp.lastCounter = res.counter;
+    users[mobile] = user;
+    writeJson(USERS_KEY, users);
+  }
+  return res;
+}
+
 // ── Aadhaar OTP lifecycle (demo) ─────────────────────────────────────────────
 
 export function requestAadhaarOtp(aadhaar) {
@@ -319,8 +459,7 @@ export function verifyAadhaarOtp(aadhaar, code) {
     return { ok: false, error: 'max_attempts' };
   }
   writeJson(AADHAAR_OTP_KEY, { ...pending, attemptsLeft });
-  return { ok: false, error: 'wrong_code', attemptsLeft };
-}
+  return { ok: false, error: 'wrong_code', attemptsLeft };}
 
 // ── sessions ─────────────────────────────────────────────────────────────────
 
@@ -330,6 +469,8 @@ export function saveSession(user) {
     mobile: user.mobile || '',
     email: user.email || '',
     authProvider: user.authProvider || 'phone-demo',
+    twoFactor: user.totp?.secret ? 'totp' : '',
+    picture: user.picture || '',
     village: user.village || '',
     state: user.state || 'Karnataka',
     aadhaar: user.aadhaar ? maskAadhaar(user.aadhaar) : '',

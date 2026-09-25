@@ -1,19 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import QRCode from 'qrcode';
 import {
   ArrowLeft, KeyRound, ShieldCheck, Smartphone, MessageSquareText,
-  RefreshCw, Timer, User, MapPin, AlertTriangle, CheckCircle2, Leaf,
-  Fingerprint, BadgeCheck, LocateFixed, Mic, MicOff,
-} from 'lucide-react';
+  RefreshCw, Timer, User, MapPin, AlertTriangle, CheckCircle2, Leaf, QrCode,
+  Fingerprint, BadgeCheck, LocateFixed, Mic, MicOff,} from 'lucide-react';
 import { sound } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
 import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, getUserByAadhaar, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
+  enableTotp, setTotpSkipped, verifyUserTotp, isTotpEnabled,
+  serverSendOtp, serverVerifyOtp, fetchGoogleConfig, serverVerifyGoogle,
+  upsertGoogleUser,
   OTP_RESEND_COOLDOWN_S,
   normalizeAadhaar, isValidAadhaar, formatAadhaar, maskAadhaar,
   requestAadhaarOtp, verifyAadhaarOtp, linkAadhaarToUser,
 } from '../utils/authService';
+import {
+  generateSecret, buildOtpAuthUri, verifyTotpCode, formatSecretForHumans,
+  totpSecondsRemaining, totpNow, TOTP_PERIOD_S,
+} from '../utils/totp';
 
 const INDIAN_STATES = [
   'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh',
@@ -31,8 +38,10 @@ const L = {
     phoneSub: 'Mobile OTP and Aadhaar verification are demo-only offline checks — no external SMS or UIDAI call is made in this prototype.',
     googleDemo: 'Continue with Google (Demo)',
     googleDemoNote: 'Demo only — no Google account is contacted.',
-    orMobile: 'or continue with mobile / Aadhaar',
-    phoneLabel: 'Mobile Number',
+    googleRealNote: 'Verified by Google — no password needed.',
+    googleVerified: 'Google account verified',
+    googleFailed: 'Google sign-in failed. Please try again.',
+    orMobile: 'or continue with mobile / Aadhaar',    phoneLabel: 'Mobile Number',
     phonePlaceholder: '98765 43210',
     phoneHint: '10-digit Indian mobile number',
     sendOtp: 'Send OTP',
@@ -50,6 +59,9 @@ const L = {
     otpTitle: 'Enter verification code',
     otpSub: 'OTP sent to',
     otpHint: 'The code is valid for 5 minutes.',
+    otpRealNote: 'Sent as a real SMS — check your phone’s messages.',
+    otpOffline: 'Network unavailable. Reconnect and try again.',
+    otpSendFailed: 'Could not send the SMS right now. Please try again.',
     smsBanner: 'SMS · AGRIPULSE',
     smsText: 'Your AgriPulse AI login OTP is',
     smsValid: 'Valid for 5 minutes. Do not share it with anyone.',
@@ -69,6 +81,30 @@ const L = {
     verified: 'Demo OTP accepted · offline verified',
     loading: 'Please wait…',
     secNote: 'Your data never leaves this device — login works fully offline.',
+    // Google Authenticator (TOTP 2FA)
+    methodSms: 'SMS OTP',
+    methodTotp: 'Authenticator',
+    totpContinueBtn: 'Continue with Authenticator',
+    totpMethodHint: 'Set up once with a QR scan — then log in with offline 6-digit codes.',
+    regContinueTotp: 'Continue to Authenticator setup',
+    useTotpInstead: 'Use Google Authenticator instead',
+    totp2faTag: 'Two-Factor Security',
+    totpSetupTitle: 'Add Google Authenticator',
+    totpSetupSub: 'Extra protection for your account. Codes are generated on your phone — no internet needed.',
+    totpStep1: 'Install Google Authenticator (free, works offline)',
+    totpStep2: 'Tap “+” → “Scan a QR code”',
+    totpStep3: 'Enter the 6-digit code below to confirm',
+    totpManualKey: 'Can’t scan? Enter this key in the app',
+    totpConfirmHint: 'Enter the code shown in the app',
+    totpConfirmBtn: 'Verify & Enable',
+    totpSkip: 'Skip for now',
+    totpSkippedNote: 'You can enable it after your next login.',
+    totpWrongCode: 'That code didn’t match. Check your phone’s clock and try again.',
+    totpVerifyTitle: 'Authenticator code',
+    totpVerifySub: 'Open Google Authenticator and enter the current 6-digit code for',
+    totpNewCodeIn: 'New code in {s}s',
+    totp2faOn: 'Google Authenticator verified · 2FA active',
+    totpMaxAttempts: 'Too many wrong codes. Please restart login.',
     aadhaarLabel: 'Aadhaar Number',
     aadhaarPlaceholder: '1234 5678 9012',
     aadhaarHint: '12-digit Aadhaar (Verhoeff checksum verified offline)',
@@ -85,16 +121,17 @@ const L = {
     detectLocation: 'Auto-detect my state',
     detecting: 'Detecting…',
     locationDetected: 'Location detected',
-    locationFailed: 'Could not detect location — select manually',
-  },
+    locationFailed: 'Could not detect location — select manually',  },
   hi: {
     tagline: 'सुरक्षित किसान लॉगिन',
     phoneTitle: 'लॉगिन का तरीका चुनें',
     phoneSub: 'मोबाइल OTP और आधार सत्यापन इस प्रोटोटाइप में सिर्फ ऑफलाइन डेमो हैं — कोई बाहरी SMS या UIDAI कॉल नहीं होता।',
     googleDemo: 'Google से जारी रखें (डेमो)',
     googleDemoNote: 'सिर्फ डेमो — कोई Google खाता उपयोग नहीं होगा।',
-    orMobile: 'या मोबाइल / आधार से जारी रखें',
-    phoneLabel: 'मोबाइल नंबर',
+    googleRealNote: 'Google द्वारा सत्यापित — पासवर्ड की ज़रूरत नहीं।',
+    googleVerified: 'Google खाता सत्यापित',
+    googleFailed: 'Google साइन-इन विफल। दोबारा कोशिश करें।',
+    orMobile: 'या मोबाइल / आधार से जारी रखें',    phoneLabel: 'मोबाइल नंबर',
     phonePlaceholder: '98765 43210',
     phoneHint: '10 अंकों का भारतीय मोबाइल नंबर',
     sendOtp: 'OTP भेजें',
@@ -112,6 +149,9 @@ const L = {
     otpTitle: 'OTP दर्ज करें',
     otpSub: 'OTP भेजा गया',
     otpHint: 'कोड 5 मिनट के लिए मान्य है।',
+    otpRealNote: 'असली SMS भेजा गया है — अपने फोन के मैसेज देखें।',
+    otpOffline: 'नेटवर्क उपलब्ध नहीं। कनेक्ट होकर दोबारा कोशिश करें।',
+    otpSendFailed: 'अभी SMS नहीं भेजा जा सका। कृपया दोबारा कोशिश करें।',
     smsBanner: 'SMS · AGRIPULSE',
     smsText: 'आपका AgriPulse AI लॉगिन OTP है',
     smsValid: '5 मिनट के लिए मान्य। किसी को बताएं नहीं।',
@@ -131,6 +171,30 @@ const L = {
     verified: 'डेमो OTP स्वीकार · ऑफलाइन सत्यापित',
     loading: 'कृपया प्रतीक्षा करें…',
     secNote: 'आपका डेटा इसी डिवाइस पर रहता है — लॉगिन पूरी तरह ऑफलाइन चलता है।',
+    // Google Authenticator (TOTP 2FA)
+    methodSms: 'SMS OTP',
+    methodTotp: 'ऑथेंटिकेटर',
+    totpContinueBtn: 'ऑथेंटिकेटर से जारी रखें',
+    totpMethodHint: 'एक बार QR स्कैन से सेटअप — फिर ऑफलाइन 6-अंकों के कोड से लॉगिन।',
+    regContinueTotp: 'ऑथेंटिकेटर सेटअप पर आगे बढ़ें',
+    useTotpInstead: 'इसके बजाय Google Authenticator इस्तेमाल करें',
+    totp2faTag: 'दो-चरणीय सुरक्षा',
+    totpSetupTitle: 'Google Authenticator जोड़ें',
+    totpSetupSub: 'आपके खाते के लिए अतिरिक्त सुरक्षा। कोड आपके फोन पर बनते हैं — इंटरनेट की ज़रूरत नहीं।',
+    totpStep1: 'Google Authenticator इंस्टॉल करें (मुफ़्त, ऑफलाइन चलता है)',
+    totpStep2: '“+” दबाएं → “QR कोड स्कैन करें”',
+    totpStep3: 'पुष्टि के लिए नीचे 6-अंकों का कोड डालें',
+    totpManualKey: 'स्कैन नहीं हो पा रहा? ऐप में यह कुंजी दर्ज करें',
+    totpConfirmHint: 'ऐप में दिख रहा कोड दर्ज करें',
+    totpConfirmBtn: 'सत्यापित करें और चालू करें',
+    totpSkip: 'अभी छोड़ें',
+    totpSkippedNote: 'अगले लॉगिन के बाद भी चालू कर सकते हैं।',
+    totpWrongCode: 'कोड मेल नहीं खाया। फोन का समय जांचकर दोबारा कोशिश करें।',
+    totpVerifyTitle: 'प्रमाणीकरण कोड',
+    totpVerifySub: 'Google Authenticator खोलें और इसके लिए मौजूदा 6-अंकों का कोड दर्ज करें:',
+    totpNewCodeIn: 'नया कोड {s} सेकंड में',
+    totp2faOn: 'Google Authenticator सत्यापित · 2FA सक्रिय',
+    totpMaxAttempts: 'बहुत गलत कोड। लॉगिन फिर से शुरू करें।',
     aadhaarLabel: 'आधार नंबर',
     aadhaarPlaceholder: '1234 5678 9012',
     aadhaarHint: '12 अंकों का आधार (ऑफलाइन Verhoeff जांच)',
@@ -147,15 +211,109 @@ const L = {
     detectLocation: 'मेरी लोकेशन पहचानें',
     detecting: 'पहचान रहे हैं…',
     locationDetected: 'लोकेशन मिल गई',
-    locationFailed: 'लोकेशन नहीं मिली — मैन्युअली चुनें',
-  },
+    locationFailed: 'लोकेशन नहीं मिली — मैन्युअली चुनें',  },
 };
+
+// ── Reusable 6-digit code input (used by the authenticator screens) ──────────
+// The parent remounts this via `key` to clear the boxes (e.g. after a wrong
+// code) — remount resets the state and autoFocus re-focuses the first box.
+function CodeBoxes({ onComplete, disabled = false }) {
+  const [digits, setDigits] = useState(['', '', '', '', '', '']);
+  const refs = useRef([]);
+
+  const handleChange = (i, value) => {
+    const digit = value.replace(/\D/g, '').slice(-1);
+    const next = [...digits];
+    next[i] = digit;
+    setDigits(next);
+    sound.playClick();
+    if (digit && i < 5) refs.current[i + 1]?.focus();
+    if (digit && i === 5 && next.every((d) => d !== '')) onComplete(next.join(''));
+  };
+
+  const handleKeyDown = (i, e) => {
+    if (e.key === 'Backspace' && !digits[i] && i > 0) refs.current[i - 1]?.focus();
+  };
+
+  const handlePaste = (e) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted.length === 6) {
+      const next = pasted.split('');
+      setDigits(next);
+      onComplete(next.join(''));
+      e.preventDefault();
+    }
+  };
+
+  return (
+    <div className="flex w-full min-w-0 gap-1 sm:gap-2 justify-center" onPaste={handlePaste}>
+      {digits.map((digit, i) => (
+        <input
+          key={i}
+          ref={(el) => { refs.current[i] = el; }}
+          type="tel"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={1}
+          value={digit}
+          disabled={disabled}
+          autoFocus={i === 0}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          className="box-border w-10 max-w-11 min-w-0 flex-1 h-12 sm:h-13 bg-white text-zinc-900 py-2 px-0 text-center text-xl font-black border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-colors disabled:opacity-60"
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── QR code canvas for the otpauth:// provisioning URI ───────────────────────
+function TotpQr({ uri, size = 208 }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !uri) return undefined;
+    QRCode.toCanvas(canvasRef.current, uri, {
+      width: size,
+      margin: 2,                 // quiet zone — required for reliable scanning
+      errorCorrectionLevel: 'M',
+      color: { dark: '#090a09', light: '#ffffff' },
+    }).catch(() => {});           // non-fatal: manual key entry remains available
+    return undefined;
+  }, [uri, size]);
+
+  return (
+    <div className="p-3 bg-white rounded-2xl border-2 border-zinc-200 shadow-inner">
+      <canvas ref={canvasRef} className="block rounded-lg" style={{ width: size, height: size }} />
+    </div>
+  );
+}
+
+// ── Google Identity Services script loader (module-level cache) ──────────────
+let gsiPromise = null;
+function loadGsiScript() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('no_window'));
+  if (window.google?.accounts?.id) return Promise.resolve();
+  if (!gsiPromise) {
+    gsiPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true;
+      s.defer = true;
+      s.onload = () => resolve();
+      s.onerror = () => { gsiPromise = null; reject(new Error('gsi_load_failed')); };
+      document.head.appendChild(s);
+    });
+  }
+  return gsiPromise;
+}
 
 export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', setSelectedLang }) {
   const l = L[selectedLang] || L.en;
 
   const [step, setStep] = useState('phone'); // phone | register | aadhaar_login | aadhaar_otp | otp | success
   const [phone, setPhone] = useState('');
+  const [loginMethod, setLoginMethod] = useState('sms'); // 'sms' | 'totp' (Google Authenticator)
   const [name, setName] = useState('');
   const [village, setVillage] = useState('');
   const [stateName, setStateName] = useState('Karnataka');
@@ -168,6 +326,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [smsOtp, setSmsOtp] = useState(null);
   const [aadhaarOtp, setAadhaarOtp] = useState(null);
   const [showSms, setShowSms] = useState(false);
+  const [serverOtp, setServerOtp] = useState(null);  // { token } when the code went as a real SMS
   const [cooldown, setCooldown] = useState(0);
   const [aadhaarCooldown, setAadhaarCooldown] = useState(0);
   const [attemptsLeft, setAttemptsLeft] = useState(3);
@@ -175,15 +334,46 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [welcomeName, setWelcomeName] = useState('');
   const [welcomeEmail, setWelcomeEmail] = useState('');
   const [isDemoLogin, setIsDemoLogin] = useState(false);
+  const [googleCfg, setGoogleCfg] = useState(null);   // null=loading, {configured,clientId}
+  const [loginProvider, setLoginProvider] = useState('phone'); // 'phone' | 'google' | 'google-demo'
+  const googleBtnRef = useRef(null);
   const [isReturning, setIsReturning] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationMsg, setLocationMsg] = useState('');
   const [voiceField, setVoiceField] = useState(null); // 'name' | 'village' | null
   const [isVoiceListening, setIsVoiceListening] = useState(false);
 
+  // ── Google Authenticator (TOTP 2FA) state ──────────────────────────────
+  const [pendingProfile, setPendingProfile] = useState(null); // authenticated, awaiting 2FA
+  const [totpSecret, setTotpSecret] = useState('');           // not yet persisted (enrollment)
+  const [totpResetKey, setTotpResetKey] = useState(0);         // clears the code boxes
+  const [totpAttempts, setTotpAttempts] = useState(5);
+  const [totpVerified, setTotpVerified] = useState(false);
+  const [totpSecLeft, setTotpSecLeft] = useState(totpSecondsRemaining());
+
   const otpRefs = useRef([]);
   const aadhaarOtpRefs = useRef([]);
 
+  // 30-second code-rotation ticker (authenticator apps rotate codes)
+  useEffect(() => {
+    const id = setInterval(() => setTotpSecLeft(totpSecondsRemaining()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // DEV ONLY: print the current authenticator code so the team can demo the
+  // 2FA screen without a phone. Stripped from production builds by the bundler.
+  useEffect(() => {
+    if (step !== 'totp' || !import.meta.env.DEV) return;
+    const secret = pendingProfile?.totp?.secret;
+    if (secret) {
+      console.log(
+        `%c[AgriPulse DEV] current authenticator code: ${totpNow(secret)}`,
+        'background:#10b981;color:#000;padding:4px 8px;border-radius:4px;font-weight:bold',
+      );
+    }
+  }, [step, pendingProfile]);
+
+  // Resend cooldown ticker
   useEffect(() => {
     if (cooldown <= 0) return undefined;
     const id = setInterval(() => setCooldown((c) => Math.max(0, c - 1)), 1000);
@@ -196,8 +386,36 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     return () => clearInterval(id);
   }, [aadhaarCooldown]);
 
-  const sendOtpFlow = (mobile) => {
-    const res = requestOtp(mobile);
+  const sendOtpFlow = async (mobile) => {
+    // 1) Real SMS delivery — server route with a configured gateway.
+    //    The code goes to the farmer's phone and is NEVER shown on the website.
+    const srv = await serverSendOtp(mobile, serverOtp?.token);
+    if (srv.ok) {
+      setServerOtp({ token: srv.token });
+      setSmsOtp(null);
+      setShowSms(false);
+      setCooldown(OTP_RESEND_COOLDOWN_S);
+      setAttemptsLeft(3);
+      setResendLocked(false);
+      setError('');
+      sound.playSuccess();
+      return true;
+    }
+    if (srv.error === 'cooldown') {
+      setCooldown(srv.waitSeconds || OTP_RESEND_COOLDOWN_S);
+      return false;
+    }
+    if (srv.error === 'max_sends') {
+      setResendLocked(true);
+      setError(l.resendMax);
+      return false;
+    }
+    if (srv.error === 'sms_failed') {
+      setError(l.otpSendFailed);
+      return false;
+    }
+    // 2) No gateway configured / offline → on-screen demo OTP (offline-first)
+    setServerOtp(null);    const res = requestOtp(mobile);
     if (!res.ok) {
       if (res.error === 'max_sends') {
         setResendLocked(true);
@@ -250,11 +468,73 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     return true;
   };
 
+  // ── REAL Google sign-in (GIS button → server-verified ID token) ────────
+
+  const handleGoogleCredential = async (credential) => {
+    setBusy(true);
+    setError('');
+    const res = await serverVerifyGoogle(credential);
+    setBusy(false);
+    if (res.ok && res.profile) {
+      const profile = upsertGoogleUser(res.profile);
+      const session = saveSession({ ...profile, authProvider: 'google' });
+      setLoginProvider('google');
+      setIsDemoLogin(false);
+      setTotpVerified(false);
+      setWelcomeName(profile.name);
+      setWelcomeEmail(profile.email);
+      setIsReturning(true);
+      sound.playSuccess();
+      setStep('success');
+      setTimeout(() => onSuccess(session), 1400);
+      return;
+    }
+    sound.playTransition();
+    setError(res.error === 'offline' ? l.otpOffline : l.googleFailed);
+  };
+
+  // Probe /api/google once: with GOOGLE_CLIENT_ID set we render the real
+  // "Continue with Google" button; otherwise we keep the demo button.
+  useEffect(() => {
+    let alive = true;
+    fetchGoogleConfig().then((cfg) => { if (alive) setGoogleCfg(cfg); });
+    return () => { alive = false; };
+  }, []);
+
+  // Render the official GIS button once the script + client id are ready
+  useEffect(() => {
+    if (step !== 'phone' || !googleCfg?.configured) return undefined;
+    let cancelled = false;
+    loadGsiScript().then(() => {
+      if (cancelled || !googleBtnRef.current || !window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({
+        client_id: googleCfg.clientId,
+        callback: (resp) => handleGoogleCredential(resp.credential),
+        cancel_on_tap_outside: true,
+      });
+      googleBtnRef.current.innerHTML = '';
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'pill',
+        logo_alignment: 'left',
+        width: 320,
+      });
+    }).catch(() => {
+      // GIS script unreachable (offline) → fall back to the demo button
+      setGoogleCfg({ configured: false });
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, googleCfg]);
+
   const handleGoogleDemoLogin = () => {
     sound.playClick();
     setError('');
     setBusy(true);
     setIsDemoLogin(true);
+    setLoginProvider('google-demo');
 
     setTimeout(() => {
       const demoProfile = {
@@ -290,12 +570,34 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }
     setError('');
     setBusy(true);
-    setTimeout(() => {
+    // Simulate network dispatch latency of an SMS gateway / lookup
+    setTimeout(async () => {
       setBusy(false);
       const existing = getUser(mobile);
+      if (loginMethod === 'totp') {
+        // Authenticator path: the rotating code IS the verification.
+        if (existing && isTotpEnabled(existing)) {
+          setIsReturning(true);
+          setPendingProfile(existing);
+          setTotpAttempts(5);
+          setTotpResetKey((k) => k + 1);
+          setStep('totp');
+        } else if (existing) {
+          // Known number, no authenticator yet → offer enrollment now
+          setIsReturning(true);
+          setPendingProfile(existing);
+          setTotpSecret(generateSecret());
+          setTotpResetKey((k) => k + 1);
+          setStep('totp-setup');
+        } else {
+          setIsReturning(false);
+          setStep('register');
+        }
+        return;
+      }
       if (existing) {
         setIsReturning(true);
-        if (sendOtpFlow(mobile)) setStep('otp');
+        if (await sendOtpFlow(mobile)) setStep('otp');
       } else {
         setIsReturning(false);
         setStep('register');
@@ -303,32 +605,64 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }, 700);
   };
 
-  const handleRegisterSubmit = () => {
-    sound.playClick();
-    if (!isValidName(name)) {
-      setError(l.invalidName);
-      sound.playTransition();
+  // Common success path — persists the session and hands off to the app
+  const finalizeLogin = (profile) => {
+    setLoginProvider('phone');
+    const mobile = normalizeMobile(phone);
+    const finalProfile = (isReturning ? updateLastLogin(mobile) : null) || profile;
+    if (aadhaarVerified && aadhaar) {
+      linkAadhaarToUser(mobile, aadhaar);
+    }
+    const session = saveSession({ ...finalProfile, aadhaarVerified: aadhaarVerified || finalProfile.aadhaarVerified });
+    setWelcomeName(finalProfile.name);
+    sound.playSuccess();
+    setStep('success');
+    setTimeout(() => onSuccess(session), 1500);
+  };
+
+  // Shared post-OTP-success routing (2FA enrollment / verification / plain login)
+  const completeOtpSuccess = (mobile) => {
+    const profile = isReturning
+      ? getUser(mobile)
+      : registerUser({ name, mobile, village, state: stateName, aadhaar: aadhaarVerified ? aadhaar : '' });
+    if (!profile) {
+      setError(l.maxAttempts);
       return;
     }
-    if (aadhaar && !isValidAadhaar(aadhaar)) {
-      setError(l.aadhaarInvalid);
-      sound.playTransition();
+    if (aadhaarVerified && aadhaar) {
+      linkAadhaarToUser(mobile, aadhaar);
+    }
+    if (isTotpEnabled(profile)) {
+      setPendingProfile(profile);
+      setTotpAttempts(5);
+      setTotpResetKey((k) => k + 1);
+      setError('');
+      setStep('totp');
       return;
     }
+    if (profile.totpSkipped) {
+      finalizeLogin(profile);
+      return;
+    }
+    setPendingProfile(profile);
+    setTotpSecret(generateSecret());
+    setTotpResetKey((k) => k + 1);
     setError('');
-    setBusy(true);
-    setTimeout(() => {
-      setBusy(false);
-      const mobile = normalizeMobile(phone);
-      if (aadhaar && isValidAadhaar(aadhaar) && !aadhaarVerified) {
-        // Need to verify aadhaar first via OTP
-        if (sendAadhaarOtpFlow(aadhaar)) {
-          setStep('aadhaar_otp');
-          return;
-        }
-      }
-      if (sendOtpFlow(mobile)) setStep('otp');
-    }, 700);
+    setStep('totp-setup');
+  };
+
+  const handleVerifyFail = (res) => {
+    sound.playTransition();
+    if (res.error === 'wrong_code') {
+      setAttemptsLeft(res.attemptsLeft);
+      setError(`${l.wrongOtp} ${res.attemptsLeft} ${l.attemptsLeft}.`);
+      setOtpDigits(['', '', '', '', '', '']);
+      otpRefs.current[0]?.focus();
+    } else if (res.error === 'expired') {
+      setError(l.expiredOtp);
+    } else {
+      setError(l.maxAttempts);
+    }
   };
 
   const handleAadhaarLoginSubmit = () => {
@@ -349,40 +683,141 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }, 600);
   };
 
+  const handleRegisterSubmit = () => {
+    sound.playClick();
+    if (!isValidName(name)) {
+      setError(l.invalidName);
+      sound.playTransition();
+      return;
+    }
+    if (aadhaar && !isValidAadhaar(aadhaar)) {
+      setError(l.aadhaarInvalid);
+      sound.playTransition();
+      return;
+    }
+    setError('');
+    setBusy(true);
+    setTimeout(async () => {
+      setBusy(false);
+      if (loginMethod === 'totp') {
+        // Authenticator path: enroll straight after registration — no SMS involved
+        setPendingProfile(null);
+        setTotpSecret(generateSecret());
+        setTotpResetKey((k) => k + 1);
+        setStep('totp-setup');
+      } else {
+        // Aadhaar (if entered) is verified first via its own demo OTP
+        if (aadhaar && isValidAadhaar(aadhaar) && !aadhaarVerified) {
+          if (sendAadhaarOtpFlow(aadhaar)) {
+            setStep('aadhaar_otp');
+            return;
+          }
+        }
+        if (await sendOtpFlow(normalizeMobile(phone))) setStep('otp');
+      }
+    }, 700);
+  };
+
   const handleVerify = (digits) => {
     const code = (digits || otpDigits).join('');
     if (code.length !== 6) return;
     setBusy(true);
+    const mobile = normalizeMobile(phone);
+    if (serverOtp) {
+      // Real SMS path — the code lives on the farmer's phone, verified server-side
+      serverVerifyOtp(mobile, code, serverOtp.token).then((res) => {
+        setBusy(false);
+        if (res.ok) {
+          completeOtpSuccess(mobile);
+          return;
+        }
+        if (res.token) setServerOtp({ token: res.token }); // attempts decremented server-side
+        if (res.error === 'offline') {
+          setError(l.otpOffline);
+          return;
+        }
+        handleVerifyFail(res);
+      });
+      return;
+    }
+    setTimeout(() => {
+      setBusy(false);
+      const res = verifyOtp(mobile, code);
+      if (res.ok) {
+        completeOtpSuccess(mobile);
+        return;
+      }
+      handleVerifyFail(res);
+    }, 600);
+  };
+
+  // ── Google Authenticator (TOTP 2FA) handlers ───────────────────────────
+
+  const handleTotpFail = () => {
+    const left = totpAttempts - 1;
+    setTotpAttempts(left);
+    if (left <= 0) {
+      setError(l.totpMaxAttempts);
+      setTimeout(() => {
+        setStep('phone');
+        setError('');
+        setTotpAttempts(5);
+        setPendingProfile(null);
+        setTotpSecret('');
+      }, 1600);
+      return false;
+    }
+    setError(`${l.totpWrongCode} ${left} ${l.attemptsLeft}.`);
+    setTotpResetKey((k) => k + 1);
+    return false;
+  };
+
+  // Enrollment: the secret is only persisted after a live code matches
+  const handleTotpSetupConfirm = (code) => {
+    if (busy) return;
+    setBusy(true);
+    setTimeout(() => {
+      setBusy(false);
+      const res = verifyTotpCode(totpSecret, code);
+      if (res.ok) {
+        const mobile = normalizeMobile(phone);
+        // Direct-authenticator sign-ups register here (the SMS path registers after its OTP)
+        if (!getUser(mobile)) registerUser({ name, mobile, village, state: stateName });
+        const profile = enableTotp(mobile, totpSecret) || pendingProfile;
+        setTotpVerified(true);
+        finalizeLogin(profile);        return;
+      }
+      sound.playTransition();
+      handleTotpFail();
+    }, 450);
+  };
+
+  const handleTotpSkip = () => {
+    sound.playClick();
+    const mobile = normalizeMobile(phone);
+    const profile = setTotpSkipped(mobile)
+      || getUser(mobile)
+      || registerUser({ name, mobile, village, state: stateName });
+    setTotpVerified(false);
+    finalizeLogin(profile);
+  };
+
+  // Login: verify the code from the authenticator app against the stored secret
+  const handleTotpVerify = (code) => {
+    if (busy) return;
+    setBusy(true);
     setTimeout(() => {
       setBusy(false);
       const mobile = normalizeMobile(phone);
-      const res = verifyOtp(mobile, code);
+      const res = verifyUserTotp(mobile, code);
       if (res.ok) {
-        const profile = isReturning
-          ? updateLastLogin(mobile)
-          : registerUser({ name, mobile, village, state: stateName, aadhaar: aadhaarVerified ? aadhaar : '' });
-        if (aadhaarVerified && aadhaar) {
-          linkAadhaarToUser(mobile, aadhaar);
-        }
-        const session = saveSession({ ...profile, aadhaarVerified: aadhaarVerified || profile.aadhaarVerified });
-        setWelcomeName(profile.name);
-        sound.playSuccess();
-        setStep('success');
-        setTimeout(() => onSuccess(session), 1500);
+        setTotpVerified(true);
+        finalizeLogin(pendingProfile);
         return;
       }
       sound.playTransition();
-      if (res.error === 'wrong_code') {
-        setAttemptsLeft(res.attemptsLeft);
-        setError(`${l.wrongOtp} ${res.attemptsLeft} ${l.attemptsLeft}.`);
-        setOtpDigits(['', '', '', '', '', '']);
-        otpRefs.current[0]?.focus();
-      } else if (res.error === 'expired') {
-        setError(l.expiredOtp);
-      } else {
-        setError(l.maxAttempts);
-      }
-    }, 600);
+      handleTotpFail();
+    }, 450);
   };
 
   const handleAadhaarVerify = (digits) => {
@@ -589,6 +1024,14 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
             else if (step === 'aadhaar_otp') { setStep(aadhaar ? 'aadhaar_login' : 'register'); setAadhaarOtpDigits(['', '', '', '', '', '']); setError(''); }
             else if (step === 'aadhaar_login') { setStep('phone'); setError(''); }
             else if (step === 'register') { setStep('phone'); setError(''); }
+            else if (step === 'totp' || step === 'totp-setup') {
+              setStep('phone');
+              setError('');
+              setBusy(false);
+              setTotpAttempts(5);
+              setPendingProfile(null);
+              setTotpSecret('');
+            }
             else onCancel();
           }}
           className="absolute top-4 left-4 p-2 text-zinc-500 hover:text-zinc-600 rounded-full hover:bg-zinc-100 z-10"
@@ -622,16 +1065,25 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <h2 className="text-2xl font-black text-zinc-900 mb-2">{l.phoneTitle}</h2>
               <p className="text-sm text-zinc-500 mb-5">{l.phoneSub}</p>
 
-              <button
-                type="button"
-                onClick={handleGoogleDemoLogin}
-                disabled={busy}
-                className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
-              >
-                <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
-                <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
-              </button>
-              <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleDemoNote}</p>
+              {googleCfg?.configured ? (
+                <>
+                  <div ref={googleBtnRef} className="w-full min-h-11 flex justify-center" />
+                  <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleRealNote}</p>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleGoogleDemoLogin}
+                    disabled={busy}
+                    className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
+                  >
+                    <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
+                    <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
+                  </button>
+                  <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleDemoNote}</p>
+                </>
+              )}
 
               <div className="w-full flex items-center gap-3 my-5" aria-hidden="true">
                 <span className="h-px flex-1 bg-zinc-200" />
@@ -661,6 +1113,24 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               </div>
               <div className="w-full text-left text-[11px] text-zinc-500 mb-3">{l.phoneHint} · {phone.length}/10</div>
 
+              {/* Verification method — pick SMS or Google Authenticator */}
+              <div className="w-full grid grid-cols-2 gap-1 p-1 mb-4 bg-zinc-100 rounded-xl border border-zinc-200" role="tablist" aria-label="Verification method">
+                {['sms', 'totp'].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={loginMethod === m}
+                    onClick={() => { sound.playClick(); setLoginMethod(m); setError(''); }}
+                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-black transition-colors ${loginMethod === m ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                  >
+                    {m === 'sms'
+                      ? <Smartphone className="w-4 h-4 shrink-0" />
+                      : <QrCode className="w-4 h-4 shrink-0" />}
+                    {m === 'sms' ? l.methodSms : l.methodTotp}
+                  </button>
+                ))}
+              </div>
               {error && (
                 <div className="w-full flex items-center gap-2 p-2.5 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
                   <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
@@ -672,8 +1142,10 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 disabled={busy}
                 className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-sm shadow-md transition-colors"
               >
-                {busy ? l.loading : l.sendOtp}
+                {busy ? l.loading : loginMethod === 'totp' ? l.totpContinueBtn : l.sendOtp}
               </button>
+              <p className="text-[11px] text-zinc-500 mt-4">{loginMethod === 'totp' ? l.totpMethodHint : l.newHere}</p>
+
 
               <button
                 onClick={() => { sound.playClick(); setStep('aadhaar_login'); setError(''); }}
@@ -681,8 +1153,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               >
                 <Fingerprint className="w-4 h-4" /> {l.aadhaarLoginTitle}
               </button>
-
-              <p className="text-[11px] text-zinc-500 mt-4">{l.newHere}</p>
             </>
           )}
 
@@ -847,7 +1317,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 disabled={busy}
                 className="mt-6 w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-sm shadow-md transition-colors"
               >
-                {busy ? l.loading : l.continueBtn}
+                {busy ? l.loading : loginMethod === 'totp' ? l.regContinueTotp : l.continueBtn}
               </button>
 
               <button
@@ -972,8 +1442,16 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 </div>
               )}
 
-              {smsOtp && (
-                <div className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-zinc-900 text-white border border-zinc-700 text-left">
+              {/* Real SMS: code went to the farmer's phone — never displayed here */}
+              {serverOtp && (
+                <div className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-emerald-50 border border-emerald-200 text-left">
+                  <Smartphone className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div className="text-xs font-bold text-emerald-800">{l.otpRealNote}</div>
+                </div>
+              )}
+
+              {/* Persistent demo-SMS card (demo mode only — no SMS gateway configured) */}
+              {!serverOtp && smsOtp && (                <div className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-zinc-900 text-white border border-zinc-700 text-left">
                   <MessageSquareText className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
                     <div className="text-[9px] font-black tracking-widest text-zinc-400">{l.smsBanner}</div>
@@ -1022,6 +1500,107 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               >
                 {busy ? l.loading : l.verifyBtn}
               </button>
+
+              {/* Enrolled users can switch to their authenticator instead of the SMS code */}
+              {isTotpEnabled(isReturning ? getUser(normalizeMobile(phone)) : null) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.playClick();
+                    setPendingProfile(getUser(normalizeMobile(phone)));
+                    setTotpAttempts(5);
+                    setTotpResetKey((k) => k + 1);
+                    setError('');
+                    setStep('totp');
+                  }}
+                  className="mt-3 w-full py-3 rounded-xl bg-white border-2 border-emerald-200 hover:bg-emerald-50 text-emerald-700 font-black text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <QrCode className="w-4 h-4" /> {l.useTotpInstead}
+                </button>
+              )}
+            </>
+          )}
+
+          {/* ── STEP: totp-setup (enroll Google Authenticator) ── */}
+          {step === 'totp-setup' && (
+            <>
+              <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
+                <QrCode className="w-8 h-8 text-emerald-600" />
+              </div>
+              <div className="text-[10px] font-black tracking-[0.2em] text-emerald-600 uppercase mb-1">{l.totp2faTag}</div>
+              <h2 className="text-2xl font-black text-zinc-900 mb-1">{l.totpSetupTitle}</h2>
+              <p className="text-xs text-zinc-500 mb-4">{l.totpSetupSub}</p>
+
+              <TotpQr uri={totpSecret ? buildOtpAuthUri({ secret: totpSecret, account: `+91${normalizeMobile(phone)}` }) : ''} />
+
+              <ol className="w-full text-left text-[11px] font-bold text-zinc-600 space-y-1.5 my-4 list-none">
+                {[l.totpStep1, l.totpStep2, l.totpStep3].map((s, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="shrink-0 w-4 h-4 mt-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black flex items-center justify-center">{i + 1}</span>
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ol>
+
+              <div className="w-full mb-4">
+                <div className="text-[10px] font-black text-zinc-500 mb-1">{l.totpManualKey}</div>
+                <div className="font-mono text-[11px] leading-relaxed tracking-wider bg-zinc-100 border border-zinc-200 rounded-lg px-2.5 py-2 break-all text-zinc-700 select-all cursor-text">
+                  {formatSecretForHumans(totpSecret)}
+                </div>
+              </div>
+
+              <div className="w-full text-xs font-black text-zinc-700 mb-2">{l.totpConfirmHint}</div>
+              <CodeBoxes key={`setup-${totpResetKey}`} onComplete={handleTotpSetupConfirm} disabled={busy} />
+
+              {error && (
+                <div className="w-full flex items-center gap-2 p-2.5 mt-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
+                  <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+                </div>
+              )}
+
+              <button
+                onClick={handleTotpSkip}
+                disabled={busy}
+                className="mt-4 w-full py-3 rounded-xl bg-white border-2 border-zinc-200 hover:bg-zinc-50 disabled:opacity-60 text-zinc-500 font-black text-xs transition-colors"
+              >
+                {l.totpSkip}
+              </button>
+              <p className="text-[10px] text-zinc-400 mt-1.5">{l.totpSkippedNote}</p>
+            </>
+          )}
+
+          {/* ── STEP: totp (verify authenticator code) ─────── */}
+          {step === 'totp' && (
+            <>
+              <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
+                <Smartphone className="w-8 h-8 text-emerald-600" />
+              </div>
+              <div className="text-[10px] font-black tracking-[0.2em] text-emerald-600 uppercase mb-1">{l.totp2faTag}</div>
+              <h2 className="text-2xl font-black text-zinc-900 mb-1">{l.totpVerifyTitle}</h2>
+              <p className="text-xs text-zinc-500 mb-1">{l.totpVerifySub}</p>
+              <p className="text-xs font-mono font-bold text-zinc-800 mb-5">{maskedPhone}</p>
+
+              <CodeBoxes key={`verify-${totpResetKey}`} onComplete={handleTotpVerify} disabled={busy} />
+
+              {error && (
+                <div className="w-full flex items-center gap-2 p-2.5 mt-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
+                  <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+                </div>
+              )}
+
+              {/* Code rotation countdown — matches the authenticator app */}
+              <div className="w-full flex items-center justify-between text-[11px] font-bold text-zinc-500 mt-4 mb-1.5">
+                <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5" /> {l.totpNewCodeIn.replace('{s}', totpSecLeft)}</span>
+                <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck className="w-3.5 h-3.5" /> 2FA</span>
+              </div>
+              <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden" aria-hidden="true">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-1000 ease-linear"
+                  style={{ width: `${(totpSecLeft / TOTP_PERIOD_S) * 100}%` }}
+                />
+              </div>
+
+              <p className="text-[10px] text-zinc-400 mt-4">{l.secNote}</p>
             </>
           )}
 
@@ -1040,14 +1619,23 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 <Leaf className="w-4 h-4 text-emerald-500" /> {welcomeName}
               </p>
               {welcomeEmail && (
-                <p className="text-xs font-mono text-zinc-600 mt-1">{welcomeEmail} · DEMO</p>
+                <p className="text-xs font-mono text-zinc-600 mt-1">
+                  {welcomeEmail}{loginProvider === 'google' ? '' : ' · DEMO'}
+                </p>
               )}
               <p className="text-xs font-mono text-zinc-500 mt-2 flex items-center gap-1">
                 {isDemoLogin
                   ? <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
                   : <ShieldCheck className="w-3.5 h-3.5" />}
-                {isDemoLogin ? l.demoStatus : l.verified}
+                {isDemoLogin
+                  ? l.demoStatus
+                  : loginProvider === 'google' ? l.googleVerified : l.verified}
               </p>
+              {totpVerified && (
+                <p className="mt-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-black text-emerald-700 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5" /> {l.totp2faOn}
+                </p>
+              )}
               {aadhaarVerified && (
                 <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-black">
                   <Fingerprint className="w-3.5 h-3.5" /> {l.aadhaarVerified} · {maskedAadhaar}
