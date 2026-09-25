@@ -4,7 +4,6 @@
 // If the model cannot run on a device and the phone is online, /api/predict (Ultralytics cloud) is used.
 
 import { CROPS } from '../data/agriData';
-import { PESTICIDE_DB } from '../data/pesticideDatabase.js';
 import { loadDetector, detectDisease, forceCPU } from '../vision/detector';
 import { detectDiseaseCloud } from '../vision/cloud-detector';
 
@@ -211,20 +210,20 @@ const NO_DETECTION = {
   id: 'det-none',
   name: 'Leaf',
   localName: 'पत्ता',
-  disease: 'Uncertain - No clear pattern',
+  disease: 'No disease detected',
   pathogen: 'Not identified',
   confidence: 0,
   severity: 'Unknown',
-  symptoms: 'The AI could not confidently identify a disease (low confidence). This happens with blurry photos, blue/sky backgrounds, or leaves not in the 52 trained classes. Try: 1) Place leaf on white paper, 2) Fill 80% of frame with single leaf, 3) Daylight, no shadow, 4) Focus on spots. If spots persist, ask a KVK expert.',
+  symptoms: 'The model did not find a known disease pattern. Fill the frame with a single leaf in daylight and scan again, or ask a KVK expert if the crop looks unwell.',
   image: TEMPLATE.blight.image,
   audio: {
     en: {
-      devanagari: 'The AI could not confidently identify a disease in this photo. Please place the leaf on white paper, fill the frame, and retake in daylight.',
-      phonetic: 'The AI could not confidently identify a disease in this photo. Please place the leaf on white paper, fill the frame, and retake in daylight.',
+      devanagari: 'No disease could be identified in this photo. Please take a closer photo of one leaf in daylight and scan again.',
+      phonetic: 'No disease could be identified in this photo. Please take a closer photo of one leaf in daylight and scan again.',
     },
     hi: {
-      devanagari: 'इस फ़ोटो में रोग स्पष्ट नहीं है। कृपया पत्ते को सफेद कागज पर रखकर, पास से, दिन की रोशनी में दोबारा फोटो लें।',
-      phonetic: 'Is photo mein rog spasht nahin hai. Kripya patte ko safed kagaz par rakhkar, paas se, din ki roshni mein dobara photo lein.',
+      devanagari: 'इस फ़ोटो में कोई रोग पहचाना नहीं जा सका। कृपया दिन की रोशनी में एक पत्ते की पास से फ़ोटो लेकर दोबारा स्कैन करें।',
+      phonetic: 'Is photo mein koi rog pehchana nahin ja saka. Kripya din ki roshni mein ek patte ki paas se photo lekar dobara scan karein.',
     },
   },
   dosage: NO_SPRAY,
@@ -306,79 +305,45 @@ function buildMatchedCrop(detections) {
   const { crop, disease } = describeLabel(top.label);
 
   if (isHealthyLabel(top.label)) {
-    const db = PESTICIDE_DB[top.label];
     return {
       ...HEALTHY,
       id: `det-${top.label}`,
-      name: crop || db?.crop || HEALTHY.name,
-      localName: db ? db.crop : HEALTHY.localName,
-      disease: db ? `${db.disease} ✅ Healthy` : HEALTHY.disease,
+      name: crop || HEALTHY.name,
       pathogen: top.label,
       confidence: pct,
-      symptoms: db ? `${db.crop} leaf looks healthy — no disease lesions. ${HEALTHY.symptoms}` : `${crop ? `${crop} leaf` : 'Leaf'} looks healthy — no disease lesions detected. ${HEALTHY.symptoms}`,
-      image: db?.image || HEALTHY.image,
-      dosage: db ? { bio: { name: db.organic.name, measure: db.organic.measure, tank: db.organic.tank, cost: db.organic.cost, safety: db.organic.safety }, chemical: { name: db.chemical.name, measure: db.chemical.measure, tank: db.chemical.tank, cost: db.chemical.cost, safety: db.chemical.safety } } : HEALTHY.dosage,
-      sprayTime: db ? db.organic.bestTime : HEALTHY.sprayTime,
-      pesticideInfo: db || null,
+      symptoms: `${crop ? `${crop} leaf` : 'Leaf'} looks healthy — no disease lesions detected. ${HEALTHY.symptoms}`,
     };
   }
 
-  // Try to get full pesticide info from DB for this exact label
-  const dbEntry = PESTICIDE_DB[top.label];
-  const tpl = dbEntry ? {
-    ...TEMPLATE[FAMILY_OVERRIDES[top.label] || 'blight'],
-    name: dbEntry.crop,
-    disease: dbEntry.disease,
-    pathogen: dbEntry.pathogen,
-    symptoms: dbEntry.symptoms,
-    image: dbEntry.image,
-    dosage: {
-      bio: { name: dbEntry.organic.name, measure: dbEntry.organic.measure, tank: dbEntry.organic.tank, cost: dbEntry.organic.cost, safety: dbEntry.organic.safety },
-      chemical: { name: dbEntry.chemical.name, measure: dbEntry.chemical.measure, tank: dbEntry.chemical.tank, cost: dbEntry.chemical.cost, safety: dbEntry.chemical.safety }
-    },
-    sprayTime: dbEntry.organic.bestTime,
-    audio: TEMPLATE.blight.audio,
-  } : (TEMPLATE[FAMILY_OVERRIDES[top.label] || 'blight'] || TEMPLATE.blight || FALLBACK_CROP);
-  
+  const tpl = TEMPLATE[FAMILY_OVERRIDES[top.label] || 'blight'] || TEMPLATE.blight || FALLBACK_CROP;
   const lowConf = top.confidence < 0.5;
-  const name = crop || dbEntry?.crop || tpl?.name || 'Leaf';
+  const name = crop || tpl?.name || 'Leaf';
   const regions = detections.filter((d) => d.label === top.label).length;
   const others = [...new Set(
     detections.filter((d) => d.label !== top.label && !isHealthyLabel(d.label)).map((d) => d.label),
   )].slice(0, 2).map((l) => describeLabel(l).disease);
 
-  const diseaseText = `${lowConf ? 'Possible: ' : ''}${dbEntry?.disease || disease}`;
-  const baseSymptoms = dbEntry?.symptoms || tpl.symptoms;
+  const diseaseText = `${lowConf ? 'Possible: ' : ''}${disease}`;
   const symptoms =
-    `${diseaseText} detected on ${name} — ${regions} affected region${regions > 1 ? 's' : ''} marked on the photo.` +
-    (lowConf ? ' Low confidence: retake in daylight with one leaf filling the frame, white paper background.' : '') +
+    `${disease} detected on ${name} — ${regions} affected region${regions > 1 ? 's' : ''} marked on the photo.` +
+    (lowConf ? ' Low confidence: retake in daylight with one leaf filling the frame.' : '') +
     (others.length ? ` Also seen: ${others.join(', ')}.` : '') +
-    ` Typical signs: ${baseSymptoms}` +
-    (dbEntry ? ` Soil: ${dbEntry.soilTypes.join(', ')}. Organic side effects: ${dbEntry.organic.sideEffects}. Chemical side effects: ${dbEntry.chemical.sideEffects}. Verify: ${dbEntry.organic.verification} / ${dbEntry.chemical.verification}` : '');
+    ` Typical signs: ${tpl.symptoms}`;
 
   const spoken =
     `${diseaseText} detected on ${name} with ${Math.round(pct)} percent confidence. ` +
-    `Recommended organic: ${dbEntry ? dbEntry.organic.name + ', ' + dbEntry.organic.measure : tpl.dosage.bio.name + ', ' + tpl.dosage.bio.measure} in a ${dbEntry ? dbEntry.organic.tank : tpl.dosage.bio.tank}. ` +
-    `Chemical: ${dbEntry ? dbEntry.chemical.name + ', ' + dbEntry.chemical.measure : tpl.dosage.chemical.name}. ` +
-    `Best spray time ${dbEntry ? dbEntry.organic.bestTime : tpl.sprayTime}.`;
+    `Recommended: ${tpl.dosage.bio.name}, ${tpl.dosage.bio.measure} in a ${tpl.dosage.bio.tank}. ` +
+    `Best spray time ${tpl.sprayTime}.`;
 
   return {
     ...tpl,
     id: `det-${top.label}`,
     name,
-    localName: dbEntry?.crop || tpl.localName,
     disease: diseaseText,
-    pathogen: dbEntry?.pathogen || top.label,
+    pathogen: top.label,
     confidence: pct,
     severity: lowConf ? 'Possible' : top.confidence >= 0.75 ? 'High' : 'Moderate',
     symptoms,
-    image: dbEntry?.image || tpl.image,
-    dosage: {
-      bio: dbEntry ? { name: dbEntry.organic.name, measure: dbEntry.organic.measure, tank: dbEntry.organic.tank, cost: dbEntry.organic.cost, safety: dbEntry.organic.safety } : tpl.dosage.bio,
-      chemical: dbEntry ? { name: dbEntry.chemical.name, measure: dbEntry.chemical.measure, tank: dbEntry.chemical.tank, cost: dbEntry.chemical.cost, safety: dbEntry.chemical.safety } : tpl.dosage.chemical
-    },
-    sprayTime: dbEntry?.organic.bestTime || tpl.sprayTime,
-    pesticideInfo: dbEntry || null,
     // English voice is generated from the real detection; other languages keep the closest curated advisory.
     audio: { ...tpl.audio, en: { devanagari: spoken, phonetic: spoken } },
   };
@@ -387,99 +352,24 @@ function buildMatchedCrop(detections) {
 /* ------------------------------------------------------------------ */
 /* Public API used by TabScanner                                       */
 /* ------------------------------------------------------------------ */
-// Perform 100% local on-device leaf analysis (cloud fallback when model can't run OR finds nothing).
-// Adaptive thresholds: tries 0.25 -> 0.15 -> 0.10 -> 0.05 -> 0.01 to improve recall on difficult images
-// (user's apple scab photo was 0 detections at 0.25 but 1 at 0.15).
-const ADAPTIVE_THRESHOLDS = [0.25, 0.15, 0.10, 0.05, 0.02, 0.01, 0.005];
-
-function withTimeout(promise, ms, label) {
-  let timer;
-  const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(label + ' timeout after ' + ms + 'ms')), ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
-}
-
-async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) {
-  const tried = new Set();
-  // Try highest conf first, but only 2-3 attempts before giving up for cloud fallback
-  const order = [initialConf, ...ADAPTIVE_THRESHOLDS].filter(c => {
-    if (tried.has(c)) return false;
-    tried.add(c);
-    return true;
-  }).sort((a,b) => b-a).slice(0, 3); // Only try top 3 thresholds for speed
-  let lastResult = null;
-  let consecutiveTimeouts = 0;
-  for (const conf of order) {
-    try {
-      const r = await withTimeout(detectFn(imageElement, { conf }), 8000, 'detect conf=' + conf);
-      consecutiveTimeouts = 0;
-      if (r?.detections?.length) return r;
-      lastResult = r;
-    } catch (e) {
-      console.warn('[AgriPulse] detect failed at conf', conf, e?.message);
-      if (e?.message?.includes('timeout')) {
-        consecutiveTimeouts++;
-        if (consecutiveTimeouts >= 1 && detectFn.name === 'detectDisease') {
-          // WebGPU hang detected - force CPU and retry
-          console.warn('[AgriPulse] WebGPU timeout, forcing CPU backend');
-          try { forceCPU(); } catch {}
-        }
-        if (consecutiveTimeouts >= 2) {
-          console.warn('[AgriPulse] 2 consecutive timeouts, aborting on-device attempts');
-          break;
-        }
-      }
-    }
-  }
-  // Only try ultra-low if we had at least one successful inference (not timeout)
-  if (consecutiveTimeouts === 0) {
-    for (const conf of [0.001, 0.0001, 0]) {
-      try {
-        const r = await withTimeout(detectFn(imageElement, { conf }), 6000, 'detect conf=' + conf);
-        if (r?.detections?.length) return r;
-        lastResult = lastResult || r;
-      } catch (e) {
-        console.warn('[AgriPulse] ultra-low detect failed', conf, e?.message);
-      }
-    }
-  }
-  return lastResult;
-}
-
-export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { conf = 0.15 } = {}) {
+// Perform 100% local on-device leaf analysis (cloud fallback only if the model cannot run here).
+export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { conf = 0.25 } = {}) {
   const startTime = performance.now();
   let result = null;
   let backend = 'on-device';
 
   try {
-    const ready = await withTimeout(initOnDeviceAI(), 15000, 'initOnDeviceAI');
+    const ready = await initOnDeviceAI();
     if (!ready) throw new Error(status.error || 'on-device model unavailable');
-    result = await detectWithAdaptiveThreshold(detectDisease, imageElement, conf);
+    result = await detectDisease(imageElement, { conf });
   } catch (err) {
     console.warn('On-device inference failed:', err);
-  }
-
-  // If on-device found nothing, timed out, or we're online, try cloud as fallback
-  const shouldTryCloud = (typeof navigator === 'undefined' || navigator.onLine);
-  if (shouldTryCloud) {
-    // If on-device failed or found nothing, try cloud
-    if (!result || !result.detections?.length) {
+    if (navigator.onLine) {
       try {
-        const cloudResult = await withTimeout(
-          detectWithAdaptiveThreshold(detectDiseaseCloud, imageElement, conf),
-          20000,
-          'cloud detect'
-        );
-        if (cloudResult?.detections?.length) {
-          result = cloudResult;
-          backend = 'cloud';
-        } else if (!result && cloudResult) {
-          result = cloudResult;
-          backend = 'cloud';
-        }
+        result = await detectDiseaseCloud(imageElement, { conf });
+        backend = 'cloud';
       } catch (cloudErr) {
-        console.warn('Cloud fallback failed or found nothing:', cloudErr);
+        console.error('Cloud fallback failed:', cloudErr);
       }
     }
   }
@@ -491,7 +381,7 @@ export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { 
     return { matchedCrop: UNAVAILABLE, confidence: 0, latencyMs, backend: 'none', detections: [], metrics: {} };
   }
 
-  const detections = [...(result.detections || [])].sort((a, b) => b.confidence - a.confidence);
+  const detections = [...result.detections].sort((a, b) => b.confidence - a.confidence);
   drawOverlay(canvasOverlay, imageElement, detections);
   const matchedCrop = buildMatchedCrop(detections);
 
