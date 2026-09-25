@@ -48,7 +48,7 @@ const S = {
     aadhaar_otp: 'आपके फोन पर आया छह अंकों का कोड नीचे लिखिए।',
     success: 'बधाई हो! आप लॉगिन हो गए। अब मैं आपको धीरे-धीरे बताता हूँ कि यह ऐप क्या-क्या सेवा देता है।',
     didntCatch: 'माफ़ कीजिए, फिर से बोलिए।',
-    askNext: 'क्या अगली सेवा के बारे में सुनना चाहेंगे?',
+    askNext: 'आगे की सेवा सुनेंगे? हाँ बोलिए।',
     askResume: 'क्या मैं जारी रखूँ?',
     tourIntro: 'तो सुनिए, इस ऐप में क्या-क्या है। हर सेवा के बाद मैं पूछूँगा, तब तक आराम से सुनते रहिए।',
     tourBye: 'जब भी ज़रूरत हो, माइक दबाकर मुझे बुला लीजिए। आपका दिन शुभ हो!',
@@ -83,7 +83,7 @@ const S = {
     aadhaar_otp: 'Type the six digit code from your phone in the boxes below.',
     success: 'Congratulations, you are logged in! Now let me slowly tell you what this app can do for you.',
     didntCatch: 'Sorry, please say that again.',
-    askNext: 'Would you like to hear about the next service?',
+    askNext: 'Want to hear the next service? Just say yes.',
     askResume: 'Shall I continue?',
     tourIntro: 'Listen — here is what is inside this app. After each one I will ask, so relax and listen.',
     tourBye: 'Whenever you need me, press the mic and call me. Have a good day!',
@@ -259,7 +259,7 @@ const PHON = {
     aadhaar_otp: 'Aapke phone par aaya chhah ankon ka code neeche likhiye.',
     success: 'Badhai ho! Aap login ho gaye. Ab main aapko dheere-dheere batata hoon ki yeh app kya-kya seva deta hai.',
     didntCatch: 'Maaf kijiye, phir se boliye.',
-    askNext: 'Kya agli seva ke baare mein sunna chahenge?',
+    askNext: 'Aage ki seva sunenge? Haan boliye.',
     askResume: 'Kya main jaari rakhun?',
     tourIntro: 'To suniye, is app mein kya-kya hai. Har seva ke baad main poochhoonga, tab tak aaraam se sunte rahiye.',
     tourBye: 'Jab bhi zaroorat ho, mic dabakar mujhe bulaa lijiye. Aapka din shubh ho!',
@@ -435,7 +435,14 @@ const INTENTS = {
 export function matchIntent(lang, q) {
   const I = INTENTS[lang] || INTENTS.en;
   const s = String(q || '').toLowerCase();
-  const has = (words) => words.some((w) => s.includes(w.toLowerCase()));
+  // Whole-word matching. Substring matching let random chatter hijack the
+  // guide ("know"/"now" counted as "no", 'ना' inside longer words, "stop"
+  // inside "stopping by"...). Multi-word intents stay phrase matches.
+  const tokens = s.split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
+  const has = (words) => words.some((w) => {
+    const wl = String(w).toLowerCase();
+    return wl.includes(' ') ? s.includes(wl) : tokens.includes(wl);
+  });
   if (has(I.stop)) return 'stop';
   if (has(I.repeat)) return 'repeat';
   if (has(I.yes)) return 'yes';
@@ -464,6 +471,7 @@ export class VoiceGuide {
     this._voicesReady = false;
     this._reminderTimers = [];             // patient step reminders
     this._reminderToken = 0;               // invalidates in-flight reminder schedules
+    this.tourAskMs = 5000;                 // tour pace: silence → keep going
   }
 
   _emit() {
@@ -725,6 +733,14 @@ export class VoiceGuide {
       return;
     }
 
+    // During the tour, a clear "no / bas / enough" stops it politely even
+    // when no question is pending (the farmer answered a beat late).
+    if (this._tourRunning && intent === 'no') {
+      this._tourRunning = false;
+      this.sayKey('tourBye', { listenAfter: false }).then(() => this.stop());
+      return;
+    }
+
     // Idle speech (no question pending): app command, else a gentle prompt.
     if (this.onCommand && this.onCommand(q)) return;
     this.say(this.script().didntCatch);
@@ -753,7 +769,10 @@ export class VoiceGuide {
       }
       await this.say(line);
       if (!this._tourRunning) return;
-      const ans = await this.askKey('askNext');
+      // Silence or anything unclear → continue at their pace; the 5s cap
+      // keeps the tour alive instead of 16s of dead air that feels like
+      // "the guide is done" after every single service.
+      const ans = await this.askKey('askNext', this.tourAskMs);
       if (!this._tourRunning) return;
       if (ans === 'no') {
         await this.sayKey('tourBye', { listenAfter: false });
