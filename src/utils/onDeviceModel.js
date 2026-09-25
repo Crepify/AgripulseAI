@@ -412,9 +412,7 @@ async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) 
   let consecutiveTimeouts = 0;
   for (const conf of order) {
     try {
-      console.log('[AgriPulse] trying conf', conf);
       const r = await withTimeout(detectFn(imageElement, { conf }), 8000, 'detect conf=' + conf);
-      console.log('[AgriPulse] conf', conf, 'detections', r?.detections?.length);
       consecutiveTimeouts = 0;
       if (r?.detections?.length) return r;
       lastResult = r;
@@ -438,7 +436,6 @@ async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) 
   if (consecutiveTimeouts === 0) {
     for (const conf of [0.001, 0.0001, 0]) {
       try {
-        console.log('[AgriPulse] trying ultra-low conf', conf);
         const r = await withTimeout(detectFn(imageElement, { conf }), 6000, 'detect conf=' + conf);
         if (r?.detections?.length) return r;
         lastResult = lastResult || r;
@@ -456,12 +453,9 @@ export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { 
   let backend = 'on-device';
 
   try {
-    console.log('[AgriPulse] analyzeLeafOnDevice init');
     const ready = await withTimeout(initOnDeviceAI(), 15000, 'initOnDeviceAI');
     if (!ready) throw new Error(status.error || 'on-device model unavailable');
-    console.log('[AgriPulse] model ready, detecting');
     result = await detectWithAdaptiveThreshold(detectDisease, imageElement, conf);
-    console.log('[AgriPulse] on-device result', result?.detections?.length);
   } catch (err) {
     console.warn('On-device inference failed:', err);
   }
@@ -471,14 +465,12 @@ export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { 
   if (shouldTryCloud) {
     // If on-device failed or found nothing, try cloud
     if (!result || !result.detections?.length) {
-      console.log('[AgriPulse] trying cloud fallback');
       try {
         const cloudResult = await withTimeout(
           detectWithAdaptiveThreshold(detectDiseaseCloud, imageElement, conf),
           20000,
           'cloud detect'
         );
-        console.log('[AgriPulse] cloud result', cloudResult?.detections?.length);
         if (cloudResult?.detections?.length) {
           result = cloudResult;
           backend = 'cloud';

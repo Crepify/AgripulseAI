@@ -110,7 +110,6 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
 
   // Reads a chosen/dropped image file and runs the same scan path for both entry points.
   const startScanFromFile = (file) => {
-    console.log('[AgriPulse] startScanFromFile', file?.name, file?.type, file?.size);
     if (!file) {
       setScanError('No file selected.');
       return;
@@ -127,14 +126,12 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
       return;
     }
     scanIdRef.current += 1;
-    console.log('[AgriPulse] scanId', scanIdRef.current);
     setIsAnalyzing(false);
     setHasScanResult(false);
     setScanError('');
     setLastScan(null);
     const reader = new FileReader();
     reader.onload = async (loadEvent) => {
-      console.log('[AgriPulse] FileReader onload', typeof loadEvent.target?.result);
       try {
         const dataUrl = loadEvent.target?.result;
         if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
@@ -142,7 +139,6 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
           setScanError('The selected image could not be read. Please try another photo.');
           return;
         }
-        console.log('[AgriPulse] setCustomImage, call runScan');
         setCustomImage(dataUrl);
         stopCamera();
         await runScan(dataUrl);
@@ -161,10 +157,8 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   };
 
   const handleFileUpload = (event) => {
-    console.log('[AgriPulse] handleFileUpload', event.target.files?.length);
     try {
       const file = event.target.files?.[0];
-      console.log('[AgriPulse] file', file?.name);
       event.target.value = '';
       if (!file) return;
       startScanFromFile(file);
@@ -175,7 +169,6 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   };
 
   const runScan = async (imgSrc) => {
-    console.log('[AgriPulse] runScan', imgSrc.slice(0,30), 'scanId', scanIdRef.current);
     const scanId = scanIdRef.current;
     setHasScanResult(false);
     setScanError('');
@@ -185,12 +178,8 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
     try { sound.playTransition(); } catch {}
 
     try {
-      console.log('[AgriPulse] loadImage start');
       const image = await loadImage(imgSrc);
-      console.log('[AgriPulse] loadImage done', image.width, image.height);
-      console.log('[AgriPulse] analyze start');
       const result = await analyzeLeafOnDevice(image, canvasRef.current);
-      console.log('[AgriPulse] analyze done', result.matchedCrop?.id, result.backend);
       if (scanId !== scanIdRef.current) return;
       const remaining = Math.max(0, 400 - (result.latencyMs || 0));
       if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
