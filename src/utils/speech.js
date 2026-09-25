@@ -64,7 +64,8 @@ class SpeechEngine {
       (baseLang === 'hi' && (v.name.includes('हिन्दी') || v.name.toLowerCase().includes('hindi'))) ||
       (baseLang === 'ta' && (v.name.includes('தமிழ்') || v.name.toLowerCase().includes('tamil'))) ||
       (baseLang === 'te' && (v.name.includes('తెలుగు') || v.name.toLowerCase().includes('telugu'))) ||
-      (baseLang === 'kn' && (v.name.includes('ಕನ್ನಡ') || v.name.toLowerCase().includes('kannada')))
+      (baseLang === 'kn' && (v.name.includes('ಕನ್ನಡ') || v.name.toLowerCase().includes('kannada'))) ||
+      (baseLang === 'mr' && (v.name.includes('मराठी') || v.name.toLowerCase().includes('marathi')))
     );
     if (matched) return { voice: matched, isNative: true };
 

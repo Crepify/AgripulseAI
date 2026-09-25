@@ -52,6 +52,7 @@ const S = {
     langSwitched: 'ठीक है, अब मैं हिंदी में बात करूँगा।',
     tourStopAsk: 'क्या मैं सेवाएँ बंद कर दूँ? हाँ या नहीं बोलिए।',
     langUnavailable: 'माफ़ कीजिए, वह भाषा इस फ़ोन पर उपलब्ध नहीं है। मैं इसी भाषा में बात करता हूँ।',
+    langFallbackAsk: 'माफ़ कीजिए, यह फ़ोन उस भाषा में नहीं बोल सकता। क्या मैं अंग्रेज़ी में बात करूँ?',
     askResume: 'क्या मैं जारी रखूँ?',
     tourIntro: 'तो सुनिए, इस ऐप में क्या-क्या है। हर सेवा के बाद मैं पूछूँगा, तब तक आराम से सुनते रहिए।',
     tourBye: 'जब भी ज़रूरत हो, माइक दबाकर मुझे बुला लीजिए। आपका दिन शुभ हो!',
@@ -90,6 +91,7 @@ const S = {
     langSwitched: 'Alright — from now on I will speak in English.',
     tourStopAsk: 'Should I stop explaining the services? Say yes or no.',
     langUnavailable: 'Sorry, that language is not available on this phone. I will keep speaking this language.',
+    langFallbackAsk: 'Sorry, this phone cannot speak that language. Shall I talk in English instead?',
     askResume: 'Shall I continue?',
     tourIntro: 'Listen — here is what is inside this app. After each one I will ask, so relax and listen.',
     tourBye: 'Whenever you need me, press the mic and call me. Have a good day!',
@@ -128,6 +130,7 @@ const S = {
     langSwitched: 'சரி — இனிமேல் நான் தமிழில் பேசுவேன்.',
     tourStopAsk: 'சேவைகளை நிறுத்தவா? ஆம் அல்லது இல்லை சொல்லுங்கள்.',
     langUnavailable: 'மன்னிக்கவும், அந்த மொழி இந்த போனில் இல்லை. இதே மொழியில் பேசுகிறேன்.',
+    langFallbackAsk: 'மன்னிக்கவும், இந்த போன் அந்த மொழியில் பேச முடியாது. ஆங்கிலத்தில் பேசலாமா?',
     askResume: 'தொடரலாமா?',
     tourIntro: 'இந்த செயலியில் என்னென்ன இருக்கிறது என்று ஒவ்வொன்றாக சொல்கிறேன். ஒவ்வொன்றுக்குப் பிறகு கேட்பேன்.',
     tourBye: 'தேவைப்படும்போது மைக்கை அழுத்தி என்னை அழையுங்கள். இனிய நாள்!',
@@ -166,6 +169,7 @@ const S = {
     langSwitched: 'సరే — ఇకపై నేను తెలుగులో మాట్లాడతాను.',
     tourStopAsk: 'సేవలు ఆపిదామా? అవును లేదా కాదు చెప్పండి.',
     langUnavailable: 'క్షమించండి, ఆ భాష ఈ ఫోన్‌లో లేదు. ఇదే భాషలో మాట్లాడతాను.',
+    langFallbackAsk: 'క్షమించండి, ఈ ఫోన్ ఆ భాషలో మాట్లాడలేదు. ఇంగ్లీషులో మాట్లాడనా?',
     askResume: 'కొనసాగించమంటారా?',
     tourIntro: 'ఈ యాప్‌లో ఏముందో ఒక్కొక్కటి చెబుతాను. ఒక్కో దాని తర్వాత నేను అడుగుతాను.',
     tourBye: 'ఎప్పుడు కావాలంటే మైక్ నొక్కి నన్ను పిలవండి. శుభ దినం!',
@@ -204,6 +208,7 @@ const S = {
     langSwitched: 'ಸರಿ — ಈಗ ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
     tourStopAsk: 'ಸೇವೆಗಳನ್ನು ನಿಲ್ಲಿಸಬೇಕೆ? ಹೌದು ಇಲ್ಲವೆ ಹೇಳಿ.',
     langUnavailable: 'ಕ್ಷಮಿಸಿ, ಆ ಭಾಷೆ ಈ ಫೋನ್‌ನಲ್ಲಿ ಇಲ್ಲ. ಇದೇ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
+    langFallbackAsk: 'ಕ್ಷಮಿಸಿ, ಈ ಫೋನ್ ಆ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡಲಾರದು. ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಮಾತನಾಡಲಾಮಾ?',
     askResume: 'ಮುಂದುವರಿಸಲಿಯಾ?',
     tourIntro: 'ಈ ಆ್ಯಪ್‌ನಲ್ಲಿ ಏನೇನಿದೆ ಎಂದು ಒಂದೊಂದಾಗಿ ಹೇಳುತ್ತೇನೆ. ಪ್ರತಿಯೊಂದರ ನಂತರ ಕೇಳುತ್ತೇನೆ.',
     tourBye: 'ಬೇಕಾದಾಗ ಮೈಕ್ ಒತ್ತಿ ನನ್ನನ್ನು ಕರೆಯಿರಿ. ಶುಭ ದಿನ!',
@@ -242,6 +247,7 @@ const S = {
     langSwitched: 'ठीक आहे — आता मी मराठीत बोलेन.',
     tourStopAsk: 'सेवा सांगणे बंद करू का? हो किंवा नाही म्हणा.',
     langUnavailable: 'क्षमस्व, ती भाषा या फोनवर नाही. मी याच भाषेत बोलतो.',
+    langFallbackAsk: 'क्षमस्व, हा फोन त्या भाषेत बोलू शकत नाही. मी इंग्रजीत बोलू का?',
     askResume: 'सुरू ठेवू का?',
     tourIntro: 'या ॲपमध्ये काय काय आहे ते एकेक सांगतो. प्रत्येकानंतर मी विचारीन.',
     tourBye: 'गरज असल्यास मायक दाबून मला बोलावा. शुभ दिवस!',
@@ -281,6 +287,7 @@ const PHON = {
     langSwitched: 'Theek hai, ab main Hindi mein baat karunga.',
     tourStopAsk: 'Kya main sevaayein band kar doon? Haan ya nahin boliye.',
     langUnavailable: 'Maaf kijiye, woh bhaasha is phone par uplabdh nahin hai. Main isi bhaasha mein baat karta hoon.',
+    langFallbackAsk: 'Maaf kijiye, yeh phone us bhaasha mein nahin bol sakta. Kya main angrezi mein baat karoon?',
     askResume: 'Kya main jaari rakhun?',
     tourIntro: 'To suniye, is app mein kya-kya hai. Har seva ke baad main poochhoonga, tab tak aaraam se sunte rahiye.',
     tourBye: 'Jab bhi zaroorat ho, mic dabakar mujhe bulaa lijiye. Aapka din shubh ho!',
@@ -944,11 +951,20 @@ export class VoiceGuide {
       const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
       if (this._ackWaiter) { this._ackWaiter.cancel(); this._ackWaiter = null; }
       if (!this._canSpeak(switchTo)) {
-        // Asked for e.g. Tamil on a phone with no Tamil voice — say so
-        // honestly and carry on in the current language. No fake switch
-        // that silently becomes English.
-        this.sayKey('langUnavailable');
-        if (outer) outer('yes'); // whatever was pending keeps moving
+        // Chrome desktop often has NO Tamil/Telugu/Kannada/Marathi voice —
+        // only Hindi + English among Indian languages. Don't dead-end: say
+        // so honestly and OFFER English, which every device can speak.
+        try {
+          const vs = this.engine && this.engine.voices ? this.engine.voices : [];
+          // eslint-disable-next-line no-console
+          console.info('[AgriPulse guide] TTS voices on this device:', vs.map((v) => v.lang).join(', ') || 'none');
+        } catch { /* diagnostics only */ }
+        this.askKey('langFallbackAsk', 8000).then((ans) => {
+          if (ans === 'yes' && this.setLanguage('en')) {
+            return this.sayKey('langSwitched').then(() => { if (outer) outer('yes'); });
+          }
+          if (outer) outer('yes'); // stay in the current language, keep moving
+        });
         return;
       }
       this.setLanguage(switchTo);
