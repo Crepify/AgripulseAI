@@ -159,72 +159,59 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
   };
 
   const handleFileUpload = (event) => {
-    try {
-      const file = event.target.files?.[0];
-      event.target.value = '';
-      if (!file) return;
-      const isImage = file.type?.startsWith('image/') || /\.(jpe?g|png|webp|bmp|gif)$/i.test(file.name || '');
-      if (!isImage) {
-        setHasScanResult(false);
-        setScanError('Please choose an image file (JPG, PNG, WEBP).');
-        return;
-      }
-      if (file.size > 15 * 1024 * 1024) {
-        setHasScanResult(false);
-        setScanError('Image too large (max 15MB). Please choose a smaller photo.');
-        return;
-      }
-      scanIdRef.current += 1;
-      setIsAnalyzing(false);
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
       setHasScanResult(false);
-      setScanError('');
-      setLastScan(null);
-      setImageLoadError(false);
-      setQualityCheck(null);
-      const cleanName = file.name.length > 30 ? file.name.slice(0, 27) + '...' : file.name;
-      setCustomImageName(cleanName);
+      setScanError('Please choose an image file to scan.');
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      setHasScanResult(false);
+      setScanError('Image too large (max 15MB). Please choose a smaller photo.');
+      return;
+    }
+    scanIdRef.current += 1;
+    setIsAnalyzing(false);
+    setHasScanResult(false);
+    setScanError('');
+    setLastScan(null);
+    setImageLoadError(false);
+    setQualityCheck(null);
+    const cleanName = file.name.length > 30 ? file.name.slice(0, 27) + '...' : file.name;
+    setCustomImageName(cleanName);
 
-      const reader = new FileReader();
-      reader.onload = async (loadEvent) => {
-        try {
-          const dataUrl = loadEvent.target?.result;
-          if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
-            setHasScanResult(false);
-            setScanError('The selected image could not be read. Please try another photo.');
-            return;
-          }
-          const qc = await checkImageQuality(dataUrl);
-          setQualityCheck(qc);
-          const compressed = await compressImage(dataUrl, 1024);
-          setCustomImage(compressed);
-          stopCamera();
-          await runScan(compressed);
-        } catch (e) {
-          console.error('[AgriPulse] handleFileUpload onload error', e);
-          setHasScanResult(false);
-          setScanError('Failed to process image: ' + (e?.message || 'unknown'));
-        }
-      };
-      reader.onerror = () => {
-        console.error('[AgriPulse] FileReader error');
+    const reader = new FileReader();
+    reader.onload = async (loadEvent) => {
+      const dataUrl = loadEvent.target?.result;
+      if (typeof dataUrl !== 'string') {
         setHasScanResult(false);
         setScanError('The selected image could not be read. Please try again.');
-      };
-      reader.readAsDataURL(file);
-    } catch (e) {
-      console.error('[AgriPulse] handleFileUpload error', e);
-      setScanError('Upload failed: ' + (e?.message || 'unknown'));
-    }
+        return;
+      }
+      const qc = await checkImageQuality(dataUrl);
+      setQualityCheck(qc);
+      const compressed = await compressImage(dataUrl, 1024);
+      setCustomImage(compressed);
+      stopCamera();
+      await runScan(compressed);
+    };
+    reader.onerror = () => {
+      setHasScanResult(false);
+      setScanError('The selected image could not be read. Please try again.');
+    };
+    reader.readAsDataURL(file);
   };
 
   const runScan = async (imgSrc) => {
-    const scanId = scanIdRef.current;
+    const scanId = ++scanIdRef.current;
     setHasScanResult(false);
     setScanError('');
     setIsAnalyzing(true);
     setLastScan(null);
-    try { clearOverlay(canvasRef.current); } catch {}
-    try { sound.playTransition(); } catch {}
+    clearOverlay(canvasRef.current);
+    sound.playTransition();
     try {
       const image = await loadImage(imgSrc);
       const result = await analyzeLeafOnDevice(image, canvasRef.current);
@@ -340,10 +327,10 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
           <button onClick={startCamera} className="h-32 rounded-2xl bg-emerald-500 text-black font-black text-2xl flex flex-col items-center justify-center gap-2 shadow-xl">
             <Camera className="w-12 h-12" /> पत्ता जांचो / Scan Leaf
           </button>
-          <input id="leaf-upload-input-main" type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" style={{ display: 'none' }} />
-          <label htmlFor="leaf-upload-input-main" className="h-24 rounded-2xl bg-white border-2 border-zinc-300 text-zinc-900 font-black text-xl flex items-center justify-center gap-3 cursor-pointer hover:opacity-90 active:scale-95">
+          <button onClick={()=>fileInputRef.current?.click()} className="h-24 rounded-2xl bg-white border-2 border-zinc-300 text-zinc-900 font-black text-xl flex items-center justify-center gap-3">
             <Upload className="w-8 h-8" /> फोटो डालो / Upload
-          </label>
+          </button>
+          <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
           {hasScanResult && (
             <div className={`p-6 rounded-2xl border-2 ${isSunlightMode ? 'bg-white border-emerald-400' : 'bg-zinc-900 border-emerald-500/50'} text-center`}>
               <div className="text-3xl mb-2">🌱</div>
@@ -365,16 +352,17 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
 
   return (
     <div className="w-full space-y-6">
-      {/* Clean minimal top bar */}
-      <div className={`p-2.5 rounded-2xl border flex items-center justify-between gap-2 ${isSunlightMode ? 'bg-white border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
+      {/* Top automation bar */}
+      <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-2 text-xs ${isSunlightMode ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300'}`}>
         <div className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-full bg-emerald-500 text-black flex items-center justify-center font-black text-xs">🌱</span>
-          <span className="font-black text-xs">{mixingAcres} acre • Auto-saved</span>
-          {stats && <span className="px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold border">{stats.count}x {stats.crop}</span>}
+          <Sparkles className="w-4 h-4 text-emerald-500" />
+          <span className="font-bold">Farmer-First: Auto land size, blur check, history, one-tap share</span>
+          {stats && <span className="px-2 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-black">{stats.crop}: {stats.count}x scanned</span>}
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={()=>setIsLowLiteracy(true)} title="Big buttons" className="w-8 h-8 rounded-full bg-amber-400 text-black flex items-center justify-center"><Eye className="w-4 h-4" /></button>
-          <button onClick={()=>setShowHistory(!showHistory)} className="w-8 h-8 rounded-full bg-zinc-800 text-white flex items-center justify-center"><History className="w-4 h-4" /></button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={()=>setIsLowLiteracy(true)} className="px-2.5 py-1 rounded-lg bg-amber-500 text-black font-black text-[10px] flex items-center gap-1"><Eye className="w-3 h-3" /> Simple Mode</button>
+          <button onClick={()=>setMultiCropMode(!multiCropMode)} className={`px-2.5 py-1 rounded-lg font-black text-[10px] border ${multiCropMode ? 'bg-emerald-500 text-black border-emerald-300' : isSunlightMode ? 'bg-white border-zinc-300' : 'bg-zinc-800 border-zinc-700'}`}>Multi-Crop: {multiCropMode ? 'ON' : 'OFF'}</button>
+          <button onClick={()=>setShowHistory(!showHistory)} className="px-2.5 py-1 rounded-lg bg-zinc-800 text-white font-black text-[10px] flex items-center gap-1"><History className="w-3 h-3" /> History</button>
         </div>
       </div>
 
@@ -449,8 +437,8 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
             ) : (
               <button onClick={stopCamera} className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 hover:bg-red-400 text-white font-black text-xs shadow-md border-2 border-red-400"><VideoOff className="w-4 h-4" /><span>{t.scanner.closeCamera}</span></button>
             )}
-            <input id="leaf-upload-input" type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" style={{ display: 'none' }} />
-            <label htmlFor="leaf-upload-input" style={{ backgroundColor: isSunlightMode ? '#ffffff' : '#1f2937', color: isSunlightMode ? '#111827' : '#ffffff', borderColor: isSunlightMode ? '#9ca3af' : '#4b5563' }} className="flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all border-2 shadow-sm cursor-pointer hover:opacity-90 active:scale-95 hover:scale-[1.02]"><Upload className="w-4 h-4" /><span>{t.scanner.uploadPhoto}</span></label>
+            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" capture="environment" className="hidden" />
+            <button onClick={() => fileInputRef.current?.click()} style={{ backgroundColor: isSunlightMode ? '#ffffff' : '#1f2937', color: isSunlightMode ? '#111827' : '#ffffff', borderColor: isSunlightMode ? '#9ca3af' : '#4b5563' }} className="flex items-center justify-center gap-2 py-3 rounded-xl font-black text-xs transition-all border-2 shadow-sm hover:scale-[1.02]"><Upload className="w-4 h-4" /><span>{t.scanner.uploadPhoto}</span></button>
           </div>
 
           {qualityCheck && !qualityCheck.isGood && (

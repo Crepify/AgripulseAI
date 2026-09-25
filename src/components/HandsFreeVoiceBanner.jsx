@@ -64,8 +64,8 @@ export default function HandsFreeVoiceBanner({ isHandsFree, onToggle, selectedLa
           <div className="font-bold text-emerald-300 flex items-center gap-1.5">
             <span>🖐️ गीले हाथ / Hands-Free Voice Mode Active:</span>
           </div>
-          <p className="text-[11px] text-zinc-300 font-light">
-            Say aloud: <strong>"स्कैन" (Scan)</strong> • <strong>"मंडी" (Mandi)</strong> • <strong>"मौसम" (Radar)</strong> • <strong>"दवा" (Verify)</strong> • <strong>"दुकान" (Stores)</strong> • <strong>"समूह" (Group)</strong>
+          <p className="text-[11px] text-zinc-300 font-light leading-tight">
+            Say: <strong>"स्कैन"</strong> • <strong>"मंडी भाव"</strong> • <strong>"मौसम"</strong> • <strong>"दवा"</strong> • <strong>"दुकान"</strong> • <strong>"समूह"</strong> • <strong>"बाजार"</strong> • <strong>"समुदाय"</strong> • <strong>"मजदूर"</strong> • <strong>"डीजल"</strong> • <strong>"सहायक"</strong> • <strong>"सेवा"</strong> • All 22 languages
           </p>
         </div>
       </div>
