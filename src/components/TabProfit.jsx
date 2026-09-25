@@ -114,7 +114,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
   const chemProfit = acreage * 19000;
   const cropLoss = acreage * 22000;
   const topModal = board?.rows?.[0]?.modal;
-  const boardStatus = !board ? null : board.live ? 'live' : board.stale ? 'stale' : board.cached ? 'cached' : 'unavailable';
+  const boardStatus = !board ? null : board.live ? 'live' : board.reference ? 'reference' : board.stale ? 'stale' : board.cached ? 'cached' : 'unavailable';
 
   const formatDate = (iso) => { if (!iso) return ''; try { return new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return iso; } };
   const formatTime = (ts) => { if (!ts) return ''; return new Date(ts).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); };
@@ -163,6 +163,16 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
             </div>
           )}
 
+          {/* Sell via Kisan Saathi — guaranteed net, zero middlemen */}
+          <button onClick={()=>{ sound.playClick(); window.dispatchEvent(new CustomEvent('ap:navigate', { detail: 'saathi' })); }}
+            className={`w-full p-4 rounded-xl border-2 border-emerald-600 flex items-center justify-between gap-2 text-left active:scale-[0.99] transition-transform ${isSunlightMode ? 'bg-emerald-50' : 'bg-emerald-950/40'}`}>
+            <div>
+              <div className="text-xs font-black text-emerald-600">🤝 {t.mandiLive.saathiCta || 'Skip the mandi — sell via Kisan Saathi'}</div>
+              <div className={`text-[11px] font-bold mt-0.5 ${isSunlightMode ? 'text-zinc-600' : 'text-zinc-400'}`}>{t.mandiLive.saathiCtaSub || '₹235/quintal NET in your bank. Zero cuts. Escrow protected.'}</div>
+            </div>
+            <ArrowUpRight className="w-6 h-6 text-emerald-500 shrink-0" />
+          </button>
+
           {/* Subsidy auto-check */}
           <div className={`p-4 rounded-xl border ${isSunlightMode ? 'bg-blue-50 border-blue-200' : 'bg-blue-950/20 border-blue-800/50'}`}>
             <div className="flex items-center gap-2 font-black text-xs"><BadgeCheck className="w-4 h-4 text-blue-500" /> Subsidy Auto-Check — {stateSel} {aadhaarVerified ? '✓ Aadhaar Verified' : '⚠️ Verify Aadhaar'}</div>
@@ -179,7 +189,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
           <div className="flex items-center justify-between pb-2 border-b border-white/5">
             <h3 className="text-sm font-bold font-mono flex items-center gap-2"><BarChart3 className="w-4 h-4 text-emerald-500" /> {t.mandiLive.boardTitle}</h3>
             <div className="flex items-center gap-2">
-              {board && <span className={`flex items-center gap-1 text-[9px] font-mono font-black px-2 py-0.5 rounded-full border ${boardStatus==='live' ? 'text-emerald-500 border-emerald-500/40 bg-emerald-500/10' : boardStatus==='cached' ? 'text-sky-500 border-sky-500/40 bg-sky-500/10' : boardStatus==='stale' ? 'text-amber-500 border-amber-500/40 bg-amber-500/10' : 'text-red-500 border-red-500/40 bg-red-500/10'}`}>{boardStatus==='live' ? <Radio className="w-2.5 h-2.5 animate-pulse" /> : boardStatus==='unavailable' ? <AlertTriangle className="w-2.5 h-2.5" /> : <Database className="w-2.5 h-2.5" />}{boardStatus==='live' ? t.mandiLive.liveBadge : boardStatus==='cached' ? t.mandiLive.freshCacheBadge : boardStatus==='stale' ? t.mandiLive.staleBadge : t.mandiLive.offlineBadge}</span>}
+              {board && <span className={`flex items-center gap-1 text-[9px] font-mono font-black px-2 py-0.5 rounded-full border ${boardStatus==='live' ? 'text-emerald-500 border-emerald-500/40 bg-emerald-500/10' : boardStatus==='cached' ? 'text-sky-500 border-sky-500/40 bg-sky-500/10' : boardStatus==='stale' || boardStatus==='reference' ? 'text-amber-500 border-amber-500/40 bg-amber-500/10' : 'text-red-500 border-red-500/40 bg-red-500/10'}`}>{boardStatus==='live' ? <Radio className="w-2.5 h-2.5 animate-pulse" /> : boardStatus==='unavailable' ? <AlertTriangle className="w-2.5 h-2.5" /> : <Database className="w-2.5 h-2.5" />}{boardStatus==='live' ? t.mandiLive.liveBadge : boardStatus==='reference' ? (t.mandiLive.referenceBadge || 'Reference rates') : boardStatus==='cached' ? t.mandiLive.freshCacheBadge : boardStatus==='stale' ? t.mandiLive.staleBadge : t.mandiLive.offlineBadge}</span>}
               <button onClick={()=>loadPrices(true)} disabled={refreshing||loading} className={`p-1.5 rounded-lg border disabled:opacity-50 ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-[#181c1a] border-[#232925]'}`}><RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /></button>
             </div>
           </div>
@@ -190,6 +200,12 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
           </div>
 
           {autoCrop && autoCrop!==commoditySel && <button onClick={()=>{ sound.playClick(); setCommoditySel(autoCrop); }} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-600 text-[11px] font-black"><Sparkles className="w-3.5 h-3.5" /> {fallbackT.useCurrentCrop}: {autoCrop}</button>}
+
+          {boardStatus==='reference' && !loading && (
+            <div className={`p-2.5 rounded-xl border text-[10px] font-bold ${isSunlightMode ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-amber-950/30 border-amber-700/50 text-amber-400'}`}>
+              ⓘ {t.mandiLive.referenceNote || 'Live feed has no report for this state/crop today — showing govt-pattern reference rates so you always have a price to work with.'}
+            </div>
+          )}
 
           {board?.latestDate && !loading && (
             <div className={`space-y-1 text-[10px] font-mono ${isSunlightMode ? 'text-zinc-500' : 'text-zinc-400'}`}>

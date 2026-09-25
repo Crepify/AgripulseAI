@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { BadgeCheck, CircleCheck, MessageCircle, IndianRupee, RefreshCw } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { useTranslation } from '../hooks/useLocalT';
 import {
   RATES, GOVT_BENCHMARKS, inr, computePayout, listTrades, saveTrade, newTradeId, TRADE_STEPS,
 } from '../utils/saathiEconomics';
@@ -26,7 +27,8 @@ function demoTrade() {
   };
 }
 
-export default function TabPassbook({ isSunlightMode }) {
+export default function TabPassbook({ selectedLang, isSunlightMode }) {
+  const ts = (useTranslation(selectedLang).saathiHub) || {};
   const card = isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-[#121514] border-[#1f2421] text-white';
   const sub = isSunlightMode ? 'text-zinc-600' : 'text-zinc-400';
   const [tick, setTick] = useState(0);
@@ -63,7 +65,7 @@ export default function TabPassbook({ isSunlightMode }) {
           <MessageCircle className="w-6 h-6 text-emerald-200 shrink-0" />
         </div>
         <div className={`p-4 ${isSunlightMode ? 'bg-white' : 'bg-[#0d1512]'}`}>
-          <div className={`text-[10px] font-mono font-black tracking-widest ${sub}`}>TOTAL NET-IN-HAND CASH • कुल पैसा हाथ में</div>
+          <div className={`text-[10px] font-mono font-black tracking-widest ${sub}`}>{ts.passbookTotal || 'TOTAL NET-IN-HAND CASH'} • कुल पैसा हाथ में</div>
           <div className="font-black" style={{ fontSize: 40, lineHeight: 1.15, color: '#16A34A' }}>{inr(totalNet)}</div>
           <div className={`text-sm font-bold ${sub}`}>{trades.length} trade{trades.length > 1 ? 's' : ''} • zero deductions • paid by UPI</div>
         </div>
@@ -101,7 +103,7 @@ export default function TabPassbook({ isSunlightMode }) {
 
       {/* AgriPulse vs Mandi — the zero-deduction proof */}
       <div className={`p-4 rounded-2xl border-2 border-emerald-600 ${card}`}>
-        <div className="text-[10px] font-mono font-black tracking-widest text-emerald-600 mb-2">WHY AGRIPULSE PAYS MORE • मंडी से तुलना</div>
+        <div className="text-[10px] font-mono font-black tracking-widest text-emerald-600 mb-2">{ts.whyMore || 'WHY AGRIPULSE PAYS MORE'} • मंडी से तुलना</div>
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 rounded-xl bg-emerald-600 text-white">
             <div className="text-[10px] font-bold opacity-90">AgriPulse NET</div>

@@ -31,7 +31,7 @@ export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSun
   const primary = [
     { id: 'scan', label: t.tabs.scan || 'Scan', icon: Scan },
     { id: 'radar', label: t.tabs.radar || 'Weather', icon: CloudSun },
-    { id: 'saathi', label: 'Saathi', icon: Handshake },
+    { id: 'saathi', label: t.tabs.saathi || 'Saathi', icon: Handshake },
     { id: 'profit', label: t.tabs.profit || 'Mandi', icon: TrendingUp },
   ];
 
@@ -52,8 +52,25 @@ export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSun
                 isSunlightMode ? 'bg-white border-zinc-200' : 'bg-[#101312] border-zinc-800'
               }`}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className={`font-black text-base ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>All Services • सभी सेवाएं</h3>
+                <h3 className={`font-black text-base ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{t.saathiHub?.allServices || 'All Services'} • सभी सेवाएं</h3>
                 <button onClick={() => setMoreOpen(false)} aria-label="Close" className={`p-2.5 rounded-full ${isSunlightMode ? 'bg-zinc-100 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}><X className="w-5 h-5" /></button>
+              </div>
+              {/* Farmer helplines — one tap to call, works without internet */}
+              <div className={`mb-3 p-3 rounded-2xl border-2 ${isSunlightMode ? 'bg-emerald-50 border-emerald-200' : 'bg-emerald-950/40 border-emerald-800/60'}`}>
+                <div className={`text-[10px] font-black tracking-widest mb-2 ${isSunlightMode ? 'text-emerald-700' : 'text-emerald-400'}`}>📞 KISAN HELPLINE • किसान हेल्पलाइन</div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Kisan Call Centre', hi: 'फसल सलाह', num: '18001801551' },
+                    { label: 'PM-KISAN', hi: 'किस्त जांच', num: '155261' },
+                    { label: 'Crop Insurance', hi: 'फसल बीमा', num: '18002091111' },
+                  ].map((h) => (
+                    <a key={h.num} href={`tel:${h.num}`} onClick={() => sound.playClick()}
+                      className={`min-h-[56px] rounded-xl border flex flex-col items-center justify-center gap-0.5 text-center px-1 active:scale-95 transition-transform ${isSunlightMode ? 'bg-white border-emerald-300 text-emerald-800' : 'bg-emerald-900/40 border-emerald-700 text-emerald-200'}`}>
+                      <span className="text-[10px] font-black leading-tight">{h.label}</span>
+                      <span className="text-[9px] font-bold opacity-75">{h.hi}</span>
+                    </a>
+                  ))}
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {MORE_TABS.map((m) => {
@@ -101,7 +118,7 @@ export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSun
           <button onClick={() => { sound.playClick(); setMoreOpen(true); }} aria-expanded={moreOpen}
             className="min-h-[64px] flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform">
             <LayoutGrid className={`w-6 h-6 ${moreOpen || inMore ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-500' : 'text-zinc-400'}`} />
-            <span className={`text-[10px] font-black ${moreOpen || inMore ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-600' : 'text-zinc-400'}`}>More</span>
+            <span className={`text-[10px] font-black ${moreOpen || inMore ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-600' : 'text-zinc-400'}`}>{t.saathiHub?.more || 'More'}</span>
           </button>
         </div>
       </nav>

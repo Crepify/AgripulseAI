@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, MapPin, Droplets, BadgeCheck, Loader2, TrendingUp, X } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { useTranslation } from '../hooks/useLocalT';
 import { RATES, GOVT_BENCHMARKS, inr } from '../utils/saathiEconomics';
 
 /*
@@ -27,7 +28,8 @@ const LOTS = [
   { id: 'LOT-6A1', hub: 'ludhiana', crop: 'Wheat', emoji: '🌾', quintals: 96, grade: 'A', moisture: 10.1, quality: 96, farmers: 18, village: 'Khanna, Ludhiana' },
 ];
 
-export default function TabBuyer({ isSunlightMode }) {
+export default function TabBuyer({ selectedLang, isSunlightMode }) {
+  const ts = (useTranslation(selectedLang).saathiHub) || {};
   const card = isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-[#121514] border-[#1f2421] text-white';
   const sub = isSunlightMode ? 'text-zinc-600' : 'text-zinc-400';
   const [selectedHub, setSelectedHub] = useState(null);
@@ -61,7 +63,7 @@ export default function TabBuyer({ isSunlightMode }) {
       {/* Live supply map (stylised village node clusters) */}
       <div className={`rounded-2xl border overflow-hidden ${card}`}>
         <div className="p-3 pb-0 flex items-center justify-between">
-          <h3 className="font-black text-sm flex items-center gap-1.5"><MapPin className="w-4 h-4 text-emerald-500" /> Live Supply Map</h3>
+          <h3 className="font-black text-sm flex items-center gap-1.5"><MapPin className="w-4 h-4 text-emerald-500" /> {ts.supplyMap || 'Live Supply Map'}</h3>
           {selectedHub && <button onClick={() => { sound.playClick(); setSelectedHub(null); }} className="text-[11px] font-black text-amber-500">Clear filter ✕</button>}
         </div>
         <div className="relative m-3 h-56 rounded-xl overflow-hidden border border-emerald-800/30" style={{ background: 'linear-gradient(160deg, #0f2419 0%, #14352a 45%, #0d1f2d 100%)' }}>
@@ -92,7 +94,7 @@ export default function TabBuyer({ isSunlightMode }) {
       </div>
 
       {/* Live bidding panel */}
-      <h3 className={`font-black text-sm flex items-center gap-1.5 px-1 ${isSunlightMode ? 'text-zinc-800' : 'text-white'}`}><TrendingUp className="w-4 h-4 text-emerald-500" /> Aggregated Village Lots ({lots.length})</h3>
+      <h3 className={`font-black text-sm flex items-center gap-1.5 px-1 ${isSunlightMode ? 'text-zinc-800' : 'text-white'}`}><TrendingUp className="w-4 h-4 text-emerald-500" /> {ts.buyerLots || 'Aggregated Village Lots'} ({lots.length})</h3>
       {lots.map((lot) => {
         const total = lot.quintals * RATES.BUYER_PAYS_PER_QUINTAL;
         const isLocked = locked[lot.id];
@@ -118,7 +120,7 @@ export default function TabBuyer({ isSunlightMode }) {
                 <span className="flex items-center gap-1.5 px-4 min-h-[48px] rounded-xl bg-amber-500 text-black text-xs font-black"><Lock className="w-4 h-4" /> Escrowed • Truck assigned 🟡</span>
               ) : (
                 <button onClick={() => lockLot(lot)} className="min-h-[56px] px-4 rounded-xl bg-emerald-600 text-white text-sm font-black flex items-center gap-2 active:scale-95">
-                  <Lock className="w-4 h-4" /> Lock Lot & Pay Escrow
+                  <Lock className="w-4 h-4" /> {ts.lockLot || 'Lock Lot & Pay Escrow'}
                 </button>
               )}
             </div>

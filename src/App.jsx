@@ -22,6 +22,8 @@ import HandsFreeVoiceBanner from './components/HandsFreeVoiceBanner';
 import BackgroundCanvas from './components/BackgroundCanvas';
 import InstallAppModal from './components/InstallAppModal';
 import LandingPage from './components/LandingPage';
+import PhoneFrame from './components/PhoneFrame';
+import PhoneHomeScreen from './components/PhoneHomeScreen';
 
 import { initOnDeviceAI } from './utils/onDeviceModel';
 import { initOfflineDB } from './utils/offlineStore';
@@ -74,6 +76,11 @@ export default function App() {
   const [guideActive, setGuideActive] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
+  // Presentation flow: the phone home screen shows first; tapping the
+  // AgriPulse icon "opens" the app (persisted per browser session).
+  const [appOpened, setAppOpened] = useState(() => {
+    try { return sessionStorage.getItem('ap_phone_opened') === '1'; } catch { return false; }
+  });
 
   const t = T[selectedLang] || T['en'];
 
@@ -158,6 +165,14 @@ export default function App() {
     setActiveTab(targetTab);
   };
 
+  // Any component can request navigation: window.dispatchEvent(
+  //   new CustomEvent('ap:navigate', { detail: 'saathi' }))
+  useEffect(() => {
+    const onNav = (e) => { if (typeof e.detail === 'string') setActiveTab(e.detail); };
+    window.addEventListener('ap:navigate', onNav);
+    return () => window.removeEventListener('ap:navigate', onNav);
+  }, []);
+
   const handleLogout = () => {
     sound.playClick();
     clearSession();
@@ -166,8 +181,20 @@ export default function App() {
     setActiveTab('scan');
   };
 
+  if (!appOpened) {
+    return (
+      <PhoneFrame>
+        <PhoneHomeScreen onOpenApp={() => {
+          try { sessionStorage.setItem('ap_phone_opened', '1'); } catch {}
+          setAppOpened(true);
+        }} />
+      </PhoneFrame>
+    );
+  }
+
   if (!user) {
     return (
+      <PhoneFrame>
       <div className="min-h-dvh w-full bg-black">
         {/* FULL MOBILE MODE — login also lives in the centered phone frame */}
         <div className="relative mx-auto min-h-dvh w-full max-w-md shadow-2xl overflow-x-hidden">
@@ -178,10 +205,12 @@ export default function App() {
           />
         </div>
       </div>
+      </PhoneFrame>
     );
   }
 
   return (
+    <PhoneFrame>
     <div className={`min-h-dvh w-full transition-colors ${isSunlightMode ? 'bg-zinc-300' : 'bg-black'}`}>
     {/* FULL MOBILE MODE — the whole app lives in a centered phone frame */}
     <div id="ap-phone-frame" className={`relative mx-auto flex min-h-dvh w-full max-w-md flex-col font-sans shadow-2xl selection:bg-emerald-500 selection:text-black transition-colors ${
@@ -323,5 +352,6 @@ export default function App() {
       />
     </div>
     </div>
+    </PhoneFrame>
   );
 }

@@ -5,6 +5,7 @@ import {
   Lock, QrCode, ShieldCheck, X, Landmark, CircleCheck, Loader2, ScanLine,
 } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { useTranslation } from '../hooks/useLocalT';
 import {
   RATES, GOVT_BENCHMARKS, inr, computePayout, maskGovtId, isValidGovtId,
   saveTrade, newTradeId,
@@ -52,7 +53,9 @@ function QrBlock({ seed, scanned }) {
   );
 }
 
-export default function TabSaathi({ isSunlightMode }) {
+export default function TabSaathi({ selectedLang, isSunlightMode }) {
+  const tr = useTranslation(selectedLang);
+  const ts = tr.saathiHub || {};
   const card = isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-[#121514] border-[#1f2421] text-white';
   const sub = isSunlightMode ? 'text-zinc-600' : 'text-zinc-400';
   const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
@@ -203,7 +206,7 @@ export default function TabSaathi({ isSunlightMode }) {
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="text-[10px] font-mono font-black text-emerald-500 tracking-widest">KISAN SAATHI CONSOLE</div>
+            <div className="text-[10px] font-mono font-black text-emerald-500 tracking-widest">{ts.console || 'KISAN SAATHI CONSOLE'}</div>
             <div className="text-lg font-black flex items-center gap-1.5"><Landmark className="w-4 h-4 text-emerald-500" /> Khed Panchayat Hub</div>
           </div>
           <span className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-black border ${online ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/40' : 'bg-red-500/10 text-red-500 border-red-500/40'}`}>
@@ -222,7 +225,7 @@ export default function TabSaathi({ isSunlightMode }) {
 
       {/* ── Govt benchmark banner (70% trust anchor) ── */}
       <div className={`p-4 rounded-2xl border-2 border-emerald-600/50 ${isSunlightMode ? 'bg-emerald-50' : 'bg-emerald-950/40'}`}>
-        <div className="text-[10px] font-mono font-black tracking-widest text-emerald-600 mb-2">🇮🇳 GOVT BENCHMARK • LIVE</div>
+        <div className="text-[10px] font-mono font-black tracking-widest text-emerald-600 mb-2">🇮🇳 {ts.benchmark || 'GOVT BENCHMARK • LIVE'}</div>
         <div className="grid grid-cols-3 gap-2 text-center">
           <div><div className={`text-[10px] font-bold ${sub}`}>Govt MSP</div><div className={`text-xl font-black ${isSunlightMode ? 'text-zinc-800' : 'text-white'}`}>₹{GOVT_BENCHMARKS.msp}</div><div className={`text-[9px] ${sub}`}>/quintal</div></div>
           <div><div className={`text-[10px] font-bold ${sub}`}>e-NAM Mandi</div><div className={`text-xl font-black ${isSunlightMode ? 'text-zinc-800' : 'text-white'}`}>₹{GOVT_BENCHMARKS.enam}</div><div className={`text-[9px] ${sub}`}>/quintal</div></div>
@@ -233,7 +236,7 @@ export default function TabSaathi({ isSunlightMode }) {
 
       {/* ── STEP 1: Farmer onboarding ── */}
       <div className={`p-4 rounded-2xl border ${card}`}>
-        <div className="flex items-center gap-2 mb-3"><span className="w-7 h-7 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center text-sm">1</span><h3 className="font-black text-base">Farmer Onboarding • किसान जोड़ें</h3>{verified && <BadgeCheck className="w-5 h-5 text-emerald-500 ml-auto" />}</div>
+        <div className="flex items-center gap-2 mb-3"><span className="w-7 h-7 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center text-sm">1</span><h3 className="font-black text-base">{ts.step1 || 'Farmer Onboarding'} • किसान जोड़ें</h3>{verified && <BadgeCheck className="w-5 h-5 text-emerald-500 ml-auto" />}</div>
         <input value={farmerName} onChange={(e) => setFarmerName(e.target.value)} placeholder="Farmer name • किसान का नाम" disabled={verified}
           className={`w-full min-h-[56px] px-4 rounded-xl border-2 text-lg font-bold outline-none mb-2 ${isSunlightMode ? 'bg-zinc-50 border-zinc-300 focus:border-emerald-500' : 'bg-zinc-900 border-zinc-700 focus:border-emerald-500 text-white'}`} />
         <div className="flex gap-2 mb-2">
@@ -246,7 +249,7 @@ export default function TabSaathi({ isSunlightMode }) {
           className={`w-full min-h-[56px] px-4 rounded-xl border-2 text-lg font-mono font-bold outline-none ${isSunlightMode ? 'bg-zinc-50 border-zinc-300 focus:border-emerald-500' : 'bg-zinc-900 border-zinc-700 focus:border-emerald-500 text-white'}`} />
         {!verified ? (
           <button onClick={handleVerify} disabled={verifying} className={`${bigBtn} mt-3 bg-emerald-600 text-white`}>
-            {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />} {verifying ? 'Verifying with Govt DB…' : `Verify ${idType}`}
+            {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldCheck className="w-5 h-5" />} {verifying ? 'Verifying with Govt DB…' : `${ts.verifyBtn || 'Verify'} ${idType}`}
           </button>
         ) : (
           <div className="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/40 flex items-center gap-2 text-emerald-600 font-black text-sm">
@@ -266,7 +269,7 @@ export default function TabSaathi({ isSunlightMode }) {
 
       {/* ── STEP 2: Web Bluetooth scale — READ-ONLY ── */}
       <div className={`p-4 rounded-2xl border ${card}`}>
-        <div className="flex items-center gap-2 mb-3"><span className="w-7 h-7 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center text-sm">2</span><h3 className="font-black text-base">Digital Weighing • तौल</h3>{stable && <CircleCheck className="w-5 h-5 text-emerald-500 ml-auto" />}</div>
+        <div className="flex items-center gap-2 mb-3"><span className="w-7 h-7 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center text-sm">2</span><h3 className="font-black text-base">{ts.step2 || 'Digital Weighing'}</h3>{stable && <CircleCheck className="w-5 h-5 text-emerald-500 ml-auto" />}</div>
 
         {/* Giant read-only readout — streams from the scale, NEVER typed */}
         <div className={`rounded-2xl border-2 p-4 text-center ${stable ? 'border-emerald-500 bg-emerald-500/5' : isSunlightMode ? 'border-zinc-300 bg-zinc-50' : 'border-zinc-700 bg-zinc-900'}`}>
@@ -276,7 +279,7 @@ export default function TabSaathi({ isSunlightMode }) {
             style={{ fontSize: 48, lineHeight: 1.1 }} />
           <div className={`text-lg font-black ${stable ? 'text-emerald-600' : sub}`}>{quintals > 0 ? `= ${quintals.toFixed(2)} Quintal` : 'Connect scale to weigh'}</div>
           <div className={`mt-1 text-[10px] font-mono font-bold ${sub}`}>
-            🔒 MANUAL ENTRY DISABLED — weight streams only from {deviceName || 'the Bluetooth scale'} (anti-fraud)
+            🔒 {ts.manualDisabled || 'MANUAL ENTRY DISABLED — weight streams only from the Bluetooth scale (anti-fraud)'}
           </div>
           {!stable && weightKg > 0 && <div className="text-amber-500 text-[11px] font-black mt-1 animate-pulse">Stabilising…</div>}
         </div>
@@ -284,7 +287,7 @@ export default function TabSaathi({ isSunlightMode }) {
         <div className="grid grid-cols-[1fr_56px] gap-2 mt-3">
           <button onClick={connectScale} disabled={scaleState === 'connecting'} className={`${bigBtn} ${scaleState === 'live' || scaleState === 'simulated' ? 'bg-emerald-500/15 text-emerald-600 border-2 border-emerald-500/50' : 'bg-blue-600 text-white'}`}>
             {scaleState === 'connecting' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Bluetooth className="w-5 h-5" />}
-            {scaleState === 'disconnected' && 'Connect Bluetooth Scale'}
+            {scaleState === 'disconnected' && (ts.connectScale || 'Connect Bluetooth Scale')}
             {scaleState === 'connecting' && 'Pairing…'}
             {scaleState === 'live' && `${deviceName} • Re-weigh`}
             {scaleState === 'simulated' && 'Re-weigh (Certified Sim)'}
@@ -296,7 +299,7 @@ export default function TabSaathi({ isSunlightMode }) {
 
       {/* ── STEP 3: AI photo quality audit ── */}
       <div className={`p-4 rounded-2xl border ${card}`}>
-        <div className="flex items-center gap-2 mb-3"><span className="w-7 h-7 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center text-sm">3</span><h3 className="font-black text-base">AI Quality Audit • {crop.emoji} {crop.hi}</h3>{cv && <CircleCheck className="w-5 h-5 text-emerald-500 ml-auto" />}</div>
+        <div className="flex items-center gap-2 mb-3"><span className="w-7 h-7 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center text-sm">3</span><h3 className="font-black text-base">{ts.step3 || 'AI Quality Audit'} • {crop.emoji} {crop.hi}</h3>{cv && <CircleCheck className="w-5 h-5 text-emerald-500 ml-auto" />}</div>
         <div className="grid grid-cols-3 gap-2">
           {[0, 1, 2].map((i) => (
             <div key={i} className={`relative aspect-square rounded-xl border-2 overflow-hidden flex items-center justify-center ${frames[i] ? 'border-emerald-500' : isSunlightMode ? 'border-dashed border-zinc-300 bg-zinc-50' : 'border-dashed border-zinc-700 bg-zinc-900'}`}>
@@ -318,7 +321,7 @@ export default function TabSaathi({ isSunlightMode }) {
         <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFrame} />
         {frames.length < 3 && (
           <button onClick={() => { sound.playClick(); fileRef.current?.click(); }} className={`${bigBtn} mt-3 bg-emerald-600 text-white`}>
-            <Camera className="w-5 h-5" /> Capture Frame {frames.length + 1} of 3
+            <Camera className="w-5 h-5" /> {ts.captureFrame || 'Capture Frame'} {frames.length + 1}/3
           </button>
         )}
         {auditing && <div className="mt-3 flex items-center gap-2 text-amber-500 font-black text-sm"><ScanLine className="w-5 h-5 animate-pulse" /> AI cross-checking color • size • rot % …</div>}
@@ -335,7 +338,7 @@ export default function TabSaathi({ isSunlightMode }) {
       {/* ── NET-IN-HAND payout card — always net, never gross ── */}
       {quintals > 0 && (
         <div className={`p-4 rounded-2xl border-2 border-emerald-600 ${isSunlightMode ? 'bg-white' : 'bg-[#0d1512]'}`}>
-          <div className={`text-[10px] font-mono font-black tracking-widest ${sub}`}>FARMER NET-IN-HAND • सीधे बैंक में</div>
+          <div className={`text-[10px] font-mono font-black tracking-widest ${sub}`}>{ts.netInHand || 'FARMER NET-IN-HAND'} • सीधे बैंक में</div>
           <div className="font-black text-emerald-600" style={{ fontSize: 40, lineHeight: 1.15 }}>{inr(pay.farmerNet)}</div>
           <div className={`text-sm font-bold ${sub}`}>{quintals.toFixed(2)} q × ₹{RATES.FARMER_NET_PER_QUINTAL}/q • +{inr(pay.extraVsMandi)} vs mandi</div>
           <div className={`mt-2 pt-2 border-t text-[11px] font-mono space-y-0.5 ${isSunlightMode ? 'border-zinc-200 text-zinc-600' : 'border-zinc-800 text-zinc-400'}`}>
@@ -354,7 +357,7 @@ export default function TabSaathi({ isSunlightMode }) {
         {escrow === 'locked' && (
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className={`p-4 rounded-2xl border-2 ${paid ? 'border-emerald-600' : 'border-amber-500'} ${card}`}>
             <div className={`flex items-center gap-2 font-black text-sm ${paid ? 'text-emerald-600' : 'text-amber-500'}`}>
-              <Lock className="w-5 h-5" /> {paid ? 'ESCROW RELEASED — UPI PAID ✓' : 'ESCROW LOCKED — DUAL-QR RELEASE PENDING'}
+              <Lock className="w-5 h-5" /> {paid ? (ts.escrowPaid || 'ESCROW RELEASED — UPI PAID ✓') : (ts.escrowLocked || 'ESCROW LOCKED — DUAL-QR RELEASE PENDING')}
             </div>
             <p className={`text-[11px] font-bold mt-1 ${sub}`}>Razorpay escrow releases ONLY when BOTH the Kisan Saathi and the Truck Driver cross-scan the dispatch QR. No single person can move the money.</p>
             <div className="grid grid-cols-2 gap-3 mt-3">
@@ -386,12 +389,12 @@ export default function TabSaathi({ isSunlightMode }) {
         <div className="max-w-md mx-auto grid grid-cols-2 gap-2 pointer-events-auto">
           <button onClick={printReceipt} disabled={!readyToDispatch}
             className="min-h-[56px] rounded-2xl bg-slate-900 text-white font-black text-sm flex items-center justify-center gap-2 border-2 border-slate-700 shadow-xl disabled:opacity-40 active:scale-[0.98]">
-            <Printer className="w-5 h-5" /> Thermal Receipt
+            <Printer className="w-5 h-5" /> {ts.printReceipt || 'Thermal Receipt'}
           </button>
           <button onClick={loadTruck} disabled={!readyToDispatch || escrow !== 'none'}
             className={`min-h-[56px] rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-xl active:scale-[0.98] disabled:opacity-40 ${escrow === 'locked' ? 'bg-amber-500 text-black' : 'bg-emerald-600 text-white'}`}>
             {escrow === 'locking' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Truck className="w-5 h-5" />}
-            {escrow === 'none' && 'Load Truck + Escrow'}
+            {escrow === 'none' && (ts.loadTruck || 'Load Truck + Escrow')}
             {escrow === 'locking' && 'Locking funds…'}
             {escrow === 'locked' && (paid ? 'PAID ✓' : 'Escrow Locked')}
           </button>

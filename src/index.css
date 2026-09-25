@@ -172,3 +172,10 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+  Inside the phone frame the "viewport" is the phone screen, not the browser
+  window — remap dynamic-viewport units so full-height layouts fit the screen.
+*/
+.ap-in-frame :where(.min-h-dvh) { min-height: 100%; }
+.ap-in-frame :where(.h-dvh) { height: 100%; }

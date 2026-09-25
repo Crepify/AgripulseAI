@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
-import { Scan, ShieldCheck, Mic, Leaf, ArrowRight, WifiOff, Languages, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Scan, ShieldCheck, Mic, Leaf, ArrowRight, Handshake, TrendingUp, Languages } from 'lucide-react';
 import LoginPage from './LoginPage';
+
+/*
+ * CLEAN MOBILE LANDING — app-style onboarding, not a website.
+ * One headline, four feature tiles, one giant CTA. Zero clutter.
+ */
 
 export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedLang }) {
   const [showAuth, setShowAuth] = useState(false);
+  const hi = selectedLang === 'hi';
 
   if (showAuth) {
     return (
@@ -16,91 +23,85 @@ export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedL
     );
   }
 
+  const features = [
+    { icon: Scan, title: hi ? 'पत्ती स्कैन' : 'Scan a Leaf', desc: hi ? 'फोटो लो, बीमारी + दवा तुरंत' : 'Photo → disease + remedy instantly', color: 'bg-emerald-100 text-emerald-700' },
+    { icon: Handshake, title: hi ? 'किसान साथी' : 'Kisan Saathi', desc: hi ? '₹235/क्विंटल सीधे बैंक में' : '₹235/quintal net, straight to bank', color: 'bg-amber-100 text-amber-700' },
+    { icon: TrendingUp, title: hi ? 'मंडी भाव' : 'Mandi Rates', desc: hi ? 'हर राज्य के लाइव भाव' : 'Live prices for every state', color: 'bg-sky-100 text-sky-700' },
+    { icon: Mic, title: hi ? 'बोलकर चलाओ' : 'Voice Control', desc: hi ? 'गीले हाथ? बस बोलिए' : 'Muddy hands? Just speak', color: 'bg-violet-100 text-violet-700' },
+  ];
+
   return (
-    <div className="min-h-dvh bg-[#f4f7f5] text-zinc-900 font-sans flex flex-col">
-      <header className="px-4 sm:px-6 py-3.5 sm:py-4 flex justify-between items-center gap-3 border-b border-zinc-200 bg-white">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm">
-            <Leaf className="w-5 h-5" />
+    <div className="min-h-dvh flex flex-col font-sans text-zinc-900"
+      style={{ background: 'linear-gradient(175deg, #f0fdf4 0%, #f4f7f5 40%, #ecfdf5 100%)' }}>
+
+      {/* top bar */}
+      <header className="px-5 pt-12 pb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-green-700 text-white shadow-md shadow-emerald-200">
+            <Leaf className="w-6 h-6" strokeWidth={2.4} />
           </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-lg sm:text-xl font-black text-emerald-700 tracking-tight leading-none">AgriPulse AI</h1>
-            <p className="hidden truncate text-[11px] text-zinc-500 sm:block">{selectedLang === 'hi' ? 'स्मार्ट फसल देखभाल' : 'Smart Crop Care & Market Copilot'}</p>
+          <div>
+            <h1 className="text-lg font-black text-emerald-800 leading-none tracking-tight">AgriPulse AI</h1>
+            <p className="text-[11px] font-bold text-zinc-500 mt-0.5">{hi ? 'किसान का अपना ऐप' : 'The farmer’s own app'}</p>
           </div>
         </div>
         <button
-          onClick={() => setShowAuth(true)}
-          className="h-11 px-5 bg-emerald-500 text-white font-black rounded-xl hover:bg-emerald-600 transition-colors active:scale-95 shrink-0"
+          onClick={() => setSelectedLang(hi ? 'en' : 'hi')}
+          className="flex items-center gap-1.5 h-10 px-3.5 rounded-xl bg-white border border-zinc-200 text-xs font-black text-zinc-700 shadow-sm active:scale-95"
         >
-          {selectedLang === 'hi' ? 'लॉगिन' : 'Login'}
+          <Languages className="w-4 h-4 text-emerald-600" /> {hi ? 'EN' : 'हिंदी'}
         </button>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-10 sm:py-16 text-center">
-        <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 text-emerald-800 px-3 py-1.5 text-[11px] sm:text-xs font-bold">
-            <WifiOff className="w-3.5 h-3.5" />
-            {selectedLang === 'hi' ? '100% ऑफलाइन काम करता है' : 'Works 100% offline'}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-100 text-sky-800 px-3 py-1.5 text-[11px] sm:text-xs font-bold">
-            <Languages className="w-3.5 h-3.5" />
-            22 {selectedLang === 'hi' ? 'भाषाएं' : 'Languages'}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 text-amber-800 px-3 py-1.5 text-[11px] sm:text-xs font-bold">
-            <Sparkles className="w-3.5 h-3.5" />
-            No app install needed
-          </span>
+      {/* hero */}
+      <main className="flex-1 flex flex-col px-5 pt-6">
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <h2 className="text-[34px] leading-[1.12] font-black tracking-tight">
+            {hi ? <>फसल भी,<br /><span className="text-emerald-600">भाव भी।</span></> : <>Grow more.<br /><span className="text-emerald-600">Earn more.</span></>}
+          </h2>
+          <p className="mt-3 text-[15px] font-medium text-zinc-600 leading-relaxed max-w-[300px]">
+            {hi
+              ? 'बीमारी की जांच, सही दवा, मंडी भाव और बिना बिचौलिए की बिक्री — सब एक ऐप में, आपकी भाषा में।'
+              : 'Disease check, right medicine, mandi prices and middleman-free selling — one app, in your language.'}
+          </p>
+        </motion.div>
+
+        {/* feature tiles */}
+        <div className="mt-7 grid grid-cols-2 gap-3">
+          {features.map((f, i) => (
+            <motion.div key={f.title} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 + i * 0.08 }}
+              className="p-4 rounded-2xl bg-white border border-zinc-100 shadow-sm">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2.5 ${f.color}`}>
+                <f.icon className="w-5 h-5" strokeWidth={2.4} />
+              </div>
+              <div className="text-[14px] font-black leading-tight">{f.title}</div>
+              <div className="text-[11px] font-bold text-zinc-500 mt-1 leading-snug">{f.desc}</div>
+            </motion.div>
+          ))}
         </div>
 
-        <h2 className="text-[clamp(2rem,7vw,3.9rem)] font-black text-zinc-900 mb-4 sm:mb-6 leading-[1.1] tracking-tight">
-          Smart Crop Care & <span className="text-emerald-600">Market Copilot</span>
-        </h2>
-        <p className="text-base sm:text-lg md:text-xl text-zinc-600 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed">
-          Built for farmers. Works 100% offline with zero latency. Secure, hands-free, and available in your local language.
-        </p>
-
-        <button
-          onClick={() => setShowAuth(true)}
-          className="flex items-center gap-2.5 px-8 py-4 bg-zinc-900 text-white rounded-2xl text-base sm:text-lg font-bold hover:scale-[1.03] transition-transform shadow-xl mb-14 sm:mb-20 active:scale-95"
-        >
-          {selectedLang === 'hi' ? 'मुफ्त में शुरू करें' : 'Get Started for Free'} <ArrowRight className="w-5 h-5" />
-        </button>
-
-        <div className="grid md:grid-cols-3 gap-4 sm:gap-6 w-full text-left">
-          <div className="p-5 sm:p-6 bg-white rounded-2xl shadow-sm border border-zinc-100 hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-4">
-              <Scan className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold mb-2">Cloud + On-Device AI</h3>
-            <p className="text-zinc-600 text-sm leading-relaxed">
-              Crop photos can use our connected cloud AI endpoint, with on-device analysis available as an offline fallback.
-            </p>
-          </div>
-
-          <div className="p-5 sm:p-6 bg-white rounded-2xl shadow-sm border border-zinc-100 hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-4">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold mb-2">Pesticide Verification</h3>
-            <p className="text-zinc-600 text-sm leading-relaxed">
-              Scan supply chain barcodes to detect counterfeit pesticides before you buy. Protect your crops and your investment.
-            </p>
-          </div>
-
-          <div className="p-5 sm:p-6 bg-white rounded-2xl shadow-sm border border-zinc-100 hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-4">
-              <Mic className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg sm:text-xl font-bold mb-2">Hands-Free Voice Copilot</h3>
-            <p className="text-zinc-600 text-sm leading-relaxed">
-              Muddy hands? Kisan Sahayak acts as your voice copilot to navigate the app and fetch market rates using natural language.
-            </p>
-          </div>
-        </div>
+        {/* trust strip */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+          className="mt-5 flex items-center justify-center gap-4 text-[11px] font-black text-zinc-500">
+          <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> {hi ? '100% ऑफलाइन' : '100% offline'}</span>
+          <span>•</span>
+          <span>{hi ? '23 भाषाएं' : '23 languages'}</span>
+          <span>•</span>
+          <span>{hi ? 'मुफ्त' : 'Free forever'}</span>
+        </motion.div>
       </main>
 
-      <footer className="text-center py-5 sm:py-6 text-zinc-500 text-xs sm:text-sm font-medium border-t border-zinc-200 pb-safe px-4">
-        AgriPulse AI • Built for Farmers • Zero Network Overhead
+      {/* CTA */}
+      <footer className="px-5 pb-10 pt-4">
+        <motion.button initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+          onClick={() => setShowAuth(true)}
+          className="w-full min-h-[60px] rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white text-lg font-black flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-200 active:scale-[0.98] transition-transform"
+        >
+          {hi ? 'शुरू करें' : 'Get Started'} <ArrowRight className="w-5 h-5" strokeWidth={2.6} />
+        </motion.button>
+        <p className="text-center text-[11px] font-bold text-zinc-400 mt-3">
+          {hi ? 'मोबाइल नंबर से 30 सेकंड में लॉगिन' : 'Login with mobile number in 30 seconds'}
+        </p>
       </footer>
     </div>
   );
