@@ -197,6 +197,57 @@ export async function serverVerifyOtp(mobile, code, token) {
   }
 }
 
+// ── real Google sign-in (server route /api/google) ───────────────────────────
+//
+// Google Identity Services returns an RS256 ID-token JWT in the browser; it is
+// verified SERVER-SIDE (/api/google) against Google's public keys. Only the
+// verified profile reaches the app. Without GOOGLE_CLIENT_ID configured the
+// route answers configured:false and the login keeps the demo button.
+
+export async function fetchGoogleConfig() {
+  try {
+    const res = await fetch('/api/google');
+    return await res.json();
+  } catch {
+    return { ok: false, configured: false };
+  }
+}
+
+export async function serverVerifyGoogle(credential) {
+  try {
+    const res = await fetch('/api/google', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ credential }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'offline' };
+  }
+}
+
+// Google profiles are keyed by the stable Google subject id (payload.sub),
+// independent of the mobile-number-keyed farmer records.
+export function upsertGoogleUser({ sub, name, email, picture }) {
+  const users = readJson(USERS_KEY, {});
+  const key = `google:${sub}`;
+  const prev = users[key] || {};
+  users[key] = {
+    ...prev,
+    name: name || prev.name || 'Google User',
+    email: email || prev.email || '',
+    picture: picture || prev.picture || '',
+    googleSub: sub,
+    mobile: prev.mobile || '',
+    village: prev.village || '',
+    state: prev.state || 'Karnataka',
+    createdAt: prev.createdAt || Date.now(),
+    lastLoginAt: Date.now(),
+  };
+  writeJson(USERS_KEY, users);
+  return users[key];
+}
+
 // ── TOTP two-factor (Google Authenticator) ───────────────────────────────────
 //
 // Enrollment: a fresh base32 secret is generated per user, shown as a QR
@@ -257,6 +308,7 @@ export function saveSession(user) {
     email: user.email || '',
     authProvider: user.authProvider || 'phone-demo',
     twoFactor: user.totp?.secret ? 'totp' : '',
+    picture: user.picture || '',
     village: user.village || '',
     state: user.state || 'Karnataka',
     loginAt: Date.now(),
