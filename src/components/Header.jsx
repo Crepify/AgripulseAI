@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wifi, WifiOff, Mic, Sun, Moon, Hand, Download, Globe, LogOut } from 'lucide-react';
+import { Wifi, WifiOff, Mic, Sun, Moon, Hand, Download, Globe, LogOut, Eye } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
 
@@ -16,6 +16,8 @@ export default function Header({
   setIsHandsFree,
   user,
   onLogout,
+  isLowLiteracy,
+  setIsLowLiteracy,
 }) {
   const t = T[selectedLang] || T['en'];
 
@@ -25,16 +27,24 @@ export default function Header({
     { code: 'ta', label: 'தமிழ்' },
     { code: 'te', label: 'తెలుగు' },
     { code: 'kn', label: 'ಕನ್ನಡ' },
+    { code: 'ml', label: 'മലയാളം' },
     { code: 'mr', label: 'मराठी' },
     { code: 'pa', label: 'ਪੰਜਾਬੀ' },
     { code: 'bn', label: 'বাংলা' },
     { code: 'gu', label: 'ગુજરાતી' },
     { code: 'or', label: 'ଓଡ଼ିଆ' },
-    { code: 'ml', label: 'മലയാളം' },
     { code: 'as', label: 'অসমীয়া' },
     { code: 'mai', label: 'मैथिली' },
     { code: 'sat', label: 'ᱥᱟᱱᱛᱟᱲᱤ' },
-    { code: 'ks', label: 'کأشُر' },
+    { code: 'ks', label: 'کٲشُر' },
+    { code: 'brx', label: 'बड़ो' },
+    { code: 'doi', label: 'डोगरी' },
+    { code: 'kok', label: 'कोंकणी' },
+    { code: 'mni', label: 'মৈতৈলোন্' },
+    { code: 'ne', label: 'नेपाली' },
+    { code: 'sa', label: 'संस्कृत' },
+    { code: 'sd', label: 'سنڌي' },
+    { code: 'ur', label: 'اردو' },
   ];
 
   return (
@@ -132,6 +142,22 @@ export default function Header({
             aria-label="Sunlight High-Contrast Mode"
           >
             {isSunlightMode ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3 text-amber-400" />}
+          </button>
+
+          {/* Low Literacy Big Icon Toggle */}
+          <button
+            onClick={() => { sound.playClick(); setIsLowLiteracy(!isLowLiteracy); }}
+            className={`p-1.5 sm:px-2 sm:py-1.5 rounded-xl text-xs font-black border transition-all ${
+              isLowLiteracy
+                ? 'bg-blue-500 text-white border-blue-400 shadow-sm animate-pulse'
+                : isSunlightMode
+                  ? 'bg-zinc-100 text-zinc-700 border-zinc-300'
+                  : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+            }`}
+            title={isLowLiteracy ? 'Simple Big Icons ON' : 'Simple Big Icons'}
+            aria-label="Low Literacy Mode"
+          >
+            <Eye className={`w-3 h-3 ${isLowLiteracy ? 'text-white' : 'text-blue-400'}`} />
           </button>
 
           {/* Offline Toggle */}

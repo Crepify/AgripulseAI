@@ -352,16 +352,17 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
 
   return (
     <div className="w-full space-y-6">
-      {/* Clean minimal top bar */}
-      <div className={`p-2.5 rounded-2xl border flex items-center justify-between gap-2 ${isSunlightMode ? 'bg-white border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
+      {/* Top automation bar */}
+      <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-2 text-xs ${isSunlightMode ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300'}`}>
         <div className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-full bg-emerald-500 text-black flex items-center justify-center font-black text-xs">🌱</span>
-          <span className="font-black text-xs">{mixingAcres} acre • Auto-saved</span>
-          {stats && <span className="px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold border">{stats.count}x {stats.crop}</span>}
+          <Sparkles className="w-4 h-4 text-emerald-500" />
+          <span className="font-bold">Farmer-First: Auto land size, blur check, history, one-tap share</span>
+          {stats && <span className="px-2 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-black">{stats.crop}: {stats.count}x scanned</span>}
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={()=>setIsLowLiteracy(true)} title="Big buttons" className="w-8 h-8 rounded-full bg-amber-400 text-black flex items-center justify-center"><Eye className="w-4 h-4" /></button>
-          <button onClick={()=>setShowHistory(!showHistory)} className="w-8 h-8 rounded-full bg-zinc-800 text-white flex items-center justify-center"><History className="w-4 h-4" /></button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={()=>setIsLowLiteracy(true)} className="px-2.5 py-1 rounded-lg bg-amber-500 text-black font-black text-[10px] flex items-center gap-1"><Eye className="w-3 h-3" /> Simple Mode</button>
+          <button onClick={()=>setMultiCropMode(!multiCropMode)} className={`px-2.5 py-1 rounded-lg font-black text-[10px] border ${multiCropMode ? 'bg-emerald-500 text-black border-emerald-300' : isSunlightMode ? 'bg-white border-zinc-300' : 'bg-zinc-800 border-zinc-700'}`}>Multi-Crop: {multiCropMode ? 'ON' : 'OFF'}</button>
+          <button onClick={()=>setShowHistory(!showHistory)} className="px-2.5 py-1 rounded-lg bg-zinc-800 text-white font-black text-[10px] flex items-center gap-1"><History className="w-3 h-3" /> History</button>
         </div>
       </div>
 

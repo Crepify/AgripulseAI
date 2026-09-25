@@ -65,11 +65,30 @@ function cacheGetFresh(key, ttl) {
 //  MANDI PRICE API
 // ═════════════════════════════════════════════════════════════════════════════
 
-export const FALLBACK_STATES = ['Maharashtra', 'Uttar Pradesh', 'Punjab', 'Madhya Pradesh', 'Karnataka'];
+export const FALLBACK_STATES = [
+  'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh',
+  'Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Manipur','Meghalaya','Mizoram','Nagaland',
+  'Odisha','Punjab','Rajasthan','Sikkim','Tamil Nadu','Telangana','Tripura','Uttar Pradesh','Uttarakhand',
+  'West Bengal','Delhi','Jammu and Kashmir','Ladakh','Puducherry','Chandigarh','Andaman and Nicobar Islands',
+  'Dadra and Nagar Haveli and Daman and Diu','Lakshadweep'
+];
+
+export const ALL_INDIAN_STATES = [...FALLBACK_STATES];
+
+export const STATE_CODE_MAP = {
+  'Andhra Pradesh': 'AP','Arunachal Pradesh': 'AR','Assam': 'AS','Bihar': 'BR','Chhattisgarh': 'CG','Goa': 'GA',
+  'Gujarat': 'GJ','Haryana': 'HR','Himachal Pradesh': 'HP','Jharkhand': 'JH','Karnataka': 'KA','Kerala': 'KL',
+  'Madhya Pradesh': 'MP','Maharashtra': 'MH','Manipur': 'MN','Meghalaya': 'ML','Mizoram': 'MZ','Nagaland': 'NL',
+  'Odisha': 'OR','Punjab': 'PB','Rajasthan': 'RJ','Sikkim': 'SK','Tamil Nadu': 'TN','Telangana': 'TS',
+  'Tripura': 'TR','Uttar Pradesh': 'UP','Uttarakhand': 'UK','West Bengal': 'WB','Delhi': 'DL',
+  'Jammu and Kashmir': 'JK','Ladakh': 'LA','Puducherry': 'PY','Chandigarh': 'CH'
+};
 
 export const COMMON_COMMODITIES = [
   'Onion', 'Tomato', 'Potato', 'Wheat', 'Rice', 'Maize', 'Cotton',
   'Soyabean', 'Gram', 'Bajra', 'Jowar', 'Sugarcane', 'Groundnut', 'Turmeric',
+  'Mustard','Moong','Urad','Masoor','Arhar','Sunflower','Sesame','Barley',
+  'Ragi','Coconut','Chilli','Garlic','Ginger','Mango','Banana','Apple',
 ];
 
 export async function getMandiStates() {
@@ -174,7 +193,7 @@ function isValidCachedRow(row) {
   return Boolean(
     String(row.state || '').trim() && String(row.market || '').trim() && String(row.crop || '').trim()
     && isValidMandiDate(normalizeMandiDate(row.date)) && min != null && max != null && modal != null
-    && min > 0 && min <= max && max > 1_000_000 && modal > 0 && modal >= min && modal <= max,
+    && min > 0 && min <= max && max <= 1_000_000 && modal > 0 && modal >= min && modal <= max,
   );
 }
 
@@ -477,6 +496,96 @@ export async function getIndiaWeather(city = 'Mandya') {
     const stale = cacheGet(cacheKey);
     if (stale) return { ...stale.value, live: false, stale: true, error: err.message };
     return { ...simulatedWeather(city), error: err.message, failedLive: true };
+  }
+}
+
+// ── auto-location for farmer-first automation ────────────────────────────────
+
+function roughStateFromLatLon(lat, lon) {
+  // Very rough bounding boxes for demo — good enough to auto-select state
+  if (lat >= 32) return lat > 34 ? 'Jammu and Kashmir' : 'Punjab';
+  if (lat >= 29) {
+    if (lon < 77) return 'Haryana';
+    if (lon < 80) return 'Uttar Pradesh';
+    return 'Uttarakhand';
+  }
+  if (lat >= 26) {
+    if (lon < 73) return 'Rajasthan';
+    if (lon < 77) return 'Haryana';
+    if (lon < 85) return 'Bihar';
+    if (lon >= 88) return 'Assam';
+    return 'Uttar Pradesh';
+  }
+  if (lat >= 22) {
+    if (lon < 72) return 'Gujarat';
+    if (lon < 76) return 'Madhya Pradesh';
+    if (lon < 81) return 'Maharashtra';
+    if (lon < 86) return 'Chhattisgarh';
+    return 'West Bengal';
+  }
+  if (lat >= 18) {
+    if (lon < 76) return 'Maharashtra';
+    if (lon < 80) return 'Karnataka';
+    if (lon < 84) return 'Telangana';
+    return 'Odisha';
+  }
+  if (lat >= 14) {
+    if (lon < 77) return 'Karnataka';
+    return 'Andhra Pradesh';
+  }
+  if (lat >= 10) return 'Tamil Nadu';
+  return 'Kerala';
+}
+
+export async function detectUserState() {
+  const cacheKey = 'ap_cache_detected_state';
+  const fresh = cacheGetFresh(cacheKey, 6 * 60 * 60 * 1000);
+  if (fresh) return fresh;
+
+  if (!navigator.geolocation) throw new Error('Geolocation not supported');
+
+  const pos = await new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: false,
+      timeout: 8000,
+      maximumAge: 600000,
+    });
+  });
+
+  const { latitude, longitude } = pos.coords;
+  let detectedState = roughStateFromLatLon(latitude, longitude);
+  let detectedCity = null;
+
+  // Try reverse geocode if online for better accuracy
+  if (navigator.onLine) {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`, {
+        headers: { Accept: 'application/json' },
+      });
+      const json = await res.json();
+      const city = json?.address?.city || json?.address?.town || json?.address?.village || json?.address?.county || null;
+      const state = json?.address?.state || '';
+      if (city) detectedCity = city;
+      if (state) {
+        const matched = ALL_INDIAN_STATES.find(s => s.toLowerCase() === state.toLowerCase() || state.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(state.toLowerCase()));
+        if (matched) detectedState = matched;
+      }
+    } catch {
+      // keep rough guess
+    }
+  }
+
+  const result = { state: detectedState, city: detectedCity, lat: latitude, lon: longitude, at: Date.now() };
+  cacheSet(cacheKey, result);
+  return result;
+}
+
+export async function detectUserLocation() {
+  try {
+    const r = await detectUserState();
+    return r;
+  } catch {
+    return null;
   }
 }
 
