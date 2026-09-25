@@ -470,8 +470,8 @@ const LANG_SWITCH_NAMES = {
   en: ['english', 'angrezi', 'angreji', 'अंग्रेज़ी', 'अंग्रेजी', 'इंग्लिश', 'ஆங்கில', 'ఇంగ్లీష్', 'ಇಂಗ್ಲಿಷ್'],
   hi: ['hindi', 'हिंदी'],
   ta: ['tamil', 'tamizh', 'तमिल', 'தமிழ'],
-  te: ['telugu', 'तेलुगु', 'తెలుగు'],
-  kn: ['kannada', 'कन्नड', 'ಕನ್ನಡ'],
+  te: ['telugu', 'तेलुगु', 'टेलुगु', 'తెలుగు'],
+  kn: ['kannada', 'कन्नड', 'कन्नड़', 'ಕನ್ನಡ'],
   mr: ['marathi', 'मराठी'],
 };
 const LANG_SWITCH_VERBS = [
@@ -479,6 +479,7 @@ const LANG_SWITCH_VERBS = [
   'say', 'karo', 'करो', 'badlo', 'बदलो', 'change', 'switch', 'baat', 'बात',
   'kaho', 'कहो', 'samjhao', 'समझाओ', 'explain', 'பேசு', 'சொல்லு',
   'చెప్పు', 'చెప్పండి', 'ಹೇಳು', 'ಹೇಳಿ',
+  'चेंज', 'स्विच', 'बदल', 'बोलिए', 'switch to', 'change to',
 ];
 
 export function matchLangSwitch(q, currentLang) {
@@ -492,6 +493,40 @@ export function matchLangSwitch(q, currentLang) {
     if (lang === currentLang) continue;
     if (names.some((n) => s.includes(n.toLowerCase()))) return lang;
   }
+  return null;
+}
+
+// The farmer may just SPEAK English (or another supported language) without
+// any switch command — the guide should talk back the way they talk. Script
+// detection covers Indic languages; a Latin transcript with genuinely
+// English words (and no romanized Hindi) switches to English. Weak words
+// ("yes"/"ok" — used by everyone) never trigger a switch on their own.
+const STRONG_ENGLISH = new Set([
+  'stop', 'continue', 'skip', 'repeat', 'again', 'english', 'speak', 'talk',
+  'change', 'switch', 'please', 'want', 'hear', 'listen', 'show', 'open',
+  'tell', 'what', 'how', 'when', 'where', 'which', 'why', 'next', 'service',
+  'read', 'start', 'explain', 'another', 'app', 'price', 'prices',
+]);
+const ROMANIZED_HINDI = new Set([
+  'haan', 'han', 'nahi', 'nahin', 'bas', 'ruk', 'rukho', 'bolo', 'bol',
+  'dikhao', 'dikha', 'chal', 'karo', 'kijiye', 'suniye', 'kya', 'aur',
+  'mein', 'seva', 'bhaav', 'daam', 'kitna', 'kaise', 'kab', 'kahan', 'nahi',
+]);
+
+export function detectSpokenLanguage(q, currentLang) {
+  const s = String(q || '').trim();
+  if (!s || s.length < 2) return null;
+  if (/[஀-௿]/.test(s)) return currentLang === 'ta' ? null : 'ta';
+  if (/[ఀ-౿]/.test(s)) return currentLang === 'te' ? null : 'te';
+  if (/[ಀ-೿]/.test(s)) return currentLang === 'kn' ? null : 'kn';
+  if (/[ऀ-ॿ]/.test(s)) {
+    return (currentLang === 'hi' || currentLang === 'mr') ? null : 'hi';
+  }
+  if (currentLang === 'en') return null; // already English
+  const tokens = s.toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
+  if (!tokens.length) return null;
+  if (tokens.some((t) => ROMANIZED_HINDI.has(t))) return null; // romanized Hindi
+  if (tokens.some((t) => STRONG_ENGLISH.has(t))) return 'en';
   return null;
 }
 
@@ -753,7 +788,7 @@ export class VoiceGuide {
   // third listening cycle during a pending question listens in en-IN.
   _listenLangCode() {
     this._listenCycle++;
-    if (this.lang !== 'en' && this._ackWaiter && (this._listenCycle % 3) === 0) return 'en-IN';
+    if (this.lang !== 'en' && (this._listenCycle % 3) === 0) return 'en-IN';
     return `${this.lang}-IN`;
   }
 
@@ -801,9 +836,10 @@ export class VoiceGuide {
       return;
     }
 
-    // Explicit language request ("English mein bolo") — works any time. The
-    // guide keeps speaking its regional language until the farmer asks.
-    const switchTo = matchLangSwitch(q, this.lang);
+    // Explicit request ("English mein bolo" / "change to english") or simply
+    // SPEAKING English ("show mandi prices") — the guide talks back the way
+    // the farmer talks, switching immediately.
+    const switchTo = matchLangSwitch(q, this.lang) || detectSpokenLanguage(q, this.lang);
     if (switchTo) {
       const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
       this._ackWaiter = null;
@@ -862,16 +898,19 @@ export class VoiceGuide {
       // re-read per iteration — the farmer may switch language mid-tour
       const L = this.script();
       const vi = this._voiceInfo();
-      let line;
+      let name, desc;
       if (vi && vi.isNative) {
-        line = `${L.services[i][0]}. ${L.services[i][1]}`;
+        [name, desc] = L.services[i];
       } else if (PHON[this.lang] && PHON[this.lang].services && PHON[this.lang].services[i]) {
-        const [pn, pd] = PHON[this.lang].services[i];
-        line = `${pn}. ${pd}`;
+        [name, desc] = PHON[this.lang].services[i];
       } else {
-        line = `${S.en.services[i][0]}. ${S.en.services[i][1]}`;
+        [name, desc] = S.en.services[i];
       }
-      await this.say(line);
+      // The option's NAME first — clearly, unhurried — then a natural beat,
+      // then its explanation. One run-on sentence was hard to follow.
+      await this.say(name);
+      if (!this._tourRunning) return;
+      await this.say(desc);
       if (!this._tourRunning) return;
       // Silence or anything unclear → continue at their pace; the 5s cap
       // keeps the tour alive instead of 16s of dead air that feels like
