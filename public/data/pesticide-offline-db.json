@@ -1,0 +1,129 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2026-09-25",
+  "source": "AgriPulse Offline Price Book — works 100% offline, no Google needed",
+  "products": [
+    {
+      "id": "upl-saaf",
+      "name": "UPL SAAF Fungicide",
+      "localName": "साफ फफूंदनाशक",
+      "composition": "Carbendazim 12% + Mancozeb 63% WP",
+      "category": "Fungicide",
+      "crops": ["Tomato", "Potato", "Rice", "Wheat", "Chilli"],
+      "mrp": "₹480",
+      "mrpRange": "₹50-₹500",
+      "manufacturer": "UPL Ltd.",
+      "cibrc": "Verified — SAAF-2025",
+      "hologram": "UPL-HOLO-VERIFY",
+      "prices": [
+        { "store": "BigHaat", "price": "₹102", "extracted_price": 102, "variant": "100 Gms", "url": "https://www.bighaat.com/products/saaf-fungicide", "delivery": "Free delivery", "rating": "4.5 ★", "inStock": true, "offline": true },
+        { "store": "BigHaat", "price": "₹50", "extracted_price": 50, "variant": "20 Gram", "url": "https://www.bighaat.com/products/saaf-fungicide", "delivery": "Free delivery", "rating": "4.6 ★ (8)", "inStock": true, "offline": true },
+        { "store": "Amazon.in", "price": "₹134", "extracted_price": 134, "variant": "100 Gms", "url": "https://www.amazon.in/s?k=SAAF+Fungicide", "delivery": "Free delivery", "rating": "4.2 ★", "inStock": true, "offline": true },
+        { "store": "AgriBegri", "price": "₹450", "extracted_price": 450, "variant": "250 Gms", "url": "https://www.agribegri.com", "delivery": "7-day returns", "rating": "4.8 ★ (12)", "inStock": true, "offline": true },
+        { "store": "Local Dealer", "price": "₹95-₹110", "extracted_price": 102, "variant": "100 Gms Mandi Avg", "url": "#", "delivery": "Delhi/Punjab/UP Mandi", "rating": "Mandi Rate", "inStock": true, "offline": true }
+      ],
+      "keywords": ["saaf", "upl", "carbendazim", "mancozeb", "fungicide", "साफ", "फफूंद", "shopping"],
+      "fakeAlert": false
+    },
+    {
+      "id": "bayer-folicur",
+      "name": "Bayer Folicur",
+      "localName": "फोलिक्योर",
+      "composition": "Tebuconazole 25.9% EC",
+      "category": "Fungicide",
+      "crops": ["Wheat", "Rice", "Chilli", "Groundnut"],
+      "mrp": "₹840",
+      "mrpRange": "₹800-₹900",
+      "manufacturer": "Bayer CropScience Ltd.",
+      "cibrc": "BAY-2026-X8912 Verified",
+      "hologram": "BAYER-HOLO-2026",
+      "prices": [
+        { "store": "BigHaat", "price": "₹840", "extracted_price": 840, "variant": "250 ml", "url": "https://www.bighaat.com/products/bayer-folicur", "delivery": "Free delivery", "rating": "4.7 ★", "inStock": true, "offline": true },
+        { "store": "Amazon.in", "price": "₹890", "extracted_price": 890, "variant": "250 ml", "url": "https://www.amazon.in/s?k=Bayer+Folicur", "delivery": "Free delivery", "rating": "4.5 ★", "inStock": true, "offline": true },
+        { "store": "AgriBegri", "price": "₹820", "extracted_price": 820, "variant": "250 ml", "url": "https://www.agribegri.com", "delivery": "Free delivery", "rating": "4.6 ★", "inStock": true, "offline": true },
+        { "store": "Local Dealer", "price": "₹800-₹890", "extracted_price": 845, "variant": "250 ml Mandi", "url": "#", "delivery": "All India Avg", "rating": "Mandi", "inStock": true, "offline": true }
+      ],
+      "keywords": ["bayer", "folicur", "tebuconazole", "फोलिक्योर", "fungicide"],
+      "fakeAlert": false
+    },
+    {
+      "id": "syngenta-amistar",
+      "name": "Syngenta Amistar Top",
+      "localName": "अमिस्टार टॉप",
+      "composition": "Azoxystrobin 18.2% + Difenoconazole 11.4% SC",
+      "category": "Fungicide",
+      "crops": ["Rice", "Tomato", "Chilli", "Onion"],
+      "mrp": "₹1,250",
+      "mrpRange": "₹1,180-₹1,320",
+      "manufacturer": "Syngenta India Ltd.",
+      "cibrc": "SYN-2025-A4401 Verified",
+      "hologram": "SYN-HOLO-2025",
+      "prices": [
+        { "store": "BigHaat", "price": "₹1,250", "extracted_price": 1250, "variant": "200 ml", "url": "https://www.bighaat.com/products/syngenta-amistar-top", "delivery": "Free delivery", "rating": "4.8 ★", "inStock": true, "offline": true },
+        { "store": "Amazon.in", "price": "₹1,320", "extracted_price": 1320, "variant": "200 ml", "url": "https://www.amazon.in/s?k=Syngenta+Amistar+Top", "delivery": "Free delivery", "rating": "4.6 ★", "inStock": true, "offline": true },
+        { "store": "AgriBegri", "price": "₹1,200", "extracted_price": 1200, "variant": "200 ml", "url": "https://www.agribegri.com", "delivery": "Free delivery", "rating": "4.7 ★", "inStock": true, "offline": true },
+        { "store": "Local Dealer", "price": "₹1,200-₹1,320", "extracted_price": 1260, "variant": "Mandi + Retail", "url": "#", "delivery": "Mandi Avg", "rating": "Mandi", "inStock": true, "offline": true }
+      ],
+      "keywords": ["syngenta", "amistar", "azoxystrobin", "difenoconazole", "अमिस्टार"],
+      "fakeAlert": false
+    },
+    {
+      "id": "neem-oil",
+      "name": "Neem Oil Organic",
+      "localName": "नीम तेल",
+      "composition": "Azadirachtin 0.15% + Neem Oil 100%",
+      "category": "Bio-Pesticide",
+      "crops": ["All Crops", "Vegetables", "Fruits"],
+      "mrp": "₹250",
+      "mrpRange": "₹240-₹300",
+      "manufacturer": "Organic Certified",
+      "cibrc": "Bio-Product Verified",
+      "hologram": "ORGANIC-VERIFY",
+      "prices": [
+        { "store": "BigHaat", "price": "₹249", "extracted_price": 249, "variant": "100 ml", "url": "https://www.bighaat.com", "delivery": "Free delivery", "rating": "4.4 ★", "inStock": true, "offline": true },
+        { "store": "Amazon.in", "price": "₹280", "extracted_price": 280, "variant": "250 ml", "url": "https://www.amazon.in/s?k=Neem+Oil", "delivery": "Free delivery", "rating": "4.3 ★", "inStock": true, "offline": true },
+        { "store": "Local Dealer", "price": "₹240-₹260", "extracted_price": 250, "variant": "Organic Market", "url": "#", "delivery": "Organic Mandi", "rating": "Organic", "inStock": true, "offline": true }
+      ],
+      "keywords": ["neem", "oil", "organic", "bio", "नीम", "तेल", "azadirachtin"],
+      "fakeAlert": false
+    },
+    {
+      "id": "confidor",
+      "name": "Bayer Confidor",
+      "localName": "कॉन्फिडोर",
+      "composition": "Imidacloprid 17.8% SL",
+      "category": "Insecticide",
+      "crops": ["Cotton", "Rice", "Chilli", "Vegetables"],
+      "mrp": "₹400",
+      "mrpRange": "₹350-₹450",
+      "manufacturer": "Bayer CropScience",
+      "cibrc": "Verified",
+      "hologram": "BAYER-CONF-VERIFY",
+      "prices": [
+        { "store": "BigHaat", "price": "₹392", "extracted_price": 392, "variant": "100 ml", "url": "https://www.bighaat.com", "delivery": "Free delivery", "rating": "4.4 ★", "inStock": true, "offline": true },
+        { "store": "AgriBegri", "price": "₹410", "extracted_price": 410, "variant": "100 ml", "url": "https://www.agribegri.com", "delivery": "Free delivery", "rating": "4.5 ★", "inStock": true, "offline": true }
+      ],
+      "keywords": ["confidor", "imidacloprid", "bayer", "insecticide"],
+      "fakeAlert": false
+    },
+    {
+      "id": "supercrop-500",
+      "name": "SuperCrop 500 (FAKE TRAP - DO NOT BUY)",
+      "localName": "नकली सुपरक्रॉप",
+      "composition": "Unregistered - No CIB&RC",
+      "category": "FAKE",
+      "crops": ["None - Fake"],
+      "mrp": "₹350 (FAKE - Below market)",
+      "mrpRange": "Fake trap",
+      "manufacturer": "Unregistered Generic Entity",
+      "cibrc": "NOT FOUND - FAKE",
+      "hologram": "INVALID",
+      "prices": [
+        { "store": "Unknown", "price": "₹350", "extracted_price": 350, "variant": "Fake - Below market", "url": "#", "delivery": "Suspicious", "rating": "1.2 ★", "inStock": false, "offline": true }
+      ],
+      "keywords": ["supercrop", "fake", "spurious", "nakli", "नकली", "duplicate"],
+      "fakeAlert": true,
+      "warning": "FAKE ALERT: MRP ₹350 is below genuine market. No CIB&RC registration. Do NOT buy."
+    }
+  ]
+}

@@ -35,18 +35,27 @@ class SpeechEngine {
     }
   }
 
+  // Cloud/neural voices (Google, Microsoft Natural, etc.) sound dramatically
+  // better than the first local voice in the list — prefer them when present.
+  static PREMIUM = /google|natural|neural|premium|enhanced|online/i;
+
   getBestVoice(langCode) {
     this.loadVoices();
     if (!this.voices || this.voices.length === 0) return null;
 
     const baseLang = langCode.split('-')[0].toLowerCase();
+    const pickBest = (list) => {
+      if (!list || list.length === 0) return null;
+      const premium = list.find(v => SpeechEngine.PREMIUM.test(v.name));
+      return premium || list[0];
+    };
 
     // 1. Exact match (e.g. 'hi-IN', 'ta-IN')
-    let matched = this.voices.find(v => v.lang.toLowerCase() === langCode.toLowerCase());
+    let matched = pickBest(this.voices.filter(v => v.lang.toLowerCase() === langCode.toLowerCase()));
     if (matched) return { voice: matched, isNative: true };
 
     // 2. Starts with base language (e.g. 'hi', 'ta', 'te', 'kn')
-    matched = this.voices.find(v => v.lang.toLowerCase().startsWith(baseLang));
+    matched = pickBest(this.voices.filter(v => v.lang.toLowerCase().startsWith(baseLang)));
     if (matched) return { voice: matched, isNative: true };
 
     // 3. Name contains language name (e.g. 'Google हिन्दी', 'Hindi', 'Lekha')
@@ -121,11 +130,17 @@ class SpeechEngine {
       };
 
       this.recognition.onresult = (event) => {
-        let transcript = '';
+        let final = '';
+        let interim = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          transcript += event.results[i][0].transcript;
+          const r = event.results[i];
+          if (r.isFinal) final += r[0].transcript;
+          else interim += r[0].transcript;
         }
-        if (onResult) onResult(transcript);
+        // FINAL results are the ones to act on — interim fragments from
+        // noise/echo used to phantom-trigger the guide (stray 'no' that
+        // killed the tour). Interim text still flows for live UI display.
+        if (onResult) onResult(final || interim, { final: !!final });
       };
 
       this.recognition.onend = () => {
@@ -138,7 +153,22 @@ class SpeechEngine {
         if (onError) onError(e.error);
       };
 
-      this.recognition.start();
+      // Chrome throws InvalidStateError if start() races a previous stop —
+      // abort and retry a couple of times instead of failing the whole
+      // listening session (rapid speak/listen cycles made this frequent).
+      const attemptStart = (retriesLeft) => {
+        try {
+          this.recognition.start();
+        } catch (err) {
+          if (retriesLeft > 0) {
+            try { this.recognition.abort(); } catch { /* wasn't running */ }
+            setTimeout(() => attemptStart(retriesLeft - 1), 350);
+            return;
+          }
+          throw err;
+        }
+      };
+      attemptStart(2);
     } catch (err) {
       this.isListening = false;
       if (onError) onError(err);
@@ -146,8 +176,11 @@ class SpeechEngine {
   }
 
   stopListening() {
-    if (this.recognition && this.isListening) {
-      this.recognition.stop();
+    // Always issue the stop: between start() and onstart firing, isListening
+    // is still false — skipping stop() there left the mic RUNNING (it then
+    // heard our own speech and phantom-triggered the guide).
+    if (this.recognition) {
+      try { this.recognition.stop(); } catch { /* wasn't started */ }
       this.isListening = false;
     }
   }

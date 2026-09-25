@@ -252,6 +252,90 @@ export function verifyOtp(mobile, code) {
   return { ok: false, error: 'wrong_code', attemptsLeft };
 }
 
+// ── real SMS OTP (server route /api/otp) ─────────────────────────────────────
+//
+// When the deployment has an SMS provider configured (Twilio / MSG91 /
+// Fast2SMS), the code is sent to the farmer's actual phone and NEVER shown
+// on the website. Without a provider the route answers not_configured and
+// the caller falls back to the on-screen demo OTP above.
+
+export async function serverSendOtp(mobile, token) {
+  try {
+    const res = await fetch('/api/otp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'send', mobile, token }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'offline' };
+  }
+}
+
+export async function serverVerifyOtp(mobile, code, token) {
+  try {
+    const res = await fetch('/api/otp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'verify', mobile, code, token }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'offline' };
+  }
+}
+
+// ── real Google sign-in (server route /api/google) ───────────────────────────
+//
+// Google Identity Services returns an RS256 ID-token JWT in the browser; it is
+// verified SERVER-SIDE (/api/google) against Google's public keys. Only the
+// verified profile reaches the app. Without GOOGLE_CLIENT_ID configured the
+// route answers configured:false and the login keeps the demo button.
+
+export async function fetchGoogleConfig() {
+  try {
+    const res = await fetch('/api/google');
+    return await res.json();
+  } catch {
+    return { ok: false, configured: false };
+  }
+}
+
+export async function serverVerifyGoogle(credential) {
+  try {
+    const res = await fetch('/api/google', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ credential }),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'offline' };
+  }
+}
+
+// Google profiles are keyed by the stable Google subject id (payload.sub),
+// independent of the mobile-number-keyed farmer records.
+export function upsertGoogleUser({ sub, name, email, picture }) {
+  const users = readJson(USERS_KEY, {});
+  const key = `google:${sub}`;
+  const prev = users[key] || {};
+  users[key] = {
+    ...prev,
+    name: name || prev.name || 'Google User',
+    email: email || prev.email || '',
+    picture: picture || prev.picture || '',
+    googleSub: sub,
+    mobile: prev.mobile || '',
+    village: prev.village || '',
+    state: prev.state || 'Karnataka',
+    createdAt: prev.createdAt || Date.now(),
+    lastLoginAt: Date.now(),
+  };
+  writeJson(USERS_KEY, users);
+  return users[key];
+}
+
 // ── Aadhaar OTP lifecycle (demo) ─────────────────────────────────────────────
 
 export function requestAadhaarOtp(aadhaar) {
@@ -319,8 +403,7 @@ export function verifyAadhaarOtp(aadhaar, code) {
     return { ok: false, error: 'max_attempts' };
   }
   writeJson(AADHAAR_OTP_KEY, { ...pending, attemptsLeft });
-  return { ok: false, error: 'wrong_code', attemptsLeft };
-}
+  return { ok: false, error: 'wrong_code', attemptsLeft };}
 
 // ── sessions ─────────────────────────────────────────────────────────────────
 
@@ -330,6 +413,7 @@ export function saveSession(user) {
     mobile: user.mobile || '',
     email: user.email || '',
     authProvider: user.authProvider || 'phone-demo',
+    picture: user.picture || '',
     village: user.village || '',
     state: user.state || 'Karnataka',
     aadhaar: user.aadhaar ? maskAadhaar(user.aadhaar) : '',

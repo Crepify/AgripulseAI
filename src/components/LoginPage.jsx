@@ -3,17 +3,38 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, KeyRound, ShieldCheck, Smartphone, MessageSquareText,
   RefreshCw, Timer, User, MapPin, AlertTriangle, CheckCircle2, Leaf,
-  Fingerprint, BadgeCheck, LocateFixed, Mic, MicOff,
-} from 'lucide-react';
+  Fingerprint, BadgeCheck, LocateFixed, Mic, MicOff, Volume2, HelpCircle,
+  ChevronDown, ArrowRight, X,} from 'lucide-react';
 import { sound } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
+import { voiceGuide, detectGuideLanguage, detectLanguageByLocation, savedLangPref } from '../utils/voiceGuide';
 import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, getUserByAadhaar, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
+  serverSendOtp, serverVerifyOtp, fetchGoogleConfig, serverVerifyGoogle,
+  upsertGoogleUser,
   OTP_RESEND_COOLDOWN_S,
   normalizeAadhaar, isValidAadhaar, formatAadhaar, maskAadhaar,
   requestAadhaarOtp, verifyAadhaarOtp, linkAadhaarToUser,
 } from '../utils/authService';
+// Voice guidance per step — Hindi carries a phonetic fallback so devices
+// without a native Devanagari voice still speak clearly.
+const VOICE = {
+  en: {
+    phone: 'Welcome to AgriPulse. Type your ten digit mobile number and press the green button. A six digit code will come on your phone.',
+    register: 'Please type your name and village. Then press continue.',
+    otp: 'Open the SMS on your phone and type the six digit code here.',
+    aadhaar: 'Type your twelve digit Aadhaar number, then verify with the OTP.',
+    success: 'You are logged in. Welcome!',
+  },
+  hi: {
+    phone: { devanagari: 'अग्रीपल्स में आपका स्वागत है। अपना दस अंकों का मोबाइल नंबर लिखें और हरे बटन को दबाएं। छह अंकों का कोड आपके फोन पर आ जाएगा।', phonetic: 'Agripulse mein aapka swagat hai. Apna das ankon ka mobile number likhein aur hare button ko dabayein. Chhah ankon ka code aapke phone par aa jayega.' },
+    register: { devanagari: 'कृपया अपना नाम और गांव लिखें। फिर आगे बढ़ें दबाएं।', phonetic: 'Kripya apna naam aur gaon likhein. Phir aage badhein dabayein.' },
+    otp: { devanagari: 'अपने फोन का SMS खोलें और छह अंकों का कोड यहां लिखें।', phonetic: 'Apne phone ka SMS kholein aur chhah ankon ka code yahan likhein.' },
+    aadhaar: { devanagari: 'अपना बारह अंकों का आधार नंबर लिखें, फिर OTP से सत्यापित करें।', phonetic: 'Apna barah ankon ka Aadhaar number likhein, phir OTP se satyapit karein.' },
+    success: { devanagari: 'आप लॉगिन हो गए हैं। स्वागत है!', phonetic: 'Aap login ho gaye hain. Swagat hai!' },
+  },
+};
 
 const INDIAN_STATES = [
   'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh',
@@ -31,8 +52,22 @@ const L = {
     phoneSub: 'Mobile OTP and Aadhaar verification are demo-only offline checks — no external SMS or UIDAI call is made in this prototype.',
     googleDemo: 'Continue with Google (Demo)',
     googleDemoNote: 'Demo only — no Google account is contacted.',
-    orMobile: 'or continue with mobile / Aadhaar',
-    phoneLabel: 'Mobile Number',
+    googleRealNote: 'Verified by Google — no password needed.',
+    googleVerified: 'Google account verified',
+    googleFailed: 'Google sign-in failed. Please try again.',
+    // Farmer guidance (voice + pictured help)
+    howTitle: 'How to login — 3 steps',
+    how1: 'Type your mobile number',
+    how2: 'Enter the 6-digit code from SMS',
+    how3: 'Add name & village — done!',
+    listenBtn: 'Listen',
+    helpBtn: 'How to use?',
+    helpTitle: 'Step-by-step help',
+    moreOptions: 'Other ways to sign in',
+    helpOtp: 'Type the 6-digit code you received by SMS.',
+    helpReg: 'Type your name and village — that is all we need.',
+    helpAadhaar: 'Type your 12-digit Aadhaar number and verify with the OTP.',
+    orMobile: 'or continue with mobile / Aadhaar',    phoneLabel: 'Mobile Number',
     phonePlaceholder: '98765 43210',
     phoneHint: '10-digit Indian mobile number',
     sendOtp: 'Send OTP',
@@ -50,6 +85,9 @@ const L = {
     otpTitle: 'Enter verification code',
     otpSub: 'OTP sent to',
     otpHint: 'The code is valid for 5 minutes.',
+    otpRealNote: 'Sent as a real SMS — check your phone’s messages.',
+    otpOffline: 'Network unavailable. Reconnect and try again.',
+    otpSendFailed: 'Could not send the SMS right now. Please try again.',
     smsBanner: 'SMS · AGRIPULSE',
     smsText: 'Your AgriPulse AI login OTP is',
     smsValid: 'Valid for 5 minutes. Do not share it with anyone.',
@@ -85,16 +123,29 @@ const L = {
     detectLocation: 'Auto-detect my state',
     detecting: 'Detecting…',
     locationDetected: 'Location detected',
-    locationFailed: 'Could not detect location — select manually',
-  },
+    locationFailed: 'Could not detect location — select manually',  },
   hi: {
     tagline: 'सुरक्षित किसान लॉगिन',
     phoneTitle: 'लॉगिन का तरीका चुनें',
     phoneSub: 'मोबाइल OTP और आधार सत्यापन इस प्रोटोटाइप में सिर्फ ऑफलाइन डेमो हैं — कोई बाहरी SMS या UIDAI कॉल नहीं होता।',
     googleDemo: 'Google से जारी रखें (डेमो)',
     googleDemoNote: 'सिर्फ डेमो — कोई Google खाता उपयोग नहीं होगा।',
-    orMobile: 'या मोबाइल / आधार से जारी रखें',
-    phoneLabel: 'मोबाइल नंबर',
+    googleRealNote: 'Google द्वारा सत्यापित — पासवर्ड की ज़रूरत नहीं।',
+    googleVerified: 'Google खाता सत्यापित',
+    googleFailed: 'Google साइन-इन विफल। दोबारा कोशिश करें।',
+    // किसान मार्गदर्शन (आवाज़ + चित्र सहायता)
+    howTitle: 'लॉगिन कैसे करें — 3 कदम',
+    how1: 'अपना मोबाइल नंबर लिखें',
+    how2: 'SMS में आया 6-अंकों का कोड भरें',
+    how3: 'नाम और गांव भरें — बस!',
+    listenBtn: 'सुनें',
+    helpBtn: 'कैसे इस्तेमाल करें?',
+    helpTitle: 'कदम-दर-कदम मदद',
+    moreOptions: 'साइन-इन के और तरीके',
+    helpOtp: 'SMS पर आया 6-अंकों का कोड नीचे लिखें।',
+    helpReg: 'अपना नाम और गांव लिखें — बस इतना ही।',
+    helpAadhaar: 'अपना 12-अंकों का आधार नंबर लिखें और OTP से सत्यापित करें।',
+    orMobile: 'या मोबाइल / आधार से जारी रखें',    phoneLabel: 'मोबाइल नंबर',
     phonePlaceholder: '98765 43210',
     phoneHint: '10 अंकों का भारतीय मोबाइल नंबर',
     sendOtp: 'OTP भेजें',
@@ -112,6 +163,9 @@ const L = {
     otpTitle: 'OTP दर्ज करें',
     otpSub: 'OTP भेजा गया',
     otpHint: 'कोड 5 मिनट के लिए मान्य है।',
+    otpRealNote: 'असली SMS भेजा गया है — अपने फोन के मैसेज देखें।',
+    otpOffline: 'नेटवर्क उपलब्ध नहीं। कनेक्ट होकर दोबारा कोशिश करें।',
+    otpSendFailed: 'अभी SMS नहीं भेजा जा सका। कृपया दोबारा कोशिश करें।',
     smsBanner: 'SMS · AGRIPULSE',
     smsText: 'आपका AgriPulse AI लॉगिन OTP है',
     smsValid: '5 मिनट के लिए मान्य। किसी को बताएं नहीं।',
@@ -147,15 +201,38 @@ const L = {
     detectLocation: 'मेरी लोकेशन पहचानें',
     detecting: 'पहचान रहे हैं…',
     locationDetected: 'लोकेशन मिल गई',
-    locationFailed: 'लोकेशन नहीं मिली — मैन्युअली चुनें',
-  },
+    locationFailed: 'लोकेशन नहीं मिली — मैन्युअली चुनें',  },
 };
+
+// ── Google Identity Services script loader (module-level cache) ──────────────
+let gsiPromise = null;
+function loadGsiScript() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('no_window'));
+  if (window.google?.accounts?.id) return Promise.resolve();
+  if (!gsiPromise) {
+    gsiPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true;
+      s.defer = true;
+      s.onload = () => resolve();
+      s.onerror = () => { gsiPromise = null; reject(new Error('gsi_load_failed')); };
+      document.head.appendChild(s);
+    });
+  }
+  return gsiPromise;
+}
 
 export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', setSelectedLang }) {
   const l = L[selectedLang] || L.en;
 
   const [step, setStep] = useState('phone'); // phone | register | aadhaar_login | aadhaar_otp | otp | success
   const [phone, setPhone] = useState('');
+  const [showMore, setShowMore] = useState(false); // advanced sign-in options
+  const [showHelp, setShowHelp] = useState(false);     // pictured help sheet
+  const [guideActive, setGuideActive] = useState(false);
+  const [guideOffer, setGuideOffer] = useState(true);  // one-tap start (also unlocks TTS)
+  const guideSpokeComplete = useRef(false);            // "press the green button" said once
   const [name, setName] = useState('');
   const [village, setVillage] = useState('');
   const [stateName, setStateName] = useState('Karnataka');
@@ -168,6 +245,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [smsOtp, setSmsOtp] = useState(null);
   const [aadhaarOtp, setAadhaarOtp] = useState(null);
   const [showSms, setShowSms] = useState(false);
+  const [serverOtp, setServerOtp] = useState(null);  // { token } when the code went as a real SMS
   const [cooldown, setCooldown] = useState(0);
   const [aadhaarCooldown, setAadhaarCooldown] = useState(0);
   const [attemptsLeft, setAttemptsLeft] = useState(3);
@@ -175,6 +253,9 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [welcomeName, setWelcomeName] = useState('');
   const [welcomeEmail, setWelcomeEmail] = useState('');
   const [isDemoLogin, setIsDemoLogin] = useState(false);
+  const [googleCfg, setGoogleCfg] = useState(null);   // null=loading, {configured,clientId}
+  const [loginProvider, setLoginProvider] = useState('phone'); // 'phone' | 'google' | 'google-demo'
+  const googleBtnRef = useRef(null);
   const [isReturning, setIsReturning] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationMsg, setLocationMsg] = useState('');
@@ -184,6 +265,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const otpRefs = useRef([]);
   const aadhaarOtpRefs = useRef([]);
 
+  // Resend cooldown ticker
   useEffect(() => {
     if (cooldown <= 0) return undefined;
     const id = setInterval(() => setCooldown((c) => Math.max(0, c - 1)), 1000);
@@ -196,8 +278,33 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     return () => clearInterval(id);
   }, [aadhaarCooldown]);
 
-  const sendOtpFlow = (mobile) => {
-    const res = requestOtp(mobile);
+  const sendOtpFlow = async (mobile) => {
+    // 1) Real SMS delivery — server route with a configured gateway.
+    //    The code goes to the farmer's phone and is NEVER shown on the website.
+    const srv = await serverSendOtp(mobile, serverOtp?.token);
+    if (srv.ok) {
+      setServerOtp({ token: srv.token });
+      setSmsOtp(null);
+      setShowSms(false);
+      setCooldown(OTP_RESEND_COOLDOWN_S);
+      setAttemptsLeft(3);
+      setResendLocked(false);
+      setError('');
+      sound.playSuccess();
+      return true;
+    }
+    if (srv.error === 'cooldown') {
+      setCooldown(srv.waitSeconds || OTP_RESEND_COOLDOWN_S);
+      return false;
+    }
+    if (srv.error === 'max_sends') {
+      setResendLocked(true);
+      setError(l.resendMax);
+      return false;
+    }
+    // 2) Gateway failed / not configured / offline → on-screen demo OTP
+    //    (offline-first: a gateway outage must never lock the farmer out)
+    setServerOtp(null);    const res = requestOtp(mobile);
     if (!res.ok) {
       if (res.error === 'max_sends') {
         setResendLocked(true);
@@ -250,11 +357,196 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     return true;
   };
 
+  // ── REAL Google sign-in (GIS button → server-verified ID token) ────────
+
+  const handleGoogleCredential = async (credential) => {
+    setBusy(true);
+    setError('');
+    const res = await serverVerifyGoogle(credential);
+    setBusy(false);
+    if (res.ok && res.profile) {
+      const profile = upsertGoogleUser(res.profile);
+      const session = saveSession({ ...profile, authProvider: 'google' });
+      setLoginProvider('google');
+      setIsDemoLogin(false);
+      setWelcomeName(profile.name);
+      setWelcomeEmail(profile.email);
+      setIsReturning(true);
+      sound.playSuccess();
+      setStep('success');
+      setTimeout(() => onSuccess(session), 1400);
+      return;
+    }
+    sound.playTransition();
+    setError(res.error === 'offline' ? l.otpOffline : l.googleFailed);
+  };
+
+  // ── Voice guide: speak the LOCAL language of wherever the farmer is ──
+  // Subscribed separately so narration works no matter when the guide starts.
+  useEffect(() => {
+    const unsubscribe = voiceGuide.subscribe(() => setGuideActive(voiceGuide.active));
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncUi = (lang) => {
+      if ((lang === 'hi' || lang === 'en') && lang !== selectedLang && setSelectedLang) {
+        setSelectedLang(lang);
+      }
+    };
+
+    const startGuide = () => {
+      if (cancelled || voiceGuide.active) return null;
+      voiceGuide.start(voiceGuide.lang);
+      const startedLang = voiceGuide.lang;
+      Promise.all([
+        voiceGuide.sayKey('greet'),
+        voiceGuide.guideStep('phone'),
+      ]).then(([ok]) => {
+        if (cancelled) return;
+        if (!ok && voiceGuide.blocked) {
+          voiceGuide.stop();
+          setGuideOffer(true); // browser needs one tap before it may speak
+        } else {
+          setGuideOffer(false);
+        }
+      });
+      return startedLang;
+    };
+
+    // A language the farmer explicitly asked for earlier ("English mein
+    // bolo") always wins — it's their app, their choice.
+    const pref = savedLangPref();
+
+    // Provisional: browser language (instant)
+    voiceGuide.lang = pref || detectGuideLanguage();
+    syncUi(voiceGuide.lang);
+
+    // Real location (GPS → reverse-geocoded state → IP fallback), cached a
+    // week — skipped when the farmer already picked a language themselves.
+    let locatedLang = pref || null;
+    const located = (pref ? Promise.resolve(pref) : detectLanguageByLocation())
+      .then((loc) => { locatedLang = loc; if (!cancelled && loc) { voiceGuide.lang = loc; syncUi(loc); } })
+      .catch(() => {});
+
+    // Don't make them wait on the GPS prompt forever — 2.5s cap, then start.
+    // If the location lands AFTER we started speaking and turns out to be a
+    // DIFFERENT language, cut over cleanly; if it's the same language, never
+    // repeat ourselves.
+    Promise.race([located, new Promise((r) => setTimeout(r, 2500))]).then(() => {
+      if (cancelled) return;
+      const startedLang = startGuide();
+      located.then(() => {
+        if (cancelled || !voiceGuide.active || startedLang == null) return;
+        if (locatedLang && locatedLang !== startedLang && step === 'phone' && phone.length === 0) {
+          voiceGuide.sayKey('greet').then(() => voiceGuide.guideStep('phone'));
+        }
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      voiceGuide.stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Narrate each step ONLY when the farmer actually reaches it —
+  // the guide never runs ahead of what they have done.
+  useEffect(() => {
+    if (!guideActive) return;
+    const L = voiceGuide.script();
+    const lines = {
+      register: L.register,
+      otp: L.otp,
+      aadhaar_login: L.aadhaar_login,
+      aadhaar_otp: L.aadhaar_otp,
+    };
+    if (step === 'phone') { guideSpokeComplete.current = false; return; }
+    if (step === 'success') {
+      voiceGuide.requestTour(); // App picks this up after login
+      voiceGuide.clearReminder();
+      voiceGuide.sayKey('success', { listenAfter: false });
+      return;
+    }
+    if (lines[step]) voiceGuide.guideStep(step); // with patient reminders
+  }, [step, guideActive]);
+
+  // "Very good! Now press the green button" — once the number is complete
+  useEffect(() => {
+    if (!guideActive || step !== 'phone') return;
+    if (phone.length === 10 && !guideSpokeComplete.current) {
+      guideSpokeComplete.current = true;
+      voiceGuide.guideStep('phoneComplete');
+    }
+    if (phone.length < 10) guideSpokeComplete.current = false;
+  }, [phone, step, guideActive]);
+
+  // Probe /api/google once: with GOOGLE_CLIENT_ID set we render the real
+  // "Continue with Google" button; otherwise we keep the demo button.
+  useEffect(() => {
+    let alive = true;
+    fetchGoogleConfig().then((cfg) => { if (alive) setGoogleCfg(cfg); });
+    return () => { alive = false; };
+  }, []);
+
+  // Render the official GIS button once the script + client id are ready
+  useEffect(() => {
+    if (step !== 'phone' || !googleCfg?.configured) return undefined;
+    let cancelled = false;
+    loadGsiScript().then(() => {
+      if (cancelled || !googleBtnRef.current || !window.google?.accounts?.id) return;
+      window.google.accounts.id.initialize({
+        client_id: googleCfg.clientId,
+        callback: (resp) => handleGoogleCredential(resp.credential),
+        cancel_on_tap_outside: true,
+      });
+      googleBtnRef.current.innerHTML = '';
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'pill',
+        logo_alignment: 'left',
+        width: 320,
+      });
+    }).catch(() => {
+      // GIS script unreachable (offline) → fall back to the demo button
+      setGoogleCfg({ configured: false });
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, googleCfg]);
+
+  // ── Farmer guidance: voice + pictured help ─────────────────────────────
+  const speakHelp = () => {
+    sound.playClick();
+    const lang = selectedLang === 'hi' ? 'hi' : 'en';
+    const keyMap = {
+      phone: 'phone', register: 'register', otp: 'otp', aadhaar_login: 'aadhaar',
+      aadhaar_otp: 'otp', success: 'success',
+    };
+    const script = VOICE[lang][keyMap[step] || 'phone'];
+    speechEngine.speak(script, selectedLang === 'hi' ? 'hi-IN' : 'en-IN');
+  };
+
+  const HELP = {
+    phone: [l.how1, l.how2, l.how3],
+    register: [l.helpReg],
+    otp: [l.helpOtp],
+    aadhaar_login: [l.helpAadhaar],
+    aadhaar_otp: [l.helpOtp],
+    success: [l.how3],
+  };
+
   const handleGoogleDemoLogin = () => {
     sound.playClick();
     setError('');
     setBusy(true);
     setIsDemoLogin(true);
+    setLoginProvider('google-demo');
 
     setTimeout(() => {
       const demoProfile = {
@@ -290,12 +582,13 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }
     setError('');
     setBusy(true);
-    setTimeout(() => {
+    // Simulate network dispatch latency of an SMS gateway / lookup
+    setTimeout(async () => {
       setBusy(false);
       const existing = getUser(mobile);
       if (existing) {
         setIsReturning(true);
-        if (sendOtpFlow(mobile)) setStep('otp');
+        if (await sendOtpFlow(mobile)) setStep('otp');
       } else {
         setIsReturning(false);
         setStep('register');
@@ -303,32 +596,48 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }, 700);
   };
 
-  const handleRegisterSubmit = () => {
-    sound.playClick();
-    if (!isValidName(name)) {
-      setError(l.invalidName);
-      sound.playTransition();
+  // Common success path — persists the session and hands off to the app
+  const finalizeLogin = (profile) => {
+    setLoginProvider('phone');
+    const mobile = normalizeMobile(phone);
+    const finalProfile = (isReturning ? updateLastLogin(mobile) : null) || profile;
+    if (aadhaarVerified && aadhaar) {
+      linkAadhaarToUser(mobile, aadhaar);
+    }
+    const session = saveSession({ ...finalProfile, aadhaarVerified: aadhaarVerified || finalProfile.aadhaarVerified });
+    setWelcomeName(finalProfile.name);
+    sound.playSuccess();
+    setStep('success');
+    setTimeout(() => onSuccess(session), 1500);
+  };
+
+  // Shared post-OTP-success routing — register/link as needed, then log in
+  const completeOtpSuccess = (mobile) => {
+    const profile = isReturning
+      ? getUser(mobile)
+      : registerUser({ name, mobile, village, state: stateName, aadhaar: aadhaarVerified ? aadhaar : '' });
+    if (!profile) {
+      setError(l.maxAttempts);
       return;
     }
-    if (aadhaar && !isValidAadhaar(aadhaar)) {
-      setError(l.aadhaarInvalid);
-      sound.playTransition();
-      return;
+    if (aadhaarVerified && aadhaar) {
+      linkAadhaarToUser(mobile, aadhaar);
     }
-    setError('');
-    setBusy(true);
-    setTimeout(() => {
-      setBusy(false);
-      const mobile = normalizeMobile(phone);
-      if (aadhaar && isValidAadhaar(aadhaar) && !aadhaarVerified) {
-        // Need to verify aadhaar first via OTP
-        if (sendAadhaarOtpFlow(aadhaar)) {
-          setStep('aadhaar_otp');
-          return;
-        }
-      }
-      if (sendOtpFlow(mobile)) setStep('otp');
-    }, 700);
+    finalizeLogin(profile);
+  };
+
+  const handleVerifyFail = (res) => {
+    sound.playTransition();
+    if (res.error === 'wrong_code') {
+      setAttemptsLeft(res.attemptsLeft);
+      setError(`${l.wrongOtp} ${res.attemptsLeft} ${l.attemptsLeft}.`);
+      setOtpDigits(['', '', '', '', '', '']);
+      otpRefs.current[0]?.focus();
+    } else if (res.error === 'expired') {
+      setError(l.expiredOtp);
+    } else {
+      setError(l.maxAttempts);
+    }
   };
 
   const handleAadhaarLoginSubmit = () => {
@@ -349,40 +658,75 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }, 600);
   };
 
+  const handleRegisterSubmit = () => {
+    sound.playClick();
+    if (!isValidName(name)) {
+      setError(l.invalidName);
+      sound.playTransition();
+      return;
+    }
+    if (aadhaar && !isValidAadhaar(aadhaar)) {
+      setError(l.aadhaarInvalid);
+      sound.playTransition();
+      return;
+    }
+    setError('');
+    setBusy(true);
+    setTimeout(async () => {
+      setBusy(false);
+        // Aadhaar (if entered) is verified first via its own demo OTP
+        if (aadhaar && isValidAadhaar(aadhaar) && !aadhaarVerified) {
+          if (sendAadhaarOtpFlow(aadhaar)) {
+            setStep('aadhaar_otp');
+            return;
+          }
+        }
+        if (await sendOtpFlow(normalizeMobile(phone))) setStep('otp');
+    }, 700);
+  };
+
   const handleVerify = (digits) => {
     const code = (digits || otpDigits).join('');
     if (code.length !== 6) return;
     setBusy(true);
+    const mobile = normalizeMobile(phone);
+    if (serverOtp) {
+      // Real SMS path — the code lives on the farmer's phone, verified server-side
+      serverVerifyOtp(mobile, code, serverOtp.token).then((res) => {
+        setBusy(false);
+        if (res.ok) {
+          completeOtpSuccess(mobile);
+          return;
+        }
+        if (res.token) setServerOtp({ token: res.token }); // attempts decremented server-side
+        if (res.error === 'offline') {
+          setError(l.otpOffline);
+          return;
+        }
+        handleVerifyFail(res);
+      });
+      return;
+    }
     setTimeout(() => {
       setBusy(false);
-      const mobile = normalizeMobile(phone);
       const res = verifyOtp(mobile, code);
       if (res.ok) {
-        const profile = isReturning
-          ? updateLastLogin(mobile)
-          : registerUser({ name, mobile, village, state: stateName, aadhaar: aadhaarVerified ? aadhaar : '' });
-        if (aadhaarVerified && aadhaar) {
-          linkAadhaarToUser(mobile, aadhaar);
-        }
-        const session = saveSession({ ...profile, aadhaarVerified: aadhaarVerified || profile.aadhaarVerified });
-        setWelcomeName(profile.name);
-        sound.playSuccess();
-        setStep('success');
-        setTimeout(() => onSuccess(session), 1500);
+        completeOtpSuccess(mobile);
         return;
       }
-      sound.playTransition();
-      if (res.error === 'wrong_code') {
-        setAttemptsLeft(res.attemptsLeft);
-        setError(`${l.wrongOtp} ${res.attemptsLeft} ${l.attemptsLeft}.`);
-        setOtpDigits(['', '', '', '', '', '']);
-        otpRefs.current[0]?.focus();
-      } else if (res.error === 'expired') {
-        setError(l.expiredOtp);
-      } else {
-        setError(l.maxAttempts);
-      }
+      handleVerifyFail(res);
     }, 600);
+  };
+
+  const handleOtpChange = (i, value) => {
+    const digit = value.replace(/\D/g, '').slice(-1);
+    const next = [...otpDigits];
+    next[i] = digit;
+    setOtpDigits(next);
+    setError('');
+    sound.playClick();
+    if (digit && i < 5) otpRefs.current[i + 1]?.focus();
+    if (digit && i === 5 && next.every((d) => d !== '')) handleVerify(next);
   };
 
   const handleAadhaarVerify = (digits) => {
@@ -430,17 +774,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
         setError(l.maxAttempts);
       }
     }, 600);
-  };
-
-  const handleOtpChange = (i, value) => {
-    const digit = value.replace(/\D/g, '').slice(-1);
-    const next = [...otpDigits];
-    next[i] = digit;
-    setOtpDigits(next);
-    setError('');
-    sound.playClick();
-    if (digit && i < 5) otpRefs.current[i + 1]?.focus();
-    if (digit && i === 5 && next.every((d) => d !== '')) handleVerify(next);
   };
 
   const handleAadhaarOtpChange = (i, value) => {
@@ -537,6 +870,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     sound.playClick();
     if (isVoiceListening && voiceField === field) {
       speechEngine.stopListening();
+      voiceGuide.resume();
       setIsVoiceListening(false);
       setVoiceField(null);
       return;
@@ -545,10 +879,11 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     const code = langMap[selectedLang] || 'hi-IN';
     setVoiceField(field);
     setIsVoiceListening(true);
+    voiceGuide.suspend(); // the field-fill owns the mic for a moment
     speechEngine.startListening(code, (transcript) => {
       if (field === 'name') setName(transcript);
       if (field === 'village') setVillage(transcript);
-    }, () => { setIsVoiceListening(false); setVoiceField(null); }, () => { setIsVoiceListening(false); setVoiceField(null); });
+    }, () => { setIsVoiceListening(false); setVoiceField(null); voiceGuide.resume(); }, () => { setIsVoiceListening(false); setVoiceField(null); voiceGuide.resume(); });
   };
 
   const maskedPhone = `+91 ${normalizeMobile(phone).slice(0, 2)}•••••${normalizeMobile(phone).slice(7)}`;
@@ -612,6 +947,62 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
         )}
 
         <div className="min-w-0 px-5 py-8 pt-14 sm:px-8 flex flex-col items-center text-center">
+
+          {/* Voice guide: one-tap start (also unlocks browser speech) */}
+          {!guideActive && guideOffer && (
+            <div className="w-full mb-3 flex items-center justify-center gap-2 flex-wrap">
+              <span className="text-[11px] font-black text-zinc-600">{voiceGuide.script().offer}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  sound.playClick();
+                  setGuideOffer(false);
+                  voiceGuide.start(voiceGuide.lang);
+                  Promise.all([
+                    voiceGuide.sayKey('greet'),
+                    voiceGuide.guideStep('phone'),
+                  ]);
+                }}
+                className="px-3 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black"
+              >
+                🔊 {voiceGuide.script().offerYes}
+              </button>
+              <button
+                type="button"
+                onClick={() => { sound.playClick(); setGuideOffer(false); }}
+                className="px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 text-[11px] font-black"
+              >
+                {voiceGuide.script().offerNo}
+              </button>
+            </div>
+          )}
+          {guideActive && (
+            <button
+              type="button"
+              onClick={() => { sound.playClick(); voiceGuide.stop(); }}
+              className="mb-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-600 text-[10px] font-black animate-pulse"
+            >
+              🎙️ {voiceGuide.script().activeLabel} · {voiceGuide.script().stopGuide}
+            </button>
+          )}
+
+          {/* Farmer help bar — voice guide + pictured steps (on every screen) */}
+          <div className="w-full flex items-center justify-center gap-2 mb-3">
+            <button
+              type="button"
+              onClick={speakHelp}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black shadow-sm transition-colors"
+            >
+              <Volume2 className="w-3.5 h-3.5" /> {l.listenBtn}
+            </button>
+            <button
+              type="button"
+              onClick={() => { sound.playClick(); setShowHelp(true); }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border-2 border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[11px] font-black transition-colors"
+            >
+              <HelpCircle className="w-3.5 h-3.5" /> {l.helpBtn}
+            </button>
+          </div>
           {/* ── STEP: phone ─────────────────────────────── */}
           {step === 'phone' && (
             <>
@@ -622,21 +1013,31 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <h2 className="text-2xl font-black text-zinc-900 mb-2">{l.phoneTitle}</h2>
               <p className="text-sm text-zinc-500 mb-5">{l.phoneSub}</p>
 
-              <button
-                type="button"
-                onClick={handleGoogleDemoLogin}
-                disabled={busy}
-                className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
-              >
-                <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
-                <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
-              </button>
-              <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleDemoNote}</p>
-
-              <div className="w-full flex items-center gap-3 my-5" aria-hidden="true">
-                <span className="h-px flex-1 bg-zinc-200" />
-                <span className="text-[10px] font-bold text-zinc-500">{l.orMobile}</span>
-                <span className="h-px flex-1 bg-zinc-200" />
+              {/* Pictured 3-step guide — what will happen */}
+              <div className="w-full mb-5 p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-left">
+                <div className="text-[10px] font-black tracking-[0.15em] text-emerald-700 uppercase mb-2.5">{l.howTitle}</div>
+                <div className="flex items-start justify-between gap-0.5">
+                  <div className="flex-1 flex flex-col items-center text-center gap-1.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center shrink-0">
+                      <Smartphone className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 leading-tight">{l.how1}</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400 mt-3 shrink-0" />
+                  <div className="flex-1 flex flex-col items-center text-center gap-1.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center shrink-0">
+                      <KeyRound className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 leading-tight">{l.how2}</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400 mt-3 shrink-0" />
+                  <div className="flex-1 flex flex-col items-center text-center gap-1.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center shrink-0">
+                      <User className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 leading-tight">{l.how3}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="w-full text-left mb-1.5">
@@ -670,19 +1071,51 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <button
                 onClick={handlePhoneSubmit}
                 disabled={busy}
-                className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-sm shadow-md transition-colors"
+                className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-base shadow-md transition-colors"
               >
                 {busy ? l.loading : l.sendOtp}
               </button>
-
-              <button
-                onClick={() => { sound.playClick(); setStep('aadhaar_login'); setError(''); }}
-                className="mt-3 w-full py-3 rounded-xl bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 text-blue-700 font-black text-sm flex items-center justify-center gap-2"
-              >
-                <Fingerprint className="w-4 h-4" /> {l.aadhaarLoginTitle}
-              </button>
-
               <p className="text-[11px] text-zinc-500 mt-4">{l.newHere}</p>
+
+              {/* Advanced options — collapsed by default. The mobile+SMS path above
+                  is the one every farmer already knows from UPI, so it stays alone. */}
+              <button
+                type="button"
+                onClick={() => { sound.playClick(); setShowMore(!showMore); }}
+                className="mt-4 flex items-center gap-1 text-[11px] font-black text-zinc-500 hover:text-zinc-700"
+              >
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMore ? 'rotate-180' : ''}`} /> {l.moreOptions}
+              </button>
+              {showMore && (
+                <div className="w-full mt-3 pt-4 border-t border-zinc-100 space-y-3">
+                  {googleCfg?.configured ? (
+                    <>
+                      <div ref={googleBtnRef} className="w-full min-h-11 flex justify-center" />
+                      <p className="w-full text-center text-[10px] text-zinc-500">{l.googleRealNote}</p>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleGoogleDemoLogin}
+                        disabled={busy}
+                        className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
+                      >
+                        <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
+                        <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
+                      </button>
+                      <p className="w-full text-center text-[10px] text-zinc-500">{l.googleDemoNote}</p>
+                    </>
+                  )}
+
+                  <button
+                    onClick={() => { sound.playClick(); setStep('aadhaar_login'); setError(''); }}
+                    className="w-full py-3 rounded-xl bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 text-blue-700 font-black text-sm flex items-center justify-center gap-2"
+                  >
+                    <Fingerprint className="w-4 h-4" /> {l.aadhaarLoginTitle}
+                  </button>
+                </div>
+              )}
             </>
           )}
 
@@ -972,8 +1405,16 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 </div>
               )}
 
-              {smsOtp && (
-                <div className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-zinc-900 text-white border border-zinc-700 text-left">
+              {/* Real SMS: code went to the farmer's phone — never displayed here */}
+              {serverOtp && (
+                <div className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-emerald-50 border border-emerald-200 text-left">
+                  <Smartphone className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div className="text-xs font-bold text-emerald-800">{l.otpRealNote}</div>
+                </div>
+              )}
+
+              {/* Persistent demo-SMS card (demo mode only — no SMS gateway configured) */}
+              {!serverOtp && smsOtp && (                <div className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-zinc-900 text-white border border-zinc-700 text-left">
                   <MessageSquareText className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
                     <div className="text-[9px] font-black tracking-widest text-zinc-400">{l.smsBanner}</div>
@@ -1022,6 +1463,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               >
                 {busy ? l.loading : l.verifyBtn}
               </button>
+
             </>
           )}
 
@@ -1040,13 +1482,17 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 <Leaf className="w-4 h-4 text-emerald-500" /> {welcomeName}
               </p>
               {welcomeEmail && (
-                <p className="text-xs font-mono text-zinc-600 mt-1">{welcomeEmail} · DEMO</p>
+                <p className="text-xs font-mono text-zinc-600 mt-1">
+                  {welcomeEmail}{loginProvider === 'google' ? '' : ' · DEMO'}
+                </p>
               )}
               <p className="text-xs font-mono text-zinc-500 mt-2 flex items-center gap-1">
                 {isDemoLogin
                   ? <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
                   : <ShieldCheck className="w-3.5 h-3.5" />}
-                {isDemoLogin ? l.demoStatus : l.verified}
+                {isDemoLogin
+                  ? l.demoStatus
+                  : loginProvider === 'google' ? l.googleVerified : l.verified}
               </p>
               {aadhaarVerified && (
                 <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-black">
@@ -1056,6 +1502,51 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
             </motion.div>
           )}
         </div>
+
+        {/* Farmer help sheet — pictured, bilingual, voice-enabled */}
+        <AnimatePresence>
+          {showHelp && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4"
+              onClick={() => { setShowHelp(false); speechEngine.stopSpeaking(); }}
+            >
+              <motion.div
+                initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                className="w-full max-w-sm bg-white rounded-2xl p-5 text-left shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-black text-zinc-900 flex items-center gap-1.5">
+                    <HelpCircle className="w-4 h-4 text-emerald-600" /> {l.helpTitle}
+                  </h3>
+                  <button
+                    onClick={() => { sound.playClick(); setShowHelp(false); speechEngine.stopSpeaking(); }}
+                    className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-500"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-2.5">
+                  {(HELP[step] || HELP.phone).map((s, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-black flex items-center justify-center">{i + 1}</span>
+                      <p className="text-xs font-bold text-zinc-700 leading-relaxed">{s}</p>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => { setShowHelp(false); speakHelp(); }}
+                  className="mt-4 w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-1.5"
+                >
+                  <Volume2 className="w-3.5 h-3.5" /> {l.listenBtn}
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="px-6 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-center gap-1.5 text-[10px] font-bold text-zinc-600">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> {l.secNote}

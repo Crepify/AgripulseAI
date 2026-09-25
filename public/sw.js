@@ -1,22 +1,15 @@
 // AgriPulse AI Service Worker for 100% Offline-First Execution
-//
-// Two caches:
-//   SHELL_CACHE  – index.html, hashed JS/CSS, manifest, icons. Versioned per build (BUILD_ID is
-//                  injected by vite.config.js), so every deploy installs fresh and old shells are dropped.
-//   MODEL_CACHE  – on-device AI model + wasm runtime (~50 MB). Persistent across deploys; cache-first,
-//                  never re-downloaded in the background. Bump the name only when the model files change.
+// BUILD_ID injected by vite.config.js — every deploy gets fresh SHELL_CACHE
 
 const BUILD_ID = '__BUILD_ID__';
 const SHELL_CACHE = `agripulse-shell-${BUILD_ID}`;
 const MODEL_CACHE = 'agripulse-models-v1';
 
-const SHELL_PRECACHE = ['/', '/index.html', '/manifest.json'];
+const SHELL_PRECACHE = ['/', '/index.html', '/manifest.json', '/data/pesticide-offline-db.json'];
 const SHELL_OPTIONAL = ['/icon.svg', '/favicon.svg', '/icons.svg'];
 const MODEL_PREFIXES = ['/models/', '/litert/', '/yolo/'];
-// All files needed for 100% offline inference after ONE online visit.
-// Previously only 3 files were precached, so going offline quickly left the wasm runtime missing.
+const DATA_PREFIXES = ['/data/'];
 const MODEL_PRECACHE = [
-  // LiteRT runtime (self-hosted, no CDN)
   '/litert/core.js',
   '/litert/wasm-utils.js',
   '/litert/litert_wasm_internal.js',
@@ -27,35 +20,42 @@ const MODEL_PRECACHE = [
   '/litert/litert_wasm_jspi_internal.wasm',
   '/litert/litert_wasm_threaded_internal.js',
   '/litert/litert_wasm_threaded_internal.wasm',
-  // YOLO pre/post-processing
   '/yolo/ultralytics_inference_web_bg.wasm',
-  // Model + labels
   '/models/agripulse.tflite',
   '/models/classes.json',
+  '/data/pesticide-offline-db.json',
 ];
 
 const isModelPath = (pathname) => MODEL_PREFIXES.some((p) => pathname.startsWith(p));
+const isDataPath = (pathname) => DATA_PREFIXES.some((p) => pathname.startsWith(p));
 
 async function addIfMissing(cache, url) {
   try {
     if (!(await cache.match(url, { ignoreVary: true }))) await cache.add(url);
-  } catch {
-    // best effort (offline during install, 404, ...)
-  }
+  } catch {}
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const shell = await caches.open(SHELL_CACHE);
-    // Discover this build's hashed assets from index.html so the whole app shell works offline
-    // after the very first visit.
-    const res = await fetch('/index.html', { cache: 'no-cache' });
-    const html = await res.text();
-    const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
-    await shell.put('/index.html', new Response(html, { headers: res.headers }));
-    await shell.addAll([...SHELL_PRECACHE.filter((u) => u !== '/index.html'), ...assets]);
+    try {
+      const res = await fetch('/index.html', { cache: 'no-cache' });
+      const html = await res.text();
+      const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
+      await shell.put('/index.html', new Response(html, { headers: res.headers }));
+      await shell.put('/', new Response(html, { headers: res.headers }));
+      if (assets.length) {
+        await Promise.all(assets.map(async (a) => {
+          try {
+            const r = await fetch(a, { cache: 'no-cache' });
+            if (r.ok) await shell.put(a, r);
+          } catch {}
+        }));
+      }
+      // Precache offline DB explicitly
+      await addIfMissing(shell, '/data/pesticide-offline-db.json');
+    } catch {}
     await Promise.all(SHELL_OPTIONAL.map((u) => addIfMissing(shell, u)));
-
     const models = await caches.open(MODEL_CACHE);
     await Promise.all(MODEL_PRECACHE.map((u) => addIfMissing(models, u)));
   })());
@@ -65,7 +65,6 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    // One-time migration from the previous single cache: keep already-downloaded model files.
     const legacy = keys.find((k) => k === 'agripulse-cache-v2');
     if (legacy) {
       const old = await caches.open(legacy);
@@ -90,36 +89,56 @@ async function cacheFirst(request, cacheName) {
   if (cached) return cached;
   try {
     const response = await fetch(request);
-    if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
+    if (response && response.ok) {
       cache.put(request, response.clone()).catch(() => {});
     }
     return response;
   } catch {
-    // Offline and not cached -> return cached if we got it after a race, else a 503 so the page can handle it
     const fallback = await cache.match(request, { ignoreVary: true });
     if (fallback) return fallback;
     return new Response('', { status: 503, statusText: 'Offline and not cached' });
   }
 }
 
+async function networkFirstNavigation(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  try {
+    const response = await fetch(request, { cache: 'no-store' });
+    if (response && response.ok) {
+      cache.put(request, response.clone()).catch(() => {});
+      cache.put('/index.html', response.clone()).catch(() => {});
+      cache.put('/', response.clone()).catch(() => {});
+      return response;
+    }
+    if (response && response.status >= 400) {
+      const cached = await cache.match(request, { ignoreVary: true }) || await cache.match('/index.html', { ignoreVary: true });
+      if (cached) return cached;
+      return response;
+    }
+  } catch (e) {
+    const cached = await cache.match(request, { ignoreVary: true }) || await cache.match('/index.html', { ignoreVary: true }) || await cache.match('/', { ignoreVary: true });
+    if (cached) return cached;
+  }
+  const fallback = await cache.match('/index.html', { ignoreVary: true });
+  if (fallback) return fallback;
+  return new Response('<h1>Offline — please reconnect</h1>', { status: 503, headers: { 'Content-Type': 'text/html' } });
+}
+
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(SHELL_CACHE);
   const cached = await cache.match(request, { ignoreVary: true });
   const networkPromise = fetch(request).then((response) => {
-    if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
+    if (response && response.ok) {
       cache.put(request, response.clone()).catch(() => {});
     }
     return response;
   }).catch(() => undefined);
-
   if (cached) {
-    // update in background
     networkPromise.catch(() => {});
     return cached;
   }
   const response = await networkPromise;
   if (response) return response;
-  // Offline navigation fallback
   if (request.mode === 'navigate') {
     const fallback = await cache.match('/index.html', { ignoreVary: true });
     if (fallback) return fallback;
@@ -130,17 +149,30 @@ async function staleWhileRevalidate(request) {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
-
-  // Never cache API calls (cloud fallback), non-GET requests or third-party origins.
   if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) {
     return;
   }
-
-  if (isModelPath(url.pathname)) {
-    event.respondWith(cacheFirst(request, MODEL_CACHE));
+  if (isModelPath(url.pathname) || isDataPath(url.pathname)) {
+    event.respondWith(cacheFirst(request, url.pathname.startsWith('/data/') ? SHELL_CACHE : MODEL_CACHE));
   } else if (url.pathname.startsWith('/assets/')) {
-    // Vite output is content-hashed → immutable
-    event.respondWith(cacheFirst(request, SHELL_CACHE));
+    event.respondWith((async () => {
+      try {
+        const res = await fetch(request, { cache: 'no-cache' });
+        if (res.ok) {
+          const cache = await caches.open(SHELL_CACHE);
+          cache.put(request, res.clone()).catch(() => {});
+          return res;
+        }
+        const cache = await caches.open(SHELL_CACHE);
+        const cached = await cache.match(request, { ignoreVary: true });
+        if (cached) return cached;
+        return res;
+      } catch {
+        return cacheFirst(request, SHELL_CACHE);
+      }
+    })());
+  } else if (request.mode === 'navigate' || request.destination === 'document' || url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(networkFirstNavigation(request));
   } else {
     event.respondWith(staleWhileRevalidate(request));
   }
