@@ -463,6 +463,7 @@ export class VoiceGuide {
     this._speechQueue = Promise.resolve(); // serialize lines — never cancel mid-word
     this._voicesReady = false;
     this._reminderTimers = [];             // patient step reminders
+    this._reminderToken = 0;               // invalidates in-flight reminder schedules
   }
 
   _emit() {
@@ -514,12 +515,18 @@ export class VoiceGuide {
   clearReminder() {
     this._reminderTimers.forEach((t) => clearTimeout(t));
     this._reminderTimers = [];
+    // Bump the token: a guideStep whose line is STILL BEING SPOKEN must not
+    // schedule its reminders afterwards (the farmer already moved on — e.g.
+    // voice-fill completed the number mid-sentence). Without this, a stale
+    // "enter your mobile number" could fire on the OTP screen a minute later.
+    this._reminderToken++;
   }
 
   guideStep(key, { repeats = 2, delayMs = 60_000 } = {}) {
     this.clearReminder();
+    const token = this._reminderToken;
     this.sayKey(key).then(() => {
-      if (!this.active) return;
+      if (!this.active || token !== this._reminderToken) return; // superseded mid-speech
       for (let i = 1; i <= repeats; i++) {
         this._reminderTimers.push(setTimeout(() => {
           // skip politely if another feature owns the mic or a question is pending
