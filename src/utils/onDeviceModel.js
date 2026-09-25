@@ -392,6 +392,14 @@ function buildMatchedCrop(detections) {
 // (user's apple scab photo was 0 detections at 0.25 but 1 at 0.15).
 const ADAPTIVE_THRESHOLDS = [0.25, 0.15, 0.10, 0.05, 0.02, 0.01, 0.005];
 
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label + ' timeout after ' + ms + 'ms')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) {
   const tried = new Set();
   const order = [initialConf, ...ADAPTIVE_THRESHOLDS].filter(c => {
@@ -402,18 +410,25 @@ async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) 
   let lastResult = null;
   for (const conf of order) {
     try {
-      const r = await detectFn(imageElement, { conf });
+      console.log('[AgriPulse] trying conf', conf);
+      const r = await withTimeout(detectFn(imageElement, { conf }), 12000, 'detect conf=' + conf);
+      console.log('[AgriPulse] conf', conf, 'detections', r?.detections?.length);
       if (r?.detections?.length) return r;
       lastResult = r;
-    } catch {}
+    } catch (e) {
+      console.warn('[AgriPulse] detect failed at conf', conf, e?.message);
+    }
   }
   // final ultra-low recall attempts - even 0.001
   for (const conf of [0.001, 0.0001, 0]) {
     try {
-      const r = await detectFn(imageElement, { conf });
+      console.log('[AgriPulse] trying ultra-low conf', conf);
+      const r = await withTimeout(detectFn(imageElement, { conf }), 10000, 'detect conf=' + conf);
       if (r?.detections?.length) return r;
       lastResult = lastResult || r;
-    } catch {}
+    } catch (e) {
+      console.warn('[AgriPulse] ultra-low detect failed', conf, e?.message);
+    }
   }
   return lastResult;
 }
@@ -424,9 +439,12 @@ export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { 
   let backend = 'on-device';
 
   try {
-    const ready = await initOnDeviceAI();
+    console.log('[AgriPulse] analyzeLeafOnDevice init');
+    const ready = await withTimeout(initOnDeviceAI(), 15000, 'initOnDeviceAI');
     if (!ready) throw new Error(status.error || 'on-device model unavailable');
+    console.log('[AgriPulse] model ready, detecting');
     result = await detectWithAdaptiveThreshold(detectDisease, imageElement, conf);
+    console.log('[AgriPulse] on-device result', result?.detections?.length);
   } catch (err) {
     console.warn('On-device inference failed:', err);
   }
