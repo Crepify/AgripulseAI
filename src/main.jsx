@@ -7,7 +7,7 @@ import React from 'react'
 class RootErrorBoundary extends React.Component {
   constructor(p){ super(p); this.state={hasError:false, error:null}; }
   static getDerivedStateFromError(e){ return {hasError:true, error:e}; }
-  componentDidCatch(err, info){ console.error('AgriPulse crash', err, info); }
+  componentDidCatch(err, info){ console.error('AgriPulse crash', err, info); try { localStorage.setItem('ap_last_error', JSON.stringify({ msg: String(err?.message || err), at: new Date().toISOString(), page: location.pathname })); } catch {} }
   render(){
     if(this.state.hasError){
       return (
@@ -19,11 +19,11 @@ class RootErrorBoundary extends React.Component {
             <button onClick={()=>{
               if('serviceWorker' in navigator){ navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}); }
               if(window.caches){ caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{}); }
-              try{ localStorage.clear(); sessionStorage.clear(); }catch{}
               setTimeout(()=> location.reload(), 300);
-            }} style={{padding:'10px 16px', background:'#10b981', color:'#fff', borderRadius:'12px', fontWeight:800, border:'none', cursor:'pointer'}}>Clear cache & reload</button>
+            }} style={{padding:'10px 16px', background:'#10b981', color:'#fff', borderRadius:'12px', fontWeight:800, border:'none', cursor:'pointer'}}>Refresh app (keeps your login)</button>
             <button onClick={()=>location.reload()} style={{padding:'10px 16px', background:'#fff', border:'1px solid #ddd', borderRadius:'12px', fontWeight:700, cursor:'pointer'}}>Reload</button>
           </div>
+          <p style={{marginTop:'10px', fontSize:'11px', color:'#999'}}>Refreshing clears only the app cache — your login and settings stay. If it keeps happening, screenshot this message for the team.</p>
         </div>
       );
     }
@@ -31,31 +31,51 @@ class RootErrorBoundary extends React.Component {
   }
 }
 
-// Auto-recover from stale hashed asset 404s (Vercel deletes old assets, SW may serve old index.html)
+// Auto-recover ONLY from genuinely stale hashed assets (Vercel deletes old
+// assets after deploys; the SW may serve an old index.html that points at
+// deleted chunks). Anything else — network blips ('Failed to fetch'), app
+// errors from /assets/*.js (which is ALL prod code!) — must NOT reload:
+// a reload bounces the farmer back to the start page, and a flaky connection
+// would loop it forever. Also rate-limited to once per 30s.
 if (typeof window !== 'undefined') {
+  const STALE_ASSET_MSG = /Loading chunk|Importing a module|dynamically imported module|Unexpected token|error loading dynamically imported/i;
+  const lastReloadKey = 'ap_asset_reload_at';
+  const refreshShell = () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(()=>{});
+      }
+      if (window.caches) {
+        caches.keys().then(ks => ks.forEach(k => { if(k.includes('agripulse-shell')) caches.delete(k); })).catch(()=>{});
+      }
+    } catch {}
+  };
+  const maybeReload = (detail) => {
+    try {
+      const last = Number(sessionStorage.getItem(lastReloadKey) || 0);
+      if (Date.now() - last < 30000) return; // never loop
+      sessionStorage.setItem(lastReloadKey, String(Date.now()));
+    } catch {}
+    console.warn('[AgriPulse] stale asset detected — refreshing once', detail);
+    refreshShell();
+    setTimeout(()=> { try { location.reload(); } catch {} }, 800);
+  };
   window.addEventListener('error', (e) => {
     const msg = e?.message || '';
     const src = e?.filename || '';
-    if (src.includes('/assets/') || msg.includes('Failed to fetch') || msg.includes('Loading chunk') || msg.includes('Importing a module') || msg.includes('Unexpected token')) {
-      console.warn('[AgriPulse] asset load failed, clearing SW cache', src, msg);
-      try {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(()=>{});
-        }
-        if (window.caches) {
-          caches.keys().then(ks => ks.forEach(k => { if(k.includes('agripulse-shell')) caches.delete(k); })).catch(()=>{});
-        }
-      } catch {}
-      setTimeout(()=> { try { location.reload(); } catch {} }, 800);
+    // ONLY stale-asset signatures (message-based). A plain app error also
+    // has src=/assets/... in prod — reloading for those was resetting
+    // farmers to the start page.
+    if (STALE_ASSET_MSG.test(msg) || (src.includes('/assets/') && STALE_ASSET_MSG.test(`${msg} ${src}`))) {
+      maybeReload(`${src} ${msg}`);
     }
   });
   window.addEventListener('unhandledrejection', (e) => {
     const m = String(e?.reason?.message || e?.reason || '');
-    if ((m.includes('Failed to fetch') || m.includes('Loading chunk') || m.includes('Importing')) && m.includes('assets')) {
-      console.warn('[AgriPulse] chunk fetch failed', m);
-      if (window.caches) {
-        caches.keys().then(ks => ks.forEach(k => { if(k.includes('agripulse-shell')) caches.delete(k); })).catch(()=>{});
-      }
+    if (STALE_ASSET_MSG.test(m) && m.includes('assets')) {
+      maybeReload(m);
+    } else if (STALE_ASSET_MSG.test(m)) {
+      refreshShell(); // prime the cache; no reload needed for a one-off
     }
   });
 }
