@@ -7,6 +7,11 @@ class SpeechEngine {
     this.recognition = null;
     this.isListening = false;
     this.voices = [];
+    // Languages the cloud TTS endpoint can speak — every device gets these
+    // regardless of installed voices (farmers can't install voice packs).
+    this.cloudLangs = ['hi', 'en', 'ta', 'te', 'kn', 'mr'];
+    this._cloudAudio = null;
+    this._cloudPlaying = false;
 
     if (this.synth) {
       this.loadVoices();
@@ -77,6 +82,53 @@ class SpeechEngine {
     return { voice: this.voices[0], isNative: false };
   }
 
+  // Unified speak: local native voice when present, else cloud TTS, else
+  // the local fallback (romanized/English) text. Farmers never need to
+  // install anything to hear Tamil/Telugu/Kannada/Marathi.
+  async speakSmart(text, langCode, onEnd, { fallbackText } = {}) {
+    const vi = this.getBestVoice(langCode);
+    if (vi && vi.isNative) {
+      this.speak(text, langCode, onEnd);
+      return;
+    }
+    try {
+      await this.cloudSpeak(text, langCode);
+      if (onEnd) onEnd(true);
+    } catch {
+      // cloud unavailable (offline / autoplay-blocked) → best local effort
+      this.speak(fallbackText || text, 'en-IN', () => onEnd && onEnd(false));
+    }
+  }
+
+  async cloudSpeak(text, langCode) {
+    const base = String(langCode || 'hi').split('-')[0];
+    const r = await fetch(`/api/tts?text=${encodeURIComponent(text)}&lang=${base}`, {
+      headers: { Accept: 'audio/mpeg' },
+    });
+    if (!r.ok) throw new Error(`tts ${r.status}`);
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    this._cloudAudio = audio;
+    this._cloudPlaying = true;
+    const done = () => {
+      this._cloudPlaying = false;
+      this._cloudAudio = null;
+      try { URL.revokeObjectURL(url); } catch { /* noop */ }
+    };
+    // Resolve only when the audio has FINISHED — the guide must not open the
+    // mic while its own voice is still playing (self-hearing).
+    return await new Promise((resolve, reject) => {
+      audio.onended = () => { done(); resolve(); };
+      audio.onerror = () => { done(); resolve(); }; // cut short ≠ fatal
+      audio.play().catch((err) => { done(); reject(err); }); // autoplay-blocked
+    });
+  }
+
+  isPlaying() {
+    return !!(this._cloudPlaying || (this.synth && this.synth.speaking));
+  }
+
   speak(textData, langCode = 'hi-IN', onEnd) {
     if (!this.synth) return;
     this.synth.cancel();
@@ -113,6 +165,11 @@ class SpeechEngine {
   }
 
   stopSpeaking() {
+    if (this._cloudAudio) {
+      try { this._cloudAudio.pause(); } catch { /* noop */ }
+      this._cloudAudio = null;
+    }
+    this._cloudPlaying = false;
     if (this.synth) {
       this.synth.cancel();
     }

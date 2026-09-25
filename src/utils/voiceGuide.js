@@ -89,6 +89,7 @@ const S = {
     didntCatch: 'Sorry, please say that again.',
     askNext: 'Want to hear the next service? Just say yes.',
     langSwitched: 'Alright — from now on I will speak in English.',
+    langSwitchedFallback: 'Alright, I have switched the language.',
     tourStopAsk: 'Should I stop explaining the services? Say yes or no.',
     langUnavailable: 'Sorry, that language is not available on this phone. I will keep speaking this language.',
     langFallbackAsk: 'Sorry, this phone cannot speak that language. Shall I talk in English instead?',
@@ -638,28 +639,50 @@ export class VoiceGuide {
 
   script() { return S[this.lang] || S.hi; }
 
+  _hasCloud(lang) {
+    return !!(this.engine.cloudLangs && this.engine.cloudLangs.includes(lang));
+  }
+
   _voiceInfo() {
+    let vi = null;
     try {
-      return this.engine.getBestVoice ? this.engine.getBestVoice(`${this.lang}-IN`) : null;
-    } catch { return null; }
+      vi = this.engine.getBestVoice ? this.engine.getBestVoice(`${this.lang}-IN`) : null;
+    } catch { vi = null; }
+    // The cloud TTS endpoint speaks every supported language, so the native
+    // script is speakable even when the device has no local voice for it.
+    if (this._hasCloud(this.lang)) {
+      return { voice: vi && vi.voice, isNative: true, cloud: !(vi && vi.isNative) };
+    }
+    return vi;
   }
 
   // Best render of a known line for THIS device:
-  //   native voice → native script · else romanized (hi) · else English
-  _renderLine(key) {
+  //   native voice OR cloud → native script · else romanized (hi) · else English
+  // Also returns a LOCAL fallback line (romanized/English) used if the cloud
+  // TTS is unreachable (offline).
+  _renderPair(key) {
     const L = this.script();
-    const vi = this._voiceInfo();
     const native = L[key];
-    if (typeof native !== 'string') return String(native ?? '');
-    if (vi && vi.isNative) return native; // CONFIRMED native voice → native script
-    const phon = PHON[this.lang] && PHON[this.lang][key];
-    if (phon) return phon;                // no/unknown native voice → romanized
-    if (this.lang !== 'en' && typeof S.en[key] === 'string') return S.en[key];
-    return native;                         // english
+    if (typeof native !== 'string') return { main: String(native ?? ''), fallback: '' };
+    const localFallback = () => {
+      const phon = PHON[this.lang] && PHON[this.lang][key];
+      if (phon) return phon;
+      if (this.lang !== 'en' && typeof S.en[key] === 'string') return S.en[key];
+      return native;
+    };
+    const vi = this._voiceInfo();
+    if (vi && vi.isNative) {
+      return { main: native, fallback: localFallback() }; // native script (local voice or cloud)
+    }
+    const main = localFallback();
+    return { main, fallback: main };
   }
 
+  _renderLine(key) { return this._renderPair(key).main; }
+
   sayKey(key, opts = {}) {
-    return this.say(this._renderLine(key), opts);
+    const p = this._renderPair(key);
+    return this.say(p.main, { ...opts, fallback: p.fallback });
   }
 
   askKey(key, timeoutMs = 16000) {
@@ -700,6 +723,7 @@ export class VoiceGuide {
   // without a Tamil voice would silently fall back to English — confusing.
   _canSpeak(lang) {
     if (lang === 'en') return true;
+    if (this._hasCloud(lang)) return true; // cloud TTS — no local voice needed
     if (PHON[lang]) return true; // romanized fallback exists (Hindi)
     try {
       const vi = this.engine.getBestVoice ? this.engine.getBestVoice(`${lang}-IN`) : null;
@@ -796,11 +820,11 @@ export class VoiceGuide {
 
   // Speak one line; resolves true if it actually played. Lines are QUEUED —
   // a new line never cancels the one before it mid-word.
-  say(text, { listenAfter = true } = {}) {
+  say(text, { listenAfter = true, fallback } = {}) {
     if (!this.active) return Promise.resolve(false);
     let resolve;
     const p = new Promise((res) => { resolve = res; });
-    const run = () => this._sayNow(text, listenAfter).then(
+    const run = () => this._sayNow(text, listenAfter, fallback).then(
       (v) => { resolve(v); return v; },
       () => { resolve(false); return false; },
     );
@@ -809,7 +833,7 @@ export class VoiceGuide {
     return p;
   }
 
-  async _sayNow(text, listenAfter) {
+  async _sayNow(text, listenAfter, fallbackText) {
     this.lastLine = text;
     if (!this.active) return false;
     await this._ensureVoices();
@@ -834,22 +858,30 @@ export class VoiceGuide {
         resolve(spoke);
       };
 
+      // Local native voice → local; else cloud TTS; else local fallback text.
       try {
-        this.engine.speak(text, langCode, () => finish(true));
+        if (this.engine.speakSmart) {
+          this.engine.speakSmart(text, langCode, () => finish(true), { fallbackText });
+        } else {
+          this.engine.speak(text, langCode, () => finish(true));
+        }
       } catch {
         finish(false);
       }
 
-      // Watch the synth: resolve when it has spoken and gone quiet again.
+      // Watch playback (local synth OR cloud audio): resolve when it has
+      // spoken and gone quiet again.
       const poll = setInterval(() => {
-        const synth = this.engine.synth;
-        if (!synth) return;
-        if (synth.speaking) { spoke = true; this.blocked = false; return; }
+        const playing = this.engine.isPlaying
+          ? this.engine.isPlaying()
+          : !!(this.engine.synth && this.engine.synth.speaking);
+        if (playing) { spoke = true; this.blocked = false; return; }
         if (spoke) finish(true); // was speaking, now quiet → done
       }, 350);
 
       // Nothing started within 3s → autoplay-blocked (needs a user gesture).
-      const giveUp = setTimeout(() => { if (!spoke) finish(false); }, 3000);
+      // (Cloud audio that never starts also lands here → fallback via finish.)
+      const giveUp = setTimeout(() => { if (!spoke) finish(false); }, 6000);
     });
     } finally {
       this._speaking = false; // backstop: never leave the mic deadlocked off
@@ -968,7 +1000,11 @@ export class VoiceGuide {
         return;
       }
       this.setLanguage(switchTo);
-      this.sayKey('langSwitched').then(() => {
+      // If the cloud TTS is unreachable, the en fallback for 'langSwitched'
+      // would claim 'I will speak in English' — wrong for a Tamil switch.
+      // Use a neutral line instead.
+      const pair = this._renderPair('langSwitched');
+      this.say(pair.main, { fallback: S.en.langSwitchedFallback || pair.fallback }).then(() => {
         if (outer) {
           // re-ask the pending question in the new language, snappily
           this.askKey('askResume', 6000).then((ans) => outer(ans === 'no' ? 'no' : 'yes'));
@@ -1042,20 +1078,25 @@ export class VoiceGuide {
       // re-read per iteration — the farmer may switch language mid-tour
       const L = this.script();
       const vi = this._voiceInfo();
-      let name, desc;
+      let name, desc, fbName, fbDesc;
+      const P = (PHON[this.lang] && PHON[this.lang].services) ? PHON[this.lang].services[i] : null;
+      const E = S.en.services[i];
       if (vi && vi.isNative) {
         [name, desc] = L.services[i];
-      } else if (PHON[this.lang] && PHON[this.lang].services && PHON[this.lang].services[i]) {
-        [name, desc] = PHON[this.lang].services[i];
+        [fbName, fbDesc] = P || E; // local fallback if cloud TTS is unreachable
+      } else if (P) {
+        [name, desc] = P;
+        [fbName, fbDesc] = [name, desc];
       } else {
-        [name, desc] = S.en.services[i];
+        [name, desc] = E;
+        [fbName, fbDesc] = [name, desc];
       }
       // The option's NAME first — clearly, unhurried — then a natural beat,
       // then its explanation. One run-on sentence was hard to follow.
-      await this.say(name);
+      await this.say(name, { fallback: fbName });
       if (this._confirmGate) await this._confirmGate;
       if (!this._tourRunning) return;
-      await this.say(desc);
+      await this.say(desc, { fallback: fbDesc });
       if (this._confirmGate) await this._confirmGate;
       if (!this._tourRunning) return;
       // Silence or anything unclear → continue at their pace; the 5s cap
