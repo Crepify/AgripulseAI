@@ -155,8 +155,11 @@ class SpeechEngine {
   }
 
   stopListening() {
-    if (this.recognition && this.isListening) {
-      this.recognition.stop();
+    // Always issue the stop: between start() and onstart firing, isListening
+    // is still false — skipping stop() there left the mic RUNNING (it then
+    // heard our own speech and phantom-triggered the guide).
+    if (this.recognition) {
+      try { this.recognition.stop(); } catch { /* wasn't started */ }
       this.isListening = false;
     }
   }

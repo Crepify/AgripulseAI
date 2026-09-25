@@ -467,7 +467,7 @@ export function matchIntent(lang, q) {
 // language on request. Requires a language name AND a speak/change verb, so
 // plain mentions ("tamil nadu mein bhaav") never trigger a switch.
 const LANG_SWITCH_NAMES = {
-  en: ['english', 'angrezi', 'अंग्रेज़ी', 'अंग्रेजी', 'ஆங்கில', 'ఇంగ్లీష్', 'ಇಂಗ್ಲಿಷ್'],
+  en: ['english', 'angrezi', 'angreji', 'अंग्रेज़ी', 'अंग्रेजी', 'इंग्लिश', 'ஆங்கில', 'ఇంగ్లీష్', 'ಇಂಗ್ಲಿಷ್'],
   hi: ['hindi', 'हिंदी'],
   ta: ['tamil', 'tamizh', 'तमिल', 'தமிழ'],
   te: ['telugu', 'तेलुगु', 'తెలుగు'],
@@ -525,6 +525,8 @@ export class VoiceGuide {
     this._reminderTimers = [];             // patient step reminders
     this._reminderToken = 0;               // invalidates in-flight reminder schedules
     this.tourAskMs = 5000;                 // tour pace: silence → keep going
+    this._speaking = false;                // our own TTS is playing — mic MUST stay off
+    this._listenCycle = 0;                 // rotates an English ear in while asking
   }
 
   _emit() {
@@ -691,11 +693,13 @@ export class VoiceGuide {
     const langCode = `${this.lang}-IN`;
     let spoke = false;
     let settled = false;
-
+    this._speaking = true; // mic must not hear our own voice through the speakers
+    try {
     return await new Promise((resolve) => {
       const finish = (ok) => {
         if (settled) return;
         settled = true;
+        this._speaking = false;
         clearInterval(poll);
         clearTimeout(giveUp);
         if (ok) spoke = true;
@@ -722,6 +726,9 @@ export class VoiceGuide {
       // Nothing started within 3s → autoplay-blocked (needs a user gesture).
       const giveUp = setTimeout(() => { if (!spoke) finish(false); }, 3000);
     });
+    } finally {
+      this._speaking = false; // backstop: never leave the mic deadlocked off
+    }
   }
 
   // Ask a yes/no question and wait for the answer (or timeout → 'timeout').
@@ -741,12 +748,24 @@ export class VoiceGuide {
 
   _resolveAck(v) { if (this._ackWaiter) this._ackWaiter.resolve(v); }
 
+  // The recognizer is single-language. While the guide speaks a regional
+  // language the farmer may still answer a question in English — so every
+  // third listening cycle during a pending question listens in en-IN.
+  _listenLangCode() {
+    this._listenCycle++;
+    if (this.lang !== 'en' && this._ackWaiter && (this._listenCycle % 3) === 0) return 'en-IN';
+    return `${this.lang}-IN`;
+  }
+
   // Keep the mic hot between instructions; restart when each utterance ends.
   _listen() {
-    if (!this.active || this.suspended || !this.engine.recognition) return;
+    if (!this.active || this.suspended || this._speaking || !this.engine.recognition) return;
     const token = ++this._listenToken;
     let latest = '';
-    const langCode = `${this.lang}-IN`;
+    const langCode = this._listenLangCode();
+    const revive = (ms) => setTimeout(() => {
+      if (token === this._listenToken && this.active && !this.suspended && !this._speaking) this._listen();
+    }, ms);
     try {
       this.engine.startListening(
         langCode,
@@ -754,11 +773,16 @@ export class VoiceGuide {
         () => {
           if (token !== this._listenToken) return;
           if (latest && latest.trim()) this._handleSpeech(latest);
-          else if (this.active && !this.suspended) setTimeout(() => {
-            if (token === this._listenToken && this.active && !this.suspended) this._listen();
-          }, 250);
+          else if (this.active && !this.suspended) revive(250);
         },
-        () => { /* mic denied or unsupported — guide stays voice-out only */ },
+        (err) => {
+          // 'not-allowed' / 'service-not-allowed' / 'audio-capture' = no mic
+          // at all — the guide stays voice-out only. Anything else (no-speech,
+          // network, aborted…) is a hiccup: Chrome does NOT always fire onend
+          // after onerror, so restart the loop ourselves or the guide goes deaf.
+          if (['not-allowed', 'service-not-allowed', 'audio-capture'].includes(err)) return;
+          if (token === this._listenToken) revive(300);
+        },
       );
     } catch { /* already started */ }
   }
