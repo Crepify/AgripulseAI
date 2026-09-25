@@ -156,6 +156,7 @@ export default function App() {
   const handleLogout = () => {
     sound.playClick();
     clearSession();
+    voiceGuide.stop(); // companion mode ends at logout — no mic on the landing page
     setUser(null);
     setActiveTab('scan');
   };

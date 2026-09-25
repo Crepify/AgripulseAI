@@ -482,12 +482,31 @@ export function matchIntent(lang, q) {
 // plain mentions ("tamil nadu mein bhaav") never trigger a switch.
 const LANG_SWITCH_NAMES = {
   en: ['english', 'angrezi', 'angreji', 'अंग्रेज़ी', 'अंग्रेजी', 'इंग्लिश', 'ஆங்கில', 'ఇంగ్లీష్', 'ಇಂಗ್ಲಿಷ್'],
-  hi: ['hindi', 'हिंदी'],
-  ta: ['tamil', 'tamizh', 'तमिल', 'தமிழ'],
-  te: ['telugu', 'तेलुगु', 'टेलुगु', 'తెలుగు'],
-  kn: ['kannada', 'कन्नड', 'कन्नड़', 'ಕನ್ನಡ'],
-  mr: ['marathi', 'मराठी'],
+  hi: ['hindi', 'हिंदी', 'हिंदि'],
+  ta: ['tamil', 'tamizh', 'तमिल', 'तमिळ', 'तामिल', 'टमिल', 'தமிழ'],
+  te: ['telugu', 'तेलुगु', 'तेलुगू', 'टेलुगु', 'తెలుగు'],
+  kn: ['kannada', 'कन्नड', 'कन्नड़', 'कान्नड', 'ಕನ್ನಡ'],
+  mr: ['marathi', 'मराठी', 'मराठि'],
 };
+// Content words that mark a phrase as a real sentence, NOT a language
+// request: "tamil NADU MEIN BHAAV HAI", "WHAT IS this app"…
+const LANG_SWITCH_CONTENT = new Set([
+  'nadu', 'pradesh', 'india', 'bharat', 'delhi', 'village', 'gaon',
+  'bhaav', 'bhav', 'daam', 'kimmat', 'price', 'prices', 'rate', 'paisa',
+  'paise', 'rupee', 'money', 'fasal', 'crop', 'kisan', 'farmer', 'mausam',
+  'weather', 'baarish', 'rain', 'disease', 'bimaari', 'dava', 'medicine',
+  'seed', 'beej', 'kitna', 'kitne', 'kahan', 'kaham', 'kab', 'kyun', 'kyu',
+  'kya', 'kaun', 'kaise', 'hai', 'hain', 'ho', 'hoga', 'chahiye', 'dikhao',
+  'dikha', 'kholo', 'khol', 'open', 'show', 'batao', 'bata', 'madad', 'help',
+  'bech', 'becho', 'khareed', 'khareedo', 'sell', 'buy', 'want', 'need',
+  'what', 'is', 'the', 'this', 'that', 'are', 'was', 'where', 'when', 'why',
+  'how', 'who', 'which', 'app',
+  'नाडू', 'प्रदेश', 'भारत', 'दिल्ली', 'गांव', 'भाव', 'दाम', 'कीमत', 'पैसा',
+  'पैसे', 'फसल', 'किसान', 'मौसम', 'बारिश', 'बीमारी', 'दवा', 'बीज',
+  'कितना', 'कितने', 'कहाँ', 'कहां', 'कब', 'क्यों', 'क्या', 'कौन', 'कैसे',
+  'है', 'हैं', 'हो', 'चाहिए', 'दिखाओ', 'दिखाइए', 'खोलो', 'बताओ', 'बताइए',
+  'मदद', 'बेचो', 'खरीदो', 'ऐप',
+]);
 const LANG_SWITCH_VERBS = [
   'bolo', 'bol', 'बोलो', 'बोल', 'speak', 'talk', 'reply', 'respond', 'answer',
   'say', 'karo', 'करो', 'badlo', 'बदलो', 'change', 'switch', 'baat', 'बात',
@@ -498,15 +517,27 @@ const LANG_SWITCH_VERBS = [
 ];
 
 export function matchLangSwitch(q, currentLang) {
-  const s = String(q || '').toLowerCase();
+  const s = String(q || '').toLowerCase().trim();
   if (!s) return null;
   const tokens = s.split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
-  const hasVerb = LANG_SWITCH_VERBS.some((v) =>
-    tokens.includes(v) || (v.length >= 4 && s.includes(v)));
-  if (!hasVerb) return null;
+  if (!tokens.length) return null;
   for (const [lang, names] of Object.entries(LANG_SWITCH_NAMES)) {
     if (lang === currentLang) continue;
-    if (names.some((n) => s.includes(n.toLowerCase()))) return lang;
+    const hit = names.some((n) => s.includes(n.toLowerCase()));
+    if (!hit) continue;
+    // SHORT request ("talk in tamil", "tamil bolo", "तमिल में", "टाक इन
+    // तामिल"): a language name and no content words → switch. Works no
+    // matter HOW the recognizer transcribed the verb — phonetic spellings
+    // of "talk"/"speak" are endless, the language name is the part that
+    // reliably survives transcription.
+    if (tokens.length <= 5 && !tokens.some((t) => LANG_SWITCH_CONTENT.has(t))) {
+      return lang;
+    }
+    // Longer utterance needs an explicit speak/change verb ("tamil nadu
+    // mein bhaav hai" must NOT switch).
+    const hasVerb = LANG_SWITCH_VERBS.some((v) =>
+      tokens.includes(v) || (v.length >= 4 && s.includes(v)));
+    if (hasVerb) return lang;
   }
   return null;
 }
@@ -581,6 +612,9 @@ export class VoiceGuide {
     this._listenCycle = 0;                 // rotates an English ear in while asking
     this._confirmGate = null;              // tour pauses while a stop-confirmation pends
     this._confirmGateResolve = null;
+    this._listenFails = 0;                 // consecutive recognizer start failures
+    this._watchdog = null;                 // revives the mic if Chrome silently drops it
+    this.watchdogMs = 10000;
   }
 
   _emit() {
@@ -676,10 +710,26 @@ export class VoiceGuide {
     return true;
   }
 
+  // Chrome's recognizer sometimes dies silently after several start/stop
+  // cycles (no onend, no onerror — the mic just stops delivering). While
+  // the guide is active and idle, if the engine reports not-listening we
+  // restart the loop ourselves. This is the safety net that keeps the
+  // guide alive for a whole session.
+  _startWatchdog() {
+    if (this._watchdog) return;
+    this._watchdog = setInterval(() => {
+      if (!this.active || this.suspended || this._speaking) return;
+      const e = this.engine;
+      if (!e || !e.recognition) return;
+      if (e.isListening === false) this._listen();
+    }, this.watchdogMs);
+  }
+
   start(lang) {
     this.lang = GUIDE_LANGS.includes(lang) ? lang : 'hi';
     this.active = true;
     this.blocked = false;
+    this._startWatchdog();
     this._emit();
   }
 
@@ -688,6 +738,7 @@ export class VoiceGuide {
     this._tourRunning = false;
     if (this._confirmGateResolve) { this._confirmGateResolve(); this._confirmGateResolve = null; }
     this._confirmGate = null;
+    if (this._watchdog) { clearInterval(this._watchdog); this._watchdog = null; }
     this.clearReminder();
     this._listenToken += 1;
     this._resolveAck(null);
@@ -708,7 +759,7 @@ export class VoiceGuide {
 
   resume() {
     this.suspended = false;
-    if (this.active) this._listen();
+    if (this.active) { this._listen(); this._startWatchdog(); }
     this._emit();
   }
 
@@ -861,7 +912,18 @@ export class VoiceGuide {
           if (token === this._listenToken) revive(300);
         },
       );
-    } catch { /* already started */ }
+      this._listenFails = 0; // started fine
+    } catch {
+      // start() threw (typically InvalidStateError — the recognizer was
+      // still stopping). Swallowing this used to kill the mic loop
+      // PERMANENTLY: the guide went deaf mid-tour. Retry instead.
+      this._listenFails += 1;
+      if (this._listenFails <= 6) {
+        setTimeout(() => {
+          if (token === this._listenToken && this.active && !this.suspended && !this._speaking) this._listen();
+        }, 400);
+      }
+    }
   }
 
   _handleSpeech(transcript) {
@@ -911,7 +973,8 @@ export class VoiceGuide {
         this._confirmGate = null;
         if (ans === 'yes') {
           this._tourRunning = false;
-          this.sayKey('tourBye', { listenAfter: false }).then(() => this.stop());
+          this._emit();
+          this.sayKey('tourBye'); // companion mode — guide stays on, mic hot
         }
         // 'no' / timeout → the tour simply carries on
       });
@@ -952,6 +1015,7 @@ export class VoiceGuide {
   async runServiceTour() {
     if (this._tourRunning) return;
     this._tourRunning = true;
+    this._startWatchdog();
     this.active = true;
     this._emit();
 
@@ -985,14 +1049,28 @@ export class VoiceGuide {
       if (this._confirmGate) await this._confirmGate;
       if (!this._tourRunning) return;
       if (ans === 'no') {
-        await this.sayKey('tourBye', { listenAfter: false });
-        this.stop();
-        return;
+        // A single stray 'no' (noise, a bystander, a breath finalized by
+        // the recognizer) must NEVER end the tour and silence the app —
+        // confirm it. A real stop is two words: बस … हाँ.
+        const sure = await this.askKey('tourStopAsk', 8000);
+        if (this._confirmGate) await this._confirmGate;
+        if (!this._tourRunning) return;
+        if (sure === 'yes') {
+          this._tourRunning = false;
+          this._emit();
+          await this.sayKey('tourBye'); // companion mode — mic stays hot
+          return;
+        }
+        // not sure / silence → carry on with the tour
       }
       // yes / timeout / unrecognized → continue at their pace
     }
-    await this.sayKey('tourDone', { listenAfter: false });
-    this.stop();
+    // Companion mode: the tour is over but the guide stays available —
+    // "talk in tamil", "mandi kholo" etc. keep working. Full stop only
+    // happens when the farmer presses stop or logs out.
+    this._tourRunning = false;
+    this._emit();
+    await this.sayKey('tourDone');
   }
 
   stopTour() { this._tourRunning = false; this.stop(); }

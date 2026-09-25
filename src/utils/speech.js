@@ -153,7 +153,22 @@ class SpeechEngine {
         if (onError) onError(e.error);
       };
 
-      this.recognition.start();
+      // Chrome throws InvalidStateError if start() races a previous stop —
+      // abort and retry a couple of times instead of failing the whole
+      // listening session (rapid speak/listen cycles made this frequent).
+      const attemptStart = (retriesLeft) => {
+        try {
+          this.recognition.start();
+        } catch (err) {
+          if (retriesLeft > 0) {
+            try { this.recognition.abort(); } catch { /* wasn't running */ }
+            setTimeout(() => attemptStart(retriesLeft - 1), 350);
+            return;
+          }
+          throw err;
+        }
+      };
+      attemptStart(2);
     } catch (err) {
       this.isListening = false;
       if (onError) onError(err);
