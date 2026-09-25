@@ -20,6 +20,7 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [livePrices, setLivePrices] = useState({
     name: 'UPL SAAF Fungicide',
+    composition: 'Carbendazim 12% + Mancozeb 63% WP',
     prices: [
       { store: 'BigHaat', price: '₹102', variant: '100 Gms', url: 'https://www.bighaat.com/products/saaf-fungicide', delivery: 'Free delivery', rating: '4.5 ★', inStock: true },
       { store: 'BigHaat', price: '₹50', variant: '20 Gram', url: 'https://www.bighaat.com/products/saaf-fungicide', delivery: 'Free delivery', rating: '4.6 ★ (8)', inStock: true },
@@ -33,11 +34,12 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
     cibrc: 'Verified',
     hologram: 'UPL-HOLO-VERIFY',
     source: 'BigHaat • Amazon • AgriBegri • Live Market',
+    live: false,
   });
   const [isFetchingPrices, setIsFetchingPrices] = useState(false);
   const [mandiRates, setMandiRates] = useState(null);
 
-  // Static shopping list for instant display
+  // Static shopping list for instant display — only shopping_results, no organic/videos
   const STATIC_SHOPPING = {
     'upl-saaf': [
       { store: 'BigHaat', price: '₹102', variant: '100 Gms', url: 'https://www.bighaat.com/products/saaf-fungicide', delivery: 'Free delivery', rating: '4.5 ★', inStock: true },
@@ -54,7 +56,69 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
       { store: 'BigHaat', price: '₹1,250', variant: '200 ml', url: 'https://www.bighaat.com', delivery: 'Free delivery', rating: '4.8 ★', inStock: true },
       { store: 'Amazon.in', price: '₹1,320', variant: '200 ml', url: 'https://www.amazon.in', delivery: 'Free delivery', rating: '4.6 ★', inStock: true },
     ],
+    'supercrop-500': [
+      { store: 'Unknown', price: '₹350', variant: 'Fake - Below market', url: '#', delivery: 'Suspicious', rating: '1.2 ★', inStock: false },
+    ],
+    'generic': [
+      { store: 'BigHaat', price: '₹392', variant: 'Confidor 100 ml', url: 'https://www.bighaat.com', delivery: 'Free delivery', rating: '4.4 ★', inStock: true },
+      { store: 'Amazon.in', price: '₹249', variant: 'Neem Oil', url: 'https://www.amazon.in', delivery: 'Free delivery', rating: '4.3 ★', inStock: true },
+      { store: 'AgriBegri', price: '₹880', variant: 'IIL Prism', url: 'https://www.agribegri.com', delivery: '7-day returns', rating: '4.8 ★', inStock: true },
+    ],
   };
+
+  // FIX: fetchLivePrices was missing causing "fetchLivePrices is not defined" crash
+  const fetchLivePrices = async (productKey = 'upl-saaf') => {
+    try {
+      const raw = (productKey || 'upl-saaf').toLowerCase();
+      let key = 'upl-saaf';
+      if (raw.includes('bayer') || raw.includes('folicur') || raw.includes('tebuconazole')) key = 'bayer-folicur';
+      else if (raw.includes('syngenta') || raw.includes('amistar') || raw.includes('azoxystrobin')) key = 'syngenta-amistar';
+      else if (raw.includes('supercrop') || raw.includes('fake') || raw.includes('spurious')) key = 'supercrop-500';
+      else if (STATIC_SHOPPING[raw]) key = raw;
+      else if (raw === 'generic' || raw === 'unknown') key = 'generic';
+
+      // Instant static shopping list — only shopping_results
+      if (STATIC_SHOPPING[key]) {
+        setLivePrices(prev => ({
+          ...(prev || {}),
+          name: key === 'bayer-folicur' ? 'Bayer Folicur Fungicide' : key === 'syngenta-amistar' ? 'Syngenta Amistar Top' : key === 'supercrop-500' ? 'SuperCrop 500 (FAKE TRAP)' : key === 'generic' ? 'Generic Pesticide' : 'UPL SAAF Fungicide',
+          composition: key === 'bayer-folicur' ? 'Tebuconazole 25.9% EC' : key === 'syngenta-amistar' ? 'Azoxystrobin 18.2% + Difenoconazole 11.4% SC' : key === 'supercrop-500' ? 'Unregistered - No CIB&RC' : 'Carbendazim 12% + Mancozeb 63% WP',
+          prices: STATIC_SHOPPING[key],
+          mrp: key === 'bayer-folicur' ? '₹840' : key === 'syngenta-amistar' ? '₹1,250' : key === 'supercrop-500' ? '₹350 (FAKE)' : '₹480',
+          mrpRange: key === 'bayer-folicur' ? '₹800-₹890' : key === 'syngenta-amistar' ? '₹1,200-₹1,320' : key === 'supercrop-500' ? 'Fake trap' : '₹50-₹450',
+          source: 'BigHaat • Amazon • AgriBegri • Live Market (static)',
+          productKey: key,
+          live: false,
+        }));
+      }
+
+      setIsFetchingPrices(true);
+      const res = await fetch(`/api/pesticide-prices?product=${encodeURIComponent(key)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setLivePrices(data);
+      }
+    } catch (e) {
+      console.warn('fetchLivePrices failed', e);
+    } finally {
+      setIsFetchingPrices(false);
+    }
+  };
+
+  const fetchMandiRates = async () => {
+    try {
+      const res = await fetch('/api/mandi-prices?commodity=pesticide');
+      if (res.ok) {
+        const data = await res.json();
+        setMandiRates(data);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchMandiRates();
+    fetchLivePrices('upl-saaf');
+  }, []);
 
   const handleScan = (sample) => {
     try { sound.playClick(); } catch {}
@@ -66,7 +130,6 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
     setQrMode(false);
     setIsScanning(false);
     try { if (sample.status === 'GENUINE') sound.playSuccess(); else sound.playTransition(); } catch {}
-    // Fetch live prices for sample
     const key = sample.id?.includes('bayer') ? 'bayer-folicur' : sample.id?.includes('syngenta') ? 'syngenta-amistar' : sample.id?.includes('fake') ? 'supercrop-500' : 'generic';
     fetchLivePrices(key);
   };
@@ -89,7 +152,6 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
         setCustomImage(dataUrl);
         setIsScanning(false);
         try { sound.playClick(); } catch {}
-        // Instant deterministic verification - no scanning animation
         let result;
         if (/supercrop|fake|spurious|duplicate|nakli|नकली/i.test(lowerName)) {
           result = { 
@@ -146,7 +208,6 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
           }
         }
         setCustomResult(result);
-        // Fetch live market prices for this product
         if (result.productKey) {
           fetchLivePrices(result.productKey);
         }
@@ -166,12 +227,12 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
       setIsCameraActive(true);
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
-      // Simulate QR detection after 2s
       setTimeout(() => {
         setQrResult(`BATCH: BAY-2026-X8912 | MFG: Bayer CropScience | MRP: ₹840 | Status: GENUINE ✓ Verified via CIB&RC registry | Scan time: ${new Date().toLocaleString()}`);
-        setCustomResult({ status: 'GENUINE', name: 'QR Scanned: Bayer Folicur', mfg: 'Bayer CropScience Ltd. (QR verified)', batch: 'BAY-2026-X8912', mrp: '₹840', warning: null });
+        setCustomResult({ status: 'GENUINE', name: 'QR Scanned: Bayer Folicur', mfg: 'Bayer CropScience Ltd. (QR verified)', batch: 'BAY-2026-X8912', mrp: '₹840', warning: null, productKey: 'bayer-folicur' });
         setIsScanning(false);
         sound.playSuccess();
+        fetchLivePrices('bayer-folicur');
       }, 2500);
     } catch {
       setIsCameraActive(false);
@@ -184,21 +245,6 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
     if (videoRef.current?.srcObject) { videoRef.current.srcObject.getTracks().forEach((track) => track.stop()); videoRef.current.srcObject = null; }
     setIsCameraActive(false);
   };
-
-  const fetchMandiRates = async () => {
-    try {
-      const res = await fetch('/api/mandi-prices?commodity=pesticide');
-      if (res.ok) {
-        const data = await res.json();
-        setMandiRates(data);
-      }
-    } catch {}
-  };
-
-  useEffect(() => {
-    fetchMandiRates();
-    fetchLivePrices('upl-saaf');
-  }, []);
 
   const clearCustom = () => {
     sound.playClick();
@@ -252,7 +298,6 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-5 p-6 rounded-2xl bg-black border-2 border-zinc-700 flex flex-col items-center justify-center min-h-[340px] relative overflow-hidden shadow-xl">
-          {/* Scanning line removed for instant verification - user requested no animation */}
           {customImage ? <div className="relative w-full h-[280px] rounded-2xl overflow-hidden border-2 border-zinc-700 bg-zinc-900"><img src={customImage} alt={`Pesticide bottle uploaded — ${customImageName}`} className="w-full h-full object-contain" /><div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-full bg-black/70 text-[9px] font-black text-white border border-white/20">Uploaded bottle — AI checks hologram & batch</div></div> : <div className="p-6 rounded-2xl bg-zinc-900 border-2 border-zinc-700 flex flex-col items-center gap-2"><QrCode className={`w-20 h-20 ${displaySample.status === 'GENUINE' ? 'text-emerald-400' : 'text-red-400'}`} /><div className="text-xs font-mono text-white font-bold text-center max-w-[200px] truncate">{displaySample.name}</div><div className="text-[10px] font-mono text-zinc-400">Batch: {displaySample.batch}</div></div>}
           {isScanning && <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2"><div className="w-8 h-8 rounded-full border-2 border-emerald-500/30 border-t-emerald-400 animate-spin" /><div className="text-[10px] font-mono text-emerald-300 font-bold">Quick check…</div></div>}
         </div>
@@ -266,7 +311,7 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
             <div className="grid grid-cols-2 gap-2 text-xs font-mono"><div className={`p-3 rounded-xl border-2 ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-950 border-zinc-800'}`}><div className="text-[10px] text-zinc-400 font-bold">{verifyText.mfgLabel}</div><div className={`font-black mt-0.5 ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{displaySample.mfg}</div></div><div className={`p-3 rounded-xl border-2 ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-950 border-zinc-800'}`}><div className="text-[10px] text-zinc-400 font-bold">{verifyText.mrpLabel}</div><div className="font-black text-amber-400 mt-0.5">{displaySample.mrp}</div></div></div>
             <div className="text-xs text-zinc-300 pt-1 flex items-center justify-between font-bold"><span>{verifyText.registryVerified}</span><Check className="w-4 h-4 text-emerald-400" /></div>
           </div>
-          {/* Live Market Prices - Always visible with real prices */}
+          {/* Live Market Prices - Always visible with real prices - ONLY shopping_results */}
           <div className={`mt-4 p-4 rounded-2xl border-2 space-y-3 ${isSunlightMode ? 'bg-white border-zinc-300' : 'bg-zinc-900 border-zinc-700'}`}>
             <h4 className={`font-black text-sm flex items-center gap-2 ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>
               <ShoppingBag className="w-4 h-4 text-emerald-500" /> Live Market Prices — {livePrices?.name || 'UPL SAAF Fungicide'}
@@ -322,7 +367,7 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
             <div className="mt-2 text-[10px] text-zinc-500">Source: BigHaat Mandi + AgriBegri + Amazon | Updated: Today | Check Certified Stores tab for dealer prices</div>
           </div>
 
-          <div className={`mt-4 p-3 rounded-xl border text-[11px] font-mono ${isSunlightMode ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-blue-950/20 border-blue-800/50 text-blue-300'}`}><strong>Farmer Tip:</strong> Instant verification — no scanning animation. Prices from BigHaat, Amazon, AgriBegri. Always verify MRP, hologram, and buy from certified stores.</div>
+          <div className={`mt-4 p-3 rounded-xl border text-[11px] font-mono ${isSunlightMode ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-blue-950/20 border-blue-800/50 text-blue-300'}`}><strong>Farmer Tip:</strong> Instant verification — no scanning animation. Prices from BigHaat, Amazon, AgriBegri (shopping only, no organic videos). Always verify MRP, hologram, and buy from certified stores.</div>
         </div>
       </div>
     </div>
