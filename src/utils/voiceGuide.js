@@ -624,8 +624,13 @@ export class VoiceGuide {
     this._reminderTimers = [];             // patient step reminders
     this._reminderToken = 0;               // invalidates in-flight reminder schedules
     this.tourAskMs = 5000;                 // tour pace: silence → keep going
-    this._speaking = false;                // our own TTS is playing — mic MUST stay off
-    this._listenCycle = 0;                 // rotates an English ear in while asking
+    this._speaking = false;                // our own TTS is playing (barge-watch active)
+    this._listenCycle = 0;                 // ear rotation for auto language detection
+    this._speechGen = 0;                   // barge-in generation — cancels queued lines
+    this._activeLineFinish = null;         // finisher of the line currently speaking
+    this._askPending = false;              // an ask()'s question is being spoken
+    this._bargeStash = '';                 // farmer's mid-question answer, replayed once the waiter exists
+    this._earIdx = 0;                      // foreign-ear rotation index
     this._confirmGate = null;              // tour pauses while a stop-confirmation pends
     this._confirmGateResolve = null;
     this._listenFails = 0;                 // consecutive recognizer start failures
@@ -788,6 +793,8 @@ export class VoiceGuide {
   stop() {
     this.active = false;
     this._tourRunning = false;
+    this._askPending = false;
+    this._bargeStash = '';
     if (this._confirmGateResolve) { this._confirmGateResolve(); this._confirmGateResolve = null; }
     this._confirmGate = null;
     if (this._watchdog) { clearInterval(this._watchdog); this._watchdog = null; }
@@ -845,10 +852,14 @@ export class VoiceGuide {
     if (!this.active) return Promise.resolve(false);
     let resolve;
     const p = new Promise((res) => { resolve = res; });
-    const run = () => this._sayNow(text, listenAfter, fallback).then(
-      (v) => { resolve(v); return v; },
-      () => { resolve(false); return false; },
-    );
+    const gen = this._speechGen; // a barge-in after enqueue cancels this line
+    const run = () => {
+      if (gen !== this._speechGen) { resolve(false); return Promise.resolve(false); }
+      return this._sayNow(text, listenAfter, fallback).then(
+        (v) => { resolve(v); return v; },
+        () => { resolve(false); return false; },
+      );
+    };
     // small natural gap between consecutive lines
     this._speechQueue = this._speechQueue.then(() => new Promise((r) => setTimeout(r, 250))).then(run, run);
     return p;
@@ -859,6 +870,9 @@ export class VoiceGuide {
     if (!this.active) return false;
     await this._ensureVoices();
     try { this.engine.stopListening(); } catch { /* noop */ }
+    // Barge watch: the mic stays live while we speak so the farmer can talk
+    // over us; echo is filtered in _maybeBarge.
+    if (this.active && !this.suspended) this._listen();
 
     const langCode = `${this.lang}-IN`;
     let spoke = false;
@@ -869,6 +883,7 @@ export class VoiceGuide {
       const finish = (ok) => {
         if (settled) return;
         settled = true;
+        this._activeLineFinish = null;
         this._speaking = false;
         clearInterval(poll);
         clearTimeout(giveUp);
@@ -878,6 +893,8 @@ export class VoiceGuide {
         this._emit();
         resolve(spoke);
       };
+
+      this._activeLineFinish = finish; // a barge-in can cut this line instantly
 
       // Local native voice → local; else cloud TTS; else local fallback text.
       try {
@@ -911,7 +928,9 @@ export class VoiceGuide {
 
   // Ask a yes/no question and wait for the answer (or timeout → 'timeout').
   ask(text, timeoutMs = 16000) {
+    this._askPending = true;
     return this.say(text).then(() => new Promise((resolve) => {
+      this._askPending = false;
       if (!this.active) { resolve(null); return; }
       // A previous question may still be pending (language switch re-ask,
       // barge-in resume…) — retire it cleanly so its stale 5s/16s timer can
@@ -931,6 +950,12 @@ export class VoiceGuide {
         },
         cancel: () => clearTimeout(timer),
       };
+      // The farmer answered BEFORE the question finished — replay it now.
+      if (this._bargeStash) {
+        const stashed = this._bargeStash;
+        this._bargeStash = '';
+        setTimeout(() => this._handleSpeech(stashed), 0);
+      }
     }));
   }
 
@@ -939,25 +964,43 @@ export class VoiceGuide {
   // The recognizer is single-language. While the guide speaks a regional
   // language the farmer may still answer a question in English — so every
   // third listening cycle during a pending question listens in en-IN.
+  // The recognizer is single-language, so auto-detection works by giving
+  // the mic a rotating 'ear': mostly the guide's own language, alternating
+  // through every other language. Speak ANY supported language and within a
+  // few seconds an ear hears it — script detection then switches the guide.
   _listenLangCode() {
     this._listenCycle++;
-    if (this.lang !== 'en' && (this._listenCycle % 3) === 0) return 'en-IN';
-    return `${this.lang}-IN`;
+    const own = `${this.lang}-IN`;
+    const foreign = ['en', 'hi', 'ta', 'te', 'kn']
+      .filter((l) => l !== this.lang)
+      .map((l) => `${l}-IN`);
+    if (this._listenCycle % 2 === 1 || foreign.length === 0) return own;
+    return foreign[(this._earIdx++) % foreign.length];
   }
 
-  // Keep the mic hot between instructions; restart when each utterance ends.
+  // Keep the mic hot between instructions AND while the guide itself speaks
+  // (barge watch): every final transcript during speech is compared against
+  // the line being spoken — our own voice through the speakers matches and is
+  // ignored; a genuinely different voice (the farmer interrupting) cuts the
+  // speech immediately, Gemini-style.
   _listen() {
-    if (!this.active || this.suspended || this._speaking || !this.engine.recognition) return;
+    if (!this.active || this.suspended || !this.engine.recognition) return;
+    try { if (this.engine.isListening) return; } catch { /* older engines */ }
     const token = ++this._listenToken;
     let latest = '';
     const langCode = this._listenLangCode();
     const revive = (ms) => setTimeout(() => {
-      if (token === this._listenToken && this.active && !this.suspended && !this._speaking) this._listen();
+      if (token === this._listenToken && this.active && !this.suspended) this._listen();
     }, ms);
     try {
       this.engine.startListening(
         langCode,
-        (transcript, meta) => { if (!meta || meta.final) latest = transcript; },
+        (transcript, meta) => {
+          if (!meta || meta.final) {
+            if (this._speaking) this._maybeBarge(String(transcript || ''));
+            else latest = transcript;
+          }
+        },
         () => {
           if (token !== this._listenToken) return;
           if (latest && latest.trim()) this._handleSpeech(latest);
@@ -984,6 +1027,39 @@ export class VoiceGuide {
         }, 400);
       }
     }
+  }
+
+  // Is this transcript just our own voice coming back through the mic?
+  // (token overlap with the line being spoken)
+  _similarToSpeech(q) {
+    const norm = (s) => String(s || '').toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
+    const a = norm(q);
+    const b = norm(this.lastLine);
+    if (!a.length || !b.length) return true;
+    const B = new Set(b);
+    let inter = 0;
+    a.forEach((t) => { if (B.has(t)) inter += 1; });
+    if (inter >= 2) return true;
+    const union = new Set([...a, ...b]).size;
+    return union > 0 && (inter / union) >= 0.2;
+  }
+
+  // The farmer talked over the guide — stop talking NOW and listen.
+  _maybeBarge(transcript) {
+    const q = String(transcript || '').trim();
+    if (!q) return;
+    if (this._similarToSpeech(q)) return; // echo of our own line — ignore
+    this._speechGen += 1;                 // cancel every line queued before this moment
+    this._speaking = false;
+    try { this.engine.stopSpeaking(); } catch { /* noop */ }
+    // Resolve the interrupted line immediately — its watcher may never have
+    // seen playback start, and waiting for the give-up timer stalled the
+    // whole speech queue for seconds after every interruption.
+    try { if (this._activeLineFinish) this._activeLineFinish(true); } catch { /* noop */ }
+    // Answered before the question finished? Stash it — ask() replays it the
+    // instant its waiter exists.
+    if (this._askPending) { this._bargeStash = q; return; }
+    this._handleSpeech(q);
   }
 
   _handleSpeech(transcript) {
@@ -1115,12 +1191,15 @@ export class VoiceGuide {
       }
       // The option's NAME first — clearly, unhurried — then a natural beat,
       // then its explanation. One run-on sentence was hard to follow.
+      const gen = this._speechGen;
       await this.say(name, { fallback: fbName });
       if (this._confirmGate) await this._confirmGate;
       if (!this._tourRunning) return;
-      await this.say(desc, { fallback: fbDesc });
-      if (this._confirmGate) await this._confirmGate;
-      if (!this._tourRunning) return;
+      if (gen === this._speechGen) { // interrupted mid-name? skip the description
+        await this.say(desc, { fallback: fbDesc });
+        if (this._confirmGate) await this._confirmGate;
+        if (!this._tourRunning) return;
+      }
       // Silence or anything unclear → continue at their pace; the 5s cap
       // keeps the tour alive instead of 16s of dead air that feels like
       // "the guide is done" after every single service.
