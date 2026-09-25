@@ -5,9 +5,10 @@ const BUILD_ID = '__BUILD_ID__';
 const SHELL_CACHE = `agripulse-shell-${BUILD_ID}`;
 const MODEL_CACHE = 'agripulse-models-v1';
 
-const SHELL_PRECACHE = ['/', '/index.html', '/manifest.json'];
+const SHELL_PRECACHE = ['/', '/index.html', '/manifest.json', '/data/pesticide-offline-db.json'];
 const SHELL_OPTIONAL = ['/icon.svg', '/favicon.svg', '/icons.svg'];
 const MODEL_PREFIXES = ['/models/', '/litert/', '/yolo/'];
+const DATA_PREFIXES = ['/data/'];
 const MODEL_PRECACHE = [
   '/litert/core.js',
   '/litert/wasm-utils.js',
@@ -22,9 +23,11 @@ const MODEL_PRECACHE = [
   '/yolo/ultralytics_inference_web_bg.wasm',
   '/models/agripulse.tflite',
   '/models/classes.json',
+  '/data/pesticide-offline-db.json',
 ];
 
 const isModelPath = (pathname) => MODEL_PREFIXES.some((p) => pathname.startsWith(p));
+const isDataPath = (pathname) => DATA_PREFIXES.some((p) => pathname.startsWith(p));
 
 async function addIfMissing(cache, url) {
   try {
@@ -38,12 +41,10 @@ self.addEventListener('install', (event) => {
     try {
       const res = await fetch('/index.html', { cache: 'no-cache' });
       const html = await res.text();
-      const assets = [...html.matchAll(/(?:src|href)="(\\/assets\\/[^"]+)"/g)].map((m) => m[1]);
+      const assets = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
       await shell.put('/index.html', new Response(html, { headers: res.headers }));
-      // Also cache root as index.html for navigation fallback
       await shell.put('/', new Response(html, { headers: res.headers }));
       if (assets.length) {
-        // Fetch assets with no-cache to ensure we have latest
         await Promise.all(assets.map(async (a) => {
           try {
             const r = await fetch(a, { cache: 'no-cache' });
@@ -51,6 +52,8 @@ self.addEventListener('install', (event) => {
           } catch {}
         }));
       }
+      // Precache offline DB explicitly
+      await addIfMissing(shell, '/data/pesticide-offline-db.json');
     } catch {}
     await Promise.all(SHELL_OPTIONAL.map((u) => addIfMissing(shell, u)));
     const models = await caches.open(MODEL_CACHE);
@@ -97,7 +100,6 @@ async function cacheFirst(request, cacheName) {
   }
 }
 
-// NETWORK-FIRST for navigation — prevents black screen from stale index.html referencing deleted hashed assets
 async function networkFirstNavigation(request) {
   const cache = await caches.open(SHELL_CACHE);
   try {
@@ -108,18 +110,15 @@ async function networkFirstNavigation(request) {
       cache.put('/', response.clone()).catch(() => {});
       return response;
     }
-    // If server returns 404/500, try cache
     if (response && response.status >= 400) {
       const cached = await cache.match(request, { ignoreVary: true }) || await cache.match('/index.html', { ignoreVary: true });
       if (cached) return cached;
       return response;
     }
   } catch (e) {
-    // Network failed — serve cached shell
     const cached = await cache.match(request, { ignoreVary: true }) || await cache.match('/index.html', { ignoreVary: true }) || await cache.match('/', { ignoreVary: true });
     if (cached) return cached;
   }
-  // Last resort
   const fallback = await cache.match('/index.html', { ignoreVary: true });
   if (fallback) return fallback;
   return new Response('<h1>Offline — please reconnect</h1>', { status: 503, headers: { 'Content-Type': 'text/html' } });
@@ -153,10 +152,9 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) {
     return;
   }
-  if (isModelPath(url.pathname)) {
-    event.respondWith(cacheFirst(request, MODEL_CACHE));
+  if (isModelPath(url.pathname) || isDataPath(url.pathname)) {
+    event.respondWith(cacheFirst(request, url.pathname.startsWith('/data/') ? SHELL_CACHE : MODEL_CACHE));
   } else if (url.pathname.startsWith('/assets/')) {
-    // For hashed assets, network first to avoid 404 black screen — if asset deleted on server, fetch new index.html path
     event.respondWith((async () => {
       try {
         const res = await fetch(request, { cache: 'no-cache' });
@@ -165,7 +163,6 @@ self.addEventListener('fetch', (event) => {
           cache.put(request, res.clone()).catch(() => {});
           return res;
         }
-        // If 404 (old hashed file deleted), try cache, then force navigation to refresh shell
         const cache = await caches.open(SHELL_CACHE);
         const cached = await cache.match(request, { ignoreVary: true });
         if (cached) return cached;

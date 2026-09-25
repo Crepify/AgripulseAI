@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, AlertOctagon, QrCode, Check, Upload, Camera, X, Image as ImageIcon, Sparkles, Scan, RefreshCw, ShoppingBag } from 'lucide-react';
+import { ShieldCheck, AlertOctagon, QrCode, Check, Upload, Camera, X, Image as ImageIcon, Sparkles, Scan, RefreshCw, ShoppingBag, WifiOff, Database } from 'lucide-react';
 import { PESTICIDE_SAMPLES } from '../data/agriData';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
+import { searchOfflinePesticides, getOfflineProductByKey, loadOfflineDB } from '../utils/offlinePesticideSearch';
 
 export default function TabVerify({ selectedLang, isSunlightMode }) {
   const t = T[selectedLang] || T['en'];
@@ -38,6 +39,10 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
   });
   const [isFetchingPrices, setIsFetchingPrices] = useState(false);
   const [mandiRates, setMandiRates] = useState(null);
+  const [offlineSearchQuery, setOfflineSearchQuery] = useState('');
+  const [offlineResults, setOfflineResults] = useState([]);
+  const [isOfflineMode, setIsOfflineMode] = useState(() => !navigator.onLine);
+  const [offlineDBLoaded, setOfflineDBLoaded] = useState(false);
 
   // Static shopping list for instant display — only shopping_results, no organic/videos
   const STATIC_SHOPPING = {
@@ -107,34 +112,56 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
         });
       }
 
-      // 3) If offline, stop here — static + cached is all we have (Google needs internet)
+      // 3) If offline, use 100% offline DB as alternative (no Google needed)
       if (!navigator.onLine) {
-        console.log('[AgriPulse] Offline - showing static + cached shopping list');
+        console.log('[AgriPulse] Offline - using offline DB alternative');
+        try {
+          const offlineProduct = await getOfflineProductByKey(key);
+          if (offlineProduct) {
+            setLivePrices({
+              ...offlineProduct,
+              source: 'Offline Price Book — 100% Offline Alternative (no Google needed)',
+              offline: true,
+              live: false,
+            });
+          }
+        } catch {}
         return;
       }
 
       // 4) Online: try live Google Shopping via /api/pesticide-prices (uses SerpAPI if SERPAPI_KEY set)
       setIsFetchingPrices(true);
-      const res = await fetch(`/api/pesticide-prices?product=${encodeURIComponent(key)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setLivePrices(data);
-        // Cache for offline use (7 days)
-        try {
-          localStorage.setItem(`ap_pesticide_${key}`, JSON.stringify({ ...data, cachedAt: Date.now() }));
-          // Also cache in IndexedDB mandiCache if available
-          const { openDB } = await import('idb').catch(() => ({ openDB: null }));
-          if (openDB) {
-            const db = await openDB('agripulse_db', 1);
-            if (db.objectStoreNames.contains('mandiCache')) {
-              await db.put('mandiCache', { crop: `pesticide_${key}`, data, timestamp: Date.now() });
+      try {
+        const res = await fetch(`/api/pesticide-prices?product=${encodeURIComponent(key)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setLivePrices(data);
+          try {
+            localStorage.setItem(`ap_pesticide_${key}`, JSON.stringify({ ...data, cachedAt: Date.now() }));
+            const { openDB } = await import('idb').catch(() => ({ openDB: null }));
+            if (openDB) {
+              const db = await openDB('agripulse_db', 1);
+              if (db.objectStoreNames.contains('mandiCache')) {
+                await db.put('mandiCache', { crop: `pesticide_${key}`, data, timestamp: Date.now() });
+              }
             }
-          }
+          } catch {}
+        } else {
+          // API failed, fallback to offline DB
+          const offlineProduct = await getOfflineProductByKey(key);
+          if (offlineProduct) setLivePrices({ ...offlineProduct, source: 'Offline Price Book — Fallback (API failed)', offline: false, live: false });
+        }
+      } catch {
+        // Network failed, fallback to offline DB
+        try {
+          const offlineProduct = await getOfflineProductByKey(key);
+          if (offlineProduct) setLivePrices({ ...offlineProduct, source: 'Offline Price Book — Fallback (offline alternative)', offline: true, live: false });
         } catch {}
+      } finally {
+        setIsFetchingPrices(false);
       }
     } catch (e) {
       console.warn('fetchLivePrices failed (offline?)', e);
-    } finally {
       setIsFetchingPrices(false);
     }
   };
@@ -159,7 +186,40 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
   useEffect(() => {
     fetchMandiRates();
     fetchLivePrices('upl-saaf');
+    // Load offline DB in background for 100% offline alternative
+    loadOfflineDB().then(() => setOfflineDBLoaded(true)).catch(()=>{});
+    // Track online/offline
+    const handleOnline = () => { setIsOfflineMode(false); fetchLivePrices('upl-saaf'); };
+    const handleOffline = () => setIsOfflineMode(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
+
+  // Offline search handler — 100% offline alternative to Google
+  const handleOfflineSearch = async (query) => {
+    setOfflineSearchQuery(query);
+    if (!query.trim()) {
+      setOfflineResults([]);
+      return;
+    }
+    try {
+      const results = await searchOfflinePesticides(query);
+      setOfflineResults(results.slice(0, 6));
+      // If exact match, show its prices
+      if (results.length > 0 && results[0]._score >= 30) {
+        setLivePrices({
+          ...results[0],
+          source: 'Offline Price Book — Search Result (100% offline, no Google)',
+          offline: true,
+          live: false,
+        });
+      }
+    } catch {}
+  };
 
   const handleScan = (sample) => {
     try { sound.playClick(); } catch {}
@@ -352,11 +412,44 @@ export default function TabVerify({ selectedLang, isSunlightMode }) {
             <div className="grid grid-cols-2 gap-2 text-xs font-mono"><div className={`p-3 rounded-xl border-2 ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-950 border-zinc-800'}`}><div className="text-[10px] text-zinc-400 font-bold">{verifyText.mfgLabel}</div><div className={`font-black mt-0.5 ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{displaySample.mfg}</div></div><div className={`p-3 rounded-xl border-2 ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-950 border-zinc-800'}`}><div className="text-[10px] text-zinc-400 font-bold">{verifyText.mrpLabel}</div><div className="font-black text-amber-400 mt-0.5">{displaySample.mrp}</div></div></div>
             <div className="text-xs text-zinc-300 pt-1 flex items-center justify-between font-bold"><span>{verifyText.registryVerified}</span><Check className="w-4 h-4 text-emerald-400" /></div>
           </div>
+          {/* OFFLINE ALTERNATIVE: 100% offline search — no Google needed */}
+          <div className={`mt-4 p-4 rounded-2xl border-2 space-y-3 ${isSunlightMode ? 'bg-emerald-50 border-emerald-300' : 'bg-zinc-900 border-emerald-700/50'}`}>
+            <h4 className={`font-black text-sm flex items-center gap-2 ${isSunlightMode ? 'text-emerald-900' : 'text-emerald-200'}`}>
+              {isOfflineMode ? <WifiOff className="w-4 h-4 text-red-500" /> : <Database className="w-4 h-4 text-emerald-500" />}
+              {isOfflineMode ? 'Offline Mode — 100% Offline Price Book' : 'Offline Alternative — Works Without Internet'}
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${isOfflineMode ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'}`}>{isOfflineMode ? 'OFFLINE' : offlineDBLoaded ? 'OFFLINE READY' : 'LOADING...'}</span>
+            </h4>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={offlineSearchQuery}
+                onChange={(e) => handleOfflineSearch(e.target.value)}
+                placeholder="Search pesticide offline: e.g. SAAF, Bayer Folicur, Neem, Amistar..."
+                className={`flex-1 px-3 py-2 rounded-xl border-2 text-xs font-mono ${isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900 placeholder:text-zinc-400' : 'bg-zinc-950 border-zinc-700 text-white placeholder:text-zinc-500'}`}
+              />
+              <button onClick={() => handleOfflineSearch(offlineSearchQuery)} className="px-3 py-2 rounded-xl bg-emerald-500 text-white font-black text-xs">Search Offline</button>
+            </div>
+            {offlineResults.length > 0 && (
+              <div className="grid grid-cols-1 gap-2">
+                {offlineResults.map((p, idx) => (
+                  <button key={idx} onClick={() => { setLivePrices({ ...p, source: 'Offline Price Book — Selected (100% offline)', offline: true, live: false }); setOfflineSearchQuery(p.name); }} className={`p-2 rounded-xl border text-left flex items-center justify-between ${isSunlightMode ? 'bg-white border-zinc-200 hover:border-emerald-400' : 'bg-zinc-950 border-zinc-800 hover:border-emerald-500/50'}`}>
+                    <div><div className={`font-black text-xs ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{p.name}</div><div className="text-[10px] text-zinc-500">{p.composition} | {p.manufacturer}</div></div>
+                    <div className="text-xs font-black text-emerald-600">{p.mrp}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className={`p-2 rounded-lg text-[10px] font-mono ${isSunlightMode ? 'bg-white border border-emerald-200 text-emerald-800' : 'bg-emerald-950/20 border border-emerald-800/50 text-emerald-300'}`}>
+              ✅ <strong>100% Offline Alternative:</strong> This price book is bundled in the app (precached by service worker). Works in airplane mode, no Google, no API key needed. Search SAAF, Folicur, Amistar, Neem, Confidor etc. When online, it auto-updates with live Google Shopping and caches for 7 days.
+            </div>
+          </div>
+
           {/* Live Market Prices - Always visible with real prices - ONLY shopping_results */}
           <div className={`mt-4 p-4 rounded-2xl border-2 space-y-3 ${isSunlightMode ? 'bg-white border-zinc-300' : 'bg-zinc-900 border-zinc-700'}`}>
             <h4 className={`font-black text-sm flex items-center gap-2 ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>
               <ShoppingBag className="w-4 h-4 text-emerald-500" /> Live Market Prices — {livePrices?.name || 'UPL SAAF Fungicide'}
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500 text-white font-black">LIVE PRICES</span>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded text-white font-black ${livePrices?.offline ? 'bg-amber-500' : livePrices?.live ? 'bg-blue-500' : 'bg-emerald-500'}`}>{livePrices?.offline ? 'OFFLINE BOOK' : livePrices?.live ? 'LIVE GOOGLE' : 'LIVE PRICES'}</span>
+              {isOfflineMode && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500 text-white font-black">NO INTERNET — OFFLINE DB</span>}
             </h4>
             <div className="text-[10px] text-zinc-500 font-mono">{livePrices?.composition || 'Carbendazim 12% + Mancozeb 63% WP'} | {livePrices?.source || 'BigHaat • Amazon • AgriBegri'}</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
