@@ -555,7 +555,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const maskedAadhaar = maskAadhaar(aadhaar);
 
   return (
-    <div className="auth-page min-h-screen w-full bg-[#f4f7f5] text-zinc-900 flex items-center justify-center p-3 sm:p-4 relative overflow-x-hidden">
+    <div className="auth-page min-h-dvh w-full bg-[#f4f7f5] text-zinc-900 flex items-center justify-center p-3 sm:p-4 relative overflow-x-hidden">
       <AnimatePresence>
         {showSms && (smsOtp || aadhaarOtp) && (
           <motion.div

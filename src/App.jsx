@@ -25,7 +25,7 @@ import { initOfflineDB } from './utils/offlineStore';
 import { getSession, clearSession } from './utils/authService';
 import { sound } from './utils/audio';
 import { T } from './data/translations';
-import { WifiOff, Mic, Download } from 'lucide-react';
+import { WifiOff, Mic } from 'lucide-react';
 
 const LANG_MAP = {
   'hi': 'hi','en': 'en','ta': 'ta','te': 'te','kn': 'kn','ml': 'ml','mr': 'mr','pa': 'pa','bn': 'bn','gu': 'gu','or': 'or','as': 'as','mai': 'mai','sat': 'sat','ks': 'ks','brx': 'brx','doi': 'doi','kok': 'kok','mni': 'mni','ne': 'ne','sa': 'sa','sd': 'sd','ur': 'ur',
@@ -67,6 +67,7 @@ export default function App() {
   const [user, setUser] = useState(() => getSession());
   const [isHandsFree, setIsHandsFree] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const t = T[selectedLang] || T['en'];
 
@@ -75,16 +76,16 @@ export default function App() {
     // Defer heavy model init to avoid blocking first paint — farmer sees UI instantly
     const timer = setTimeout(() => initOnDeviceAI(), 800);
 
-    // Persist language choice
-    try { localStorage.setItem('ap_lang', selectedLang); } catch {}
-    try { localStorage.setItem('ap_sunlight', String(isSunlightMode)); } catch {}
-
     // Listen for PWA install prompt
     const handleBeforeInstall = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
       setIsInstallModalOpen(true);
     };
+
+    const onScroll = () => setIsScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
 
@@ -94,6 +95,7 @@ export default function App() {
 
     return () => {
       clearTimeout(timer);
+      window.removeEventListener('scroll', onScroll);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
     };
   }, []);
@@ -133,61 +135,71 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen flex flex-col justify-between font-sans selection:bg-emerald-500 selection:text-black transition-colors ${
+    <div className={`min-h-dvh flex flex-col font-sans selection:bg-emerald-500 selection:text-black transition-colors ${
       isSunlightMode ? 'bg-[#f4f7f5] text-zinc-900' : 'bg-[#090a09] text-white'
     }`}>
       {/* Background Bio-Aura Canvas (Dark mode only) */}
       {!isSunlightMode && <BackgroundCanvas />}
 
-      {/* Clean Offline Alert Strip */}
-      {isOffline && (
-        <div className="bg-amber-500 text-black px-4 py-1.5 text-xs font-bold flex items-center justify-between sticky top-0 z-50 shadow-md">
-          <span className="flex items-center gap-2">
-            <WifiOff className="w-3.5 h-3.5" />
-            <span>{t.offlineMode}</span>
-          </span>
-          <span className="text-[11px] font-mono">{t.savedLocally}</span>
-        </div>
-      )}
+      {/*
+        Unified sticky top unit.
+        The offline strip, header, hands-free banner and tab bar live in ONE
+        sticky container, so they can never drift apart or overlap — the old
+        version pinned each layer at a hard-coded pixel offset (top-[48px],
+        top-[56px], top-[57px]) that stopped matching the real header height
+        as the layout scaled across screen sizes.
+      */}
+      <div className={`sticky top-0 z-40 transition-shadow ${isScrolled ? 'shadow-lg' : ''}`}>
+        {/* Offline Alert Strip */}
+        {isOffline && (
+          <div className="bg-amber-400 text-black px-4 py-1.5 text-[11px] sm:text-xs font-bold flex items-center justify-between">
+            <span className="flex items-center gap-2 min-w-0">
+              <WifiOff className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{t.offlineMode}</span>
+            </span>
+            <span className="hidden sm:inline text-[10px] sm:text-[11px] font-mono shrink-0">{t.savedLocally}</span>
+          </div>
+        )}
 
-      {/* Main Header */}
-      <Header
-        selectedLang={selectedLang}
-        setSelectedLang={setSelectedLang}
-        isOffline={isOffline}
-        setIsOffline={setIsOffline}
-        onOpenVoiceModal={() => setIsVoiceOpen(true)}
-        onOpenInstallModal={() => setIsInstallModalOpen(true)}
-        isSunlightMode={isSunlightMode}
-        setIsSunlightMode={setIsSunlightMode}
-        isHandsFree={isHandsFree}
-        setIsHandsFree={setIsHandsFree}
-        user={user}
-        onLogout={handleLogout}
-        isLowLiteracy={isLowLiteracy}
-        setIsLowLiteracy={setIsLowLiteracy}
-      />
+        {/* Main Header */}
+        <Header
+          selectedLang={selectedLang}
+          setSelectedLang={setSelectedLang}
+          isOffline={isOffline}
+          setIsOffline={setIsOffline}
+          onOpenVoiceModal={() => setIsVoiceOpen(true)}
+          onOpenInstallModal={() => setIsInstallModalOpen(true)}
+          isSunlightMode={isSunlightMode}
+          setIsSunlightMode={setIsSunlightMode}
+          isHandsFree={isHandsFree}
+          setIsHandsFree={setIsHandsFree}
+          user={user}
+          onLogout={handleLogout}
+          isLowLiteracy={isLowLiteracy}
+          setIsLowLiteracy={setIsLowLiteracy}
+        />
 
-      {/* Wet-Hands / Hands-Free Voice Navigation Active Banner */}
-      <HandsFreeVoiceBanner
-        isHandsFree={isHandsFree}
-        onToggle={() => setIsHandsFree(!isHandsFree)}
-        selectedLang={selectedLang}
-        onNavigate={handleAutoNavigate}
-      />
+        {/* Wet-Hands / Hands-Free Voice Navigation Banner */}
+        <HandsFreeVoiceBanner
+          isHandsFree={isHandsFree}
+          onToggle={() => setIsHandsFree(!isHandsFree)}
+          selectedLang={selectedLang}
+          onNavigate={handleAutoNavigate}
+        />
 
-      {/* Top Tab Navigation Bar (Sticky & Always Visible on all screen sizes) */}
-      <TabNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        selectedLang={selectedLang}
-        isSunlightMode={isSunlightMode}
-        isLowLiteracy={isLowLiteracy}
-      />
+        {/* Tab Navigation (scroll-snap row on mobile, always reachable) */}
+        <TabNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          selectedLang={selectedLang}
+          isSunlightMode={isSunlightMode}
+          isLowLiteracy={isLowLiteracy}
+        />
+      </div>
 
       {/* Main Tab Stage (Full Natural Scroll) */}
-      <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-3 pb-28 relative z-10">
-        {activeTab === 'scan' && <TabScanner selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+      <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-5 pb-28 sm:pb-12 relative z-10">
+        {activeTab === 'scan' && <TabScanner selectedLang={selectedLang} isSunlightMode={isSunlightMode} isLowLiteracy={isLowLiteracy} setIsLowLiteracy={setIsLowLiteracy} />}
         {activeTab === 'radar' && <TabRadar selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'verify' && <TabVerify selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'profit' && <TabProfit selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
@@ -201,23 +213,24 @@ export default function App() {
         {activeTab === 'services' && <TabServices selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
       </main>
 
-      {/* Floating 1-Tap Voice Assistant Button */}
-      <div className="fixed bottom-6 right-4 sm:right-6 z-40">
+      {/* Floating 1-Tap Voice Assistant — round icon on phones, labeled pill on larger screens */}
+      <div className="fixed right-3 sm:right-5 bottom-safe z-30">
         <button
           onClick={() => { sound.playClick(); setIsVoiceOpen(true); }}
-          className="flex items-center gap-2 px-4 py-2.5 sm:px-5 sm:py-3 rounded-full bg-emerald-400 hover:bg-emerald-300 text-black font-black text-xs sm:text-sm border-2 border-emerald-300 shadow-[0_0_25px_rgba(52,211,153,0.6)] transition-transform hover:scale-105 active:scale-95"
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-400 hover:bg-emerald-300 text-black border-2 border-emerald-300 shadow-[0_0_25px_rgba(52,211,153,0.6)] transition-transform hover:scale-105 active:scale-95 sm:h-auto sm:w-auto sm:gap-2 sm:px-5 sm:py-3"
+          aria-label="Kisan Sahayak — Ask AI by voice"
         >
-          <Mic className="w-4 h-4 fill-black" />
-          <span>{t.askAiBtn}</span>
+          <Mic className="w-5 h-5 fill-black sm:w-4 sm:h-4" />
+          <span className="hidden sm:inline font-black text-sm">{t.askAiBtn}</span>
         </button>
       </div>
 
       {/* Clean Minimalist Footer */}
-      <footer className={`border-t px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between text-xs transition-colors relative z-10 ${
+      <footer className={`border-t px-4 lg:px-8 py-3 pb-safe flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs transition-colors relative z-10 ${
         isSunlightMode ? 'bg-zinc-200 border-zinc-300 text-zinc-700 font-bold' : 'bg-zinc-950 border-zinc-800 text-zinc-400 font-medium'
       }`}>
-        <div>{t.footerText}</div>
-        <div className="text-[11px] font-mono">
+        <div className="min-w-0 truncate">{t.footerText}</div>
+        <div className="text-[11px] font-mono shrink-0">
           AgriPulse AI • NexHack 2026
         </div>
       </footer>

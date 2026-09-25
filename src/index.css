@@ -4,16 +4,18 @@
   box-sizing: border-box;
 }
 
+/*
+  Layout foundation — built for phones first.
+
+  The previous version pinned `touch-action: pan-y` on html/body which
+  swallowed the horizontal swipe gesture used by the tab bar, and it used
+  `100vh` everywhere which mis-scales on mobile browsers (the dynamic
+  viewport changes when the URL bar collapses). Both fixed here.
+*/
 html {
   width: 100%;
   max-width: 100vw;
-  height: auto;
-  min-height: 100%;
   overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
-  scroll-behavior: smooth;
 }
 
 body {
@@ -22,38 +24,76 @@ body {
   width: 100%;
   max-width: 100vw;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: #090a09;
   color: #ffffff;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
 }
 
 #root {
   width: 100%;
   max-width: 100vw;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
-  overflow-y: visible;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar (kept deliberately thin) */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #090a09;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: #27272a;
   border-radius: 9999px;
+}
+
+/* Hidden scrollbar for scrollable pill rows (tab bar, sample crops…) */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Clear keyboard focus for every farmer, mouse or keyboard */
+:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/*
+  Floating controls clear the iOS home-indicator / Android gesture area.
+  `bottom-safe` is used instead of a fixed bottom offset.
+*/
+.bottom-safe {
+  bottom: max(1rem, calc(env(safe-area-inset-bottom, 0px) + 0.5rem));
+}
+
+/* Padding so sticky/overlapping chrome never covers the last content line. */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+
+/*
+  Modals: 90% of the *visible* viewport on dvh-supporting browsers,
+  falling back to 90vh where dvh is unknown.
+*/
+.modal-max-h {
+  max-height: 90vh;
+  max-height: min(90dvh, 90vh);
 }
 
 /* Keep the country code and phone field inside the card at narrow widths. */
@@ -104,4 +144,16 @@ body {
 .auth-page select option {
   color: #18181b;
   background: #ffffff;
+}
+
+/* Respect users who ask for less motion (also calms the background canvas). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
