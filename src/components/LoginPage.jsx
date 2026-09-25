@@ -10,6 +10,7 @@ import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
   enableTotp, setTotpSkipped, verifyUserTotp, isTotpEnabled,
+  serverSendOtp, serverVerifyOtp,
   OTP_RESEND_COOLDOWN_S,
 } from '../utils/authService';
 import {
@@ -51,6 +52,9 @@ const L = {
     otpTitle: 'Enter verification code',
     otpSub: 'OTP sent to',
     otpHint: 'The code is valid for 5 minutes.',
+    otpRealNote: 'Sent as a real SMS — check your phone’s messages.',
+    otpOffline: 'Network unavailable. Reconnect and try again.',
+    otpSendFailed: 'Could not send the SMS right now. Please try again.',
     smsBanner: 'SMS · AGRIPULSE',
     smsText: 'Your AgriPulse AI login OTP is',
     smsValid: 'Valid for 5 minutes. Do not share it with anyone.',
@@ -120,6 +124,9 @@ const L = {
     otpTitle: 'OTP दर्ज करें',
     otpSub: 'OTP भेजा गया',
     otpHint: 'कोड 5 मिनट के लिए मान्य है।',
+    otpRealNote: 'असली SMS भेजा गया है — अपने फोन के मैसेज देखें।',
+    otpOffline: 'नेटवर्क उपलब्ध नहीं। कनेक्ट होकर दोबारा कोशिश करें।',
+    otpSendFailed: 'अभी SMS नहीं भेजा जा सका। कृपया दोबारा कोशिश करें।',
     smsBanner: 'SMS · AGRIPULSE',
     smsText: 'आपका AgriPulse AI लॉगिन OTP है',
     smsValid: '5 मिनट के लिए मान्य। किसी को बताएं नहीं।',
@@ -255,6 +262,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [busy, setBusy] = useState(false);
   const [smsOtp, setSmsOtp] = useState(null);       // simulated SMS payload
   const [showSms, setShowSms] = useState(false);
+  const [serverOtp, setServerOtp] = useState(null);  // { token } when the code went as a real SMS
   const [cooldown, setCooldown] = useState(0);
   const [attemptsLeft, setAttemptsLeft] = useState(3);
   const [resendLocked, setResendLocked] = useState(false);
@@ -299,7 +307,36 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     return () => clearInterval(id);
   }, [cooldown]);
 
-  const sendOtpFlow = (mobile) => {
+  const sendOtpFlow = async (mobile) => {
+    // 1) Real SMS delivery — server route with a configured gateway.
+    //    The code goes to the farmer's phone and is NEVER shown on the website.
+    const srv = await serverSendOtp(mobile, serverOtp?.token);
+    if (srv.ok) {
+      setServerOtp({ token: srv.token });
+      setSmsOtp(null);
+      setShowSms(false);
+      setCooldown(OTP_RESEND_COOLDOWN_S);
+      setAttemptsLeft(3);
+      setResendLocked(false);
+      setError('');
+      sound.playSuccess();
+      return true;
+    }
+    if (srv.error === 'cooldown') {
+      setCooldown(srv.waitSeconds || OTP_RESEND_COOLDOWN_S);
+      return false;
+    }
+    if (srv.error === 'max_sends') {
+      setResendLocked(true);
+      setError(l.resendMax);
+      return false;
+    }
+    if (srv.error === 'sms_failed') {
+      setError(l.otpSendFailed);
+      return false;
+    }
+    // 2) No gateway configured / offline → on-screen demo OTP (offline-first)
+    setServerOtp(null);
     const res = requestOtp(mobile);
     if (!res.ok) {
       if (res.error === 'max_sends') {
@@ -361,7 +398,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     setError('');
     setBusy(true);
     // Simulate network dispatch latency of an SMS gateway / lookup
-    setTimeout(() => {
+    setTimeout(async () => {
       setBusy(false);
       const existing = getUser(mobile);
       if (loginMethod === 'totp') {
@@ -387,7 +424,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
       }
       if (existing) {
         setIsReturning(true);
-        if (sendOtpFlow(mobile)) setStep('otp');
+        if (await sendOtpFlow(mobile)) setStep('otp');
       } else {
         setIsReturning(false);
         setStep('register');
@@ -404,9 +441,15 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }
     setError('');
     setBusy(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       setBusy(false);
-      if (sendOtpFlow(normalizeMobile(phone))) setStep('otp');
+      if (loginMethod === 'totp') {
+        // Authenticator path: enroll straight after registration — no SMS involved
+        setPendingProfile(null);
+        setTotpSecret(generateSecret());
+        setTotpResetKey((k) => k + 1);
+        setStep('totp-setup');
+      } else if (await sendOtpFlow(normalizeMobile(phone))) setStep('otp');
     }, 700);
   };
 
@@ -421,54 +464,78 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     setTimeout(() => onSuccess(session), 1500);
   };
 
+  // Shared post-OTP-success routing (2FA enrollment / verification / plain login)
+  const completeOtpSuccess = (mobile) => {
+    const profile = isReturning
+      ? getUser(mobile)
+      : registerUser({ name, mobile, village, state: stateName });
+    if (!profile) {
+      setError(l.maxAttempts);
+      return;
+    }
+    if (isTotpEnabled(profile)) {
+      setPendingProfile(profile);
+      setTotpAttempts(5);
+      setTotpResetKey((k) => k + 1);
+      setError('');
+      setStep('totp');
+      return;
+    }
+    if (profile.totpSkipped) {
+      finalizeLogin(profile);
+      return;
+    }
+    setPendingProfile(profile);
+    setTotpSecret(generateSecret());
+    setTotpResetKey((k) => k + 1);
+    setError('');
+    setStep('totp-setup');
+  };
+
+  const handleVerifyFail = (res) => {
+    sound.playTransition();
+    if (res.error === 'wrong_code') {
+      setAttemptsLeft(res.attemptsLeft);
+      setError(`${l.wrongOtp} ${res.attemptsLeft} ${l.attemptsLeft}.`);
+      setOtpDigits(['', '', '', '', '', '']);
+      otpRefs.current[0]?.focus();
+    } else if (res.error === 'expired') {
+      setError(l.expiredOtp);
+    } else {
+      setError(l.maxAttempts);
+    }
+  };
+
   const handleVerify = (digits) => {
     const code = (digits || otpDigits).join('');
     if (code.length !== 6) return;
     setBusy(true);
+    const mobile = normalizeMobile(phone);
+    if (serverOtp) {
+      // Real SMS path — the code lives on the farmer's phone, verified server-side
+      serverVerifyOtp(mobile, code, serverOtp.token).then((res) => {
+        setBusy(false);
+        if (res.ok) {
+          completeOtpSuccess(mobile);
+          return;
+        }
+        if (res.token) setServerOtp({ token: res.token }); // attempts decremented server-side
+        if (res.error === 'offline') {
+          setError(l.otpOffline);
+          return;
+        }
+        handleVerifyFail(res);
+      });
+      return;
+    }
     setTimeout(() => {
       setBusy(false);
-      const mobile = normalizeMobile(phone);
       const res = verifyOtp(mobile, code);
       if (res.ok) {
-        const profile = isReturning
-          ? getUser(mobile)
-          : registerUser({ name, mobile, village, state: stateName });
-        if (!profile) {
-          setError(l.maxAttempts);
-          return;
-        }
-        // 2FA routing: enrolled users must present an authenticator code;
-        // everyone else is offered a one-time enrollment (Skip is remembered).
-        if (isTotpEnabled(profile)) {
-          setPendingProfile(profile);
-          setTotpAttempts(5);
-          setTotpResetKey((k) => k + 1);
-          setError('');
-          setStep('totp');
-          return;
-        }
-        if (profile.totpSkipped) {
-          finalizeLogin(profile);
-          return;
-        }
-        setPendingProfile(profile);
-        setTotpSecret(generateSecret());
-        setTotpResetKey((k) => k + 1);
-        setError('');
-        setStep('totp-setup');
+        completeOtpSuccess(mobile);
         return;
       }
-      sound.playTransition();
-      if (res.error === 'wrong_code') {
-        setAttemptsLeft(res.attemptsLeft);
-        setError(`${l.wrongOtp} ${res.attemptsLeft} ${l.attemptsLeft}.`);
-        setOtpDigits(['', '', '', '', '', '']);
-        otpRefs.current[0]?.focus();
-      } else if (res.error === 'expired') {
-        setError(l.expiredOtp);
-      } else {
-        setError(l.maxAttempts);
-      }
+      handleVerifyFail(res);
     }, 600);
   };
 
@@ -502,6 +569,8 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
       const res = verifyTotpCode(totpSecret, code);
       if (res.ok) {
         const mobile = normalizeMobile(phone);
+        // Direct-authenticator sign-ups register here (the SMS path registers after its OTP)
+        if (!getUser(mobile)) registerUser({ name, mobile, village, state: stateName });
         const profile = enableTotp(mobile, totpSecret) || pendingProfile;
         setTotpVerified(true);
         finalizeLogin(profile);
@@ -815,8 +884,16 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 </div>
               )}
 
-              {/* Persistent demo-SMS card (so the OTP is never lost) */}
-              {smsOtp && (
+              {/* Real SMS: code went to the farmer's phone — never displayed here */}
+              {serverOtp && (
+                <div className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-emerald-50 border border-emerald-200 text-left">
+                  <Smartphone className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div className="text-xs font-bold text-emerald-800">{l.otpRealNote}</div>
+                </div>
+              )}
+
+              {/* Persistent demo-SMS card (demo mode only — no SMS gateway configured) */}
+              {!serverOtp && smsOtp && (
                 <div className="w-full flex items-center gap-2.5 p-3 mb-4 rounded-xl bg-zinc-900 text-white border border-zinc-700 text-left">
                   <MessageSquareText className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
@@ -860,6 +937,24 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               >
                 {busy ? l.loading : l.verifyBtn}
               </button>
+
+              {/* Enrolled users can switch to their authenticator instead of the SMS code */}
+              {isTotpEnabled(isReturning ? getUser(normalizeMobile(phone)) : null) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    sound.playClick();
+                    setPendingProfile(getUser(normalizeMobile(phone)));
+                    setTotpAttempts(5);
+                    setTotpResetKey((k) => k + 1);
+                    setError('');
+                    setStep('totp');
+                  }}
+                  className="mt-3 w-full py-3 rounded-xl bg-white border-2 border-emerald-200 hover:bg-emerald-50 text-emerald-700 font-black text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <QrCode className="w-4 h-4" /> {l.useTotpInstead}
+                </button>
+              )}
             </>
           )}
 
