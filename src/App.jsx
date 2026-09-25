@@ -8,6 +8,12 @@ import TabVerify from './components/TabVerify';
 import TabProfit from './components/TabProfit';
 import TabStores from './components/TabStores';
 import TabGroup from './components/TabGroup';
+import TabMarketplace from './components/TabMarketplace';
+import TabCommunity from './components/TabCommunity';
+import TabJobs from './components/TabJobs';
+import TabFuel from './components/TabFuel';
+import TabChatBot from './components/TabChatBot';
+import TabServices from './components/TabServices';
 import VoiceAssistant from './components/VoiceAssistant';
 import HandsFreeVoiceBanner from './components/HandsFreeVoiceBanner';
 import BackgroundCanvas from './components/BackgroundCanvas';
@@ -21,13 +27,42 @@ import { sound } from './utils/audio';
 import { T } from './data/translations';
 import { WifiOff, Mic, Download } from 'lucide-react';
 
+const LANG_MAP = {
+  'hi': 'hi','en': 'en','ta': 'ta','te': 'te','kn': 'kn','ml': 'ml','mr': 'mr','pa': 'pa','bn': 'bn','gu': 'gu','or': 'or','as': 'as','mai': 'mai','sat': 'sat','ks': 'ks','brx': 'brx','doi': 'doi','kok': 'kok','mni': 'mni','ne': 'ne','sa': 'sa','sd': 'sd','ur': 'ur',
+  'bodo': 'brx','dogri': 'doi','konkani': 'kok','manipuri': 'mni','nepali': 'ne','sanskrit': 'sa','sindhi': 'sd',
+};
+
+function detectBrowserLanguage() {
+  try {
+    const saved = localStorage.getItem('ap_lang');
+    if (saved && T[saved]) return saved;
+    const nav = (navigator.language || navigator.userLanguage || 'hi').toLowerCase();
+    const base = nav.split('-')[0];
+    // Map browser lang to our codes
+    if (LANG_MAP[nav]) return LANG_MAP[nav];
+    if (LANG_MAP[base]) return LANG_MAP[base];
+    // Fallback: if browser is en, use en, else hi for Indian users
+    if (base === 'en') return 'en';
+    return 'hi';
+  } catch { return 'hi'; }
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('scan');
-  const [selectedLang, setSelectedLang] = useState('hi');
+  const [selectedLang, setSelectedLang] = useState(() => detectBrowserLanguage());
   const [isOffline, setIsOffline] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
-  const [isSunlightMode, setIsSunlightMode] = useState(true);
+  const [isSunlightMode, setIsSunlightMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ap_sunlight');
+      if (saved !== null) return saved === 'true';
+      return true;
+    } catch { return true; }
+  });
+  const [isLowLiteracy, setIsLowLiteracy] = useState(() => {
+    try { return localStorage.getItem('ap_low_literacy') === 'true'; } catch { return false; }
+  });
   // Real persistent session — restored from localStorage (30-day validity)
   const [user, setUser] = useState(() => getSession());
   const [isHandsFree, setIsHandsFree] = useState(false);
@@ -37,26 +72,44 @@ export default function App() {
 
   useEffect(() => {
     initOfflineDB();
-    initOnDeviceAI();
+    // Defer heavy model init to avoid blocking first paint — farmer sees UI instantly
+    const timer = setTimeout(() => initOnDeviceAI(), 800);
+
+    // Persist language choice
+    try { localStorage.setItem('ap_lang', selectedLang); } catch {}
+    try { localStorage.setItem('ap_sunlight', String(isSunlightMode)); } catch {}
 
     // Listen for PWA install prompt
     const handleBeforeInstall = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      // Auto-open install banner if not dismissed
       setIsInstallModalOpen(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
 
-    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+    if ('serviceWorker' in navigator && import.meta.env.PROD) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
 
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
     };
   }, []);
+
+  // Persist language when it changes
+  useEffect(() => {
+    try { localStorage.setItem('ap_lang', selectedLang); } catch {}
+  }, [selectedLang]);
+
+  useEffect(() => {
+    try { localStorage.setItem('ap_sunlight', String(isSunlightMode)); } catch {}
+  }, [isSunlightMode]);
+
+  useEffect(() => {
+    try { localStorage.setItem('ap_low_literacy', String(isLowLiteracy)); } catch {}
+  }, [isLowLiteracy]);
 
   const handleAutoNavigate = (targetTab) => {
     setActiveTab(targetTab);
@@ -111,6 +164,8 @@ export default function App() {
         setIsHandsFree={setIsHandsFree}
         user={user}
         onLogout={handleLogout}
+        isLowLiteracy={isLowLiteracy}
+        setIsLowLiteracy={setIsLowLiteracy}
       />
 
       {/* Wet-Hands / Hands-Free Voice Navigation Active Banner */}
@@ -127,46 +182,23 @@ export default function App() {
         setActiveTab={setActiveTab}
         selectedLang={selectedLang}
         isSunlightMode={isSunlightMode}
+        isLowLiteracy={isLowLiteracy}
       />
 
       {/* Main Tab Stage (Full Natural Scroll) */}
       <main className="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-3 pb-28 relative z-10">
-        {activeTab === 'scan' && (
-          <TabScanner
-            selectedLang={selectedLang}
-            isSunlightMode={isSunlightMode}
-          />
-        )}
-        {activeTab === 'radar' && (
-          <TabRadar
-            selectedLang={selectedLang}
-            isSunlightMode={isSunlightMode}
-          />
-        )}
-        {activeTab === 'verify' && (
-          <TabVerify
-            selectedLang={selectedLang}
-            isSunlightMode={isSunlightMode}
-          />
-        )}
-        {activeTab === 'profit' && (
-          <TabProfit
-            selectedLang={selectedLang}
-            isSunlightMode={isSunlightMode}
-          />
-        )}
-        {activeTab === 'stores' && (
-          <TabStores
-            selectedLang={selectedLang}
-            isSunlightMode={isSunlightMode}
-          />
-        )}
-        {activeTab === 'group' && (
-          <TabGroup
-            selectedLang={selectedLang}
-            isSunlightMode={isSunlightMode}
-          />
-        )}
+        {activeTab === 'scan' && <TabScanner selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'radar' && <TabRadar selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'verify' && <TabVerify selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'profit' && <TabProfit selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'stores' && <TabStores selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'group' && <TabGroup selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'marketplace' && <TabMarketplace selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'community' && <TabCommunity selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'jobs' && <TabJobs selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'fuel' && <TabFuel selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'chatbot' && <TabChatBot selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'services' && <TabServices selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
       </main>
 
       {/* Floating 1-Tap Voice Assistant Button */}

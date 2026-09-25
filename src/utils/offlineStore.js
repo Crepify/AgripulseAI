@@ -1,5 +1,4 @@
-// IndexedDB Storage Layer for Offline-First PWA Execution
-
+// IndexedDB Storage Layer for Offline-First PWA Execution — optimized for speed
 import { openDB } from 'idb';
 import CryptoJS from 'crypto-js';
 
@@ -7,16 +6,35 @@ const DB_NAME = 'agripulse_db';
 const DB_VERSION = 1;
 const ENCRYPTION_KEY = 'agripulse-secure-key-2026';
 
+// Fast path: small metadata encrypted, large image stored separately to avoid CryptoJS slowness on base64
 function encryptData(data) {
-  return CryptoJS.AES.encrypt(JSON.stringify(data), ENCRYPTION_KEY).toString();
+  try {
+    // Strip heavy image field for fast encryption if present
+    const lightweight = { ...data };
+    if (lightweight.image && typeof lightweight.image === 'string' && lightweight.image.length > 5000) {
+      lightweight._imageTruncated = true;
+      lightweight._imageLength = lightweight.image.length;
+      delete lightweight.image;
+    }
+    return CryptoJS.AES.encrypt(JSON.stringify(lightweight), ENCRYPTION_KEY).toString();
+  } catch {
+    return JSON.stringify(data);
+  }
 }
 
 function decryptData(ciphertext) {
   try {
     const bytes = CryptoJS.AES.decrypt(ciphertext, ENCRYPTION_KEY);
-    return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+    const txt = bytes.toString(CryptoJS.enc.Utf8);
+    if (!txt) throw new Error('empty decrypt');
+    return JSON.parse(txt);
   } catch (e) {
-    return null;
+    try {
+      // Fallback: might be plain JSON if encryption failed
+      return JSON.parse(ciphertext);
+    } catch {
+      return null;
+    }
   }
 }
 
