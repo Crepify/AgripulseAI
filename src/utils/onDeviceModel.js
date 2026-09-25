@@ -402,32 +402,44 @@ function withTimeout(promise, ms, label) {
 
 async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) {
   const tried = new Set();
+  // Try highest conf first, but only 2-3 attempts before giving up for cloud fallback
   const order = [initialConf, ...ADAPTIVE_THRESHOLDS].filter(c => {
     if (tried.has(c)) return false;
     tried.add(c);
     return true;
-  }).sort((a,b) => b-a);
+  }).sort((a,b) => b-a).slice(0, 3); // Only try top 3 thresholds for speed
   let lastResult = null;
+  let consecutiveTimeouts = 0;
   for (const conf of order) {
     try {
       console.log('[AgriPulse] trying conf', conf);
-      const r = await withTimeout(detectFn(imageElement, { conf }), 12000, 'detect conf=' + conf);
+      const r = await withTimeout(detectFn(imageElement, { conf }), 8000, 'detect conf=' + conf);
       console.log('[AgriPulse] conf', conf, 'detections', r?.detections?.length);
+      consecutiveTimeouts = 0;
       if (r?.detections?.length) return r;
       lastResult = r;
     } catch (e) {
       console.warn('[AgriPulse] detect failed at conf', conf, e?.message);
+      if (e?.message?.includes('timeout')) {
+        consecutiveTimeouts++;
+        if (consecutiveTimeouts >= 2) {
+          console.warn('[AgriPulse] 2 consecutive timeouts, aborting on-device attempts');
+          break; // Stop trying on-device, fallback to cloud
+        }
+      }
     }
   }
-  // final ultra-low recall attempts - even 0.001
-  for (const conf of [0.001, 0.0001, 0]) {
-    try {
-      console.log('[AgriPulse] trying ultra-low conf', conf);
-      const r = await withTimeout(detectFn(imageElement, { conf }), 10000, 'detect conf=' + conf);
-      if (r?.detections?.length) return r;
-      lastResult = lastResult || r;
-    } catch (e) {
-      console.warn('[AgriPulse] ultra-low detect failed', conf, e?.message);
+  // Only try ultra-low if we had at least one successful inference (not timeout)
+  if (consecutiveTimeouts === 0) {
+    for (const conf of [0.001, 0.0001, 0]) {
+      try {
+        console.log('[AgriPulse] trying ultra-low conf', conf);
+        const r = await withTimeout(detectFn(imageElement, { conf }), 6000, 'detect conf=' + conf);
+        if (r?.detections?.length) return r;
+        lastResult = lastResult || r;
+      } catch (e) {
+        console.warn('[AgriPulse] ultra-low detect failed', conf, e?.message);
+      }
     }
   }
   return lastResult;
@@ -449,16 +461,23 @@ export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { 
     console.warn('On-device inference failed:', err);
   }
 
-  // If on-device found nothing and we're online, try cloud as second opinion
-  if ((!result || !result.detections?.length) && navigator.onLine) {
+  // If on-device found nothing, timed out, or we're online, try cloud as fallback
+  const shouldTryCloud = (!result || !result.detections?.length) && (typeof navigator === 'undefined' || navigator.onLine);
+  if (shouldTryCloud) {
+    console.log('[AgriPulse] trying cloud fallback');
     try {
-      const cloudResult = await detectWithAdaptiveThreshold(detectDiseaseCloud, imageElement, conf);
+      const cloudResult = await withTimeout(
+        detectWithAdaptiveThreshold(detectDiseaseCloud, imageElement, conf),
+        15000,
+        'cloud detect'
+      );
+      console.log('[AgriPulse] cloud result', cloudResult?.detections?.length);
       if (cloudResult?.detections?.length) {
         result = cloudResult;
         backend = 'cloud';
-      } else if (!result) {
-        result = cloudResult; // may be empty but we have a result object
-        if (cloudResult) backend = 'cloud';
+      } else if (!result && cloudResult) {
+        result = cloudResult;
+        backend = 'cloud';
       }
     } catch (cloudErr) {
       console.warn('Cloud fallback failed or found nothing:', cloudErr);

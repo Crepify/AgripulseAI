@@ -13,6 +13,7 @@ import { YOLO, annotate } from "@ultralytics/yolo";
 export const MODEL_URL = "/models/agripulse.tflite";
 
 let modelPromise = null;
+let forcedDevice = null; // null = auto, 'cpu' = force CPU after webgpu failures
 
 /** "Tomato___Late_blight" -> { crop: "Tomato", disease: "Late blight" }; "frogeye_spot" -> { crop: "", disease: "frogeye spot" } */
 export function splitLabel(name) {
@@ -21,45 +22,85 @@ export function splitLabel(name) {
 }
 
 /** Load once (first call downloads ~37 MB; the browser caches it afterwards). */
-export function loadDetector(onProgress) {
+export function loadDetector(onProgress, deviceOverride = null) {
+  const device = deviceOverride || forcedDevice || "auto";
+  // If we already have a model and device matches, return it
+  if (modelPromise && !deviceOverride) {
+    return modelPromise;
+  }
+  if (deviceOverride) {
+    // Force reload with specific device
+    modelPromise = null;
+  }
   if (!modelPromise) {
     onProgress?.("Loading model…");
-    // Defensive: location may be undefined in some test envs
     const base = typeof location !== 'undefined' ? location.href : 'http://localhost/';
+    console.log('[AgriPulse] YOLO.load device:', device);
     modelPromise = YOLO.load(MODEL_URL, {
-      device: "auto",                                        // WebGPU if available, else CPU/wasm
-      litertWasmUrl: new URL("/litert/", base),     // self-hosted LiteRT.js runtime (absolute URL, trailing slash)
-      wasmUrl: new URL("/yolo/ultralytics_inference_web_bg.wasm", base), // self-hosted pre/post-processing wasm
+      device: device,
+      litertWasmUrl: new URL("/litert/", base),
+      wasmUrl: new URL("/yolo/ultralytics_inference_web_bg.wasm", base),
     }).then((m) => {
       console.info(`[AgriPulse] model ready on "${m.device}" — ${Object.keys(m.names).length} classes`);
       return m;
     }).catch((err) => {
       console.error('[AgriPulse] YOLO.load failed:', err);
-      modelPromise = null; // allow a retry after a transient failure
+      modelPromise = null;
       throw err;
     });
   }
   return modelPromise;
 }
 
+export function forceCPU() {
+  console.log('[AgriPulse] forcing CPU backend');
+  forcedDevice = 'cpu';
+  modelPromise = null;
+}
+
 /** Detect on an <img>, <video>, <canvas>, ImageBitmap or File. Boxes are in source pixels. */
 export async function detectDisease(source, { conf = 0.15, iou = 0.7 } = {}) {
   const model = await loadDetector();
-  const results = await model.predict(source, { conf, iou });
-  return {
-    device: model.device,
-    width: results.width,
-    height: results.height,
-    speedMs: results.speed,                       // { preprocess, inference, postprocess }
-    detections: results.boxes.map((b) => ({
-      classId: b.cls,
-      label: b.name,                              // e.g. "Tomato___Late_blight"
-      ...splitLabel(b.name),
-      confidence: b.conf,
-      box: [b.x1, b.y1, b.x2, b.y2],
-    })),
-    raw: results,
-  };
+  try {
+    const results = await model.predict(source, { conf, iou });
+    return {
+      device: model.device,
+      width: results.width,
+      height: results.height,
+      speedMs: results.speed,
+      detections: results.boxes.map((b) => ({
+        classId: b.cls,
+        label: b.name,
+        ...splitLabel(b.name),
+        confidence: b.conf,
+        box: [b.x1, b.y1, b.x2, b.y2],
+      })),
+      raw: results,
+    };
+  } catch (e) {
+    // If webgpu fails, try CPU
+    if (model.device === 'webgpu' || model.device === 'gpu') {
+      console.warn('[AgriPulse] webgpu predict failed, falling back to CPU', e);
+      forceCPU();
+      const cpuModel = await loadDetector(null, 'cpu');
+      const results = await cpuModel.predict(source, { conf, iou });
+      return {
+        device: cpuModel.device,
+        width: results.width,
+        height: results.height,
+        speedMs: results.speed,
+        detections: results.boxes.map((b) => ({
+          classId: b.cls,
+          label: b.name,
+          ...splitLabel(b.name),
+          confidence: b.conf,
+          box: [b.x1, b.y1, b.x2, b.y2],
+        })),
+        raw: results,
+      };
+    }
+    throw e;
+  }
 }
 
 /** Detect + draw labelled boxes onto a canvas in one call. */
