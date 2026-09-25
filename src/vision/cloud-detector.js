@@ -36,7 +36,7 @@ export class CloudError extends Error {
   constructor(message, status) { super(message); this.status = status; }
 }
 
-export async function detectDiseaseCloud(source, { conf = 0.25, iou = 0.7, imgsz = 640 } = {}) {
+export async function detectDiseaseCloud(source, { conf = 0.15, iou = 0.7, imgsz = 640 } = {}) {
   const { blob, w: W, h: H } = await toJpegBlob(source);
 
   const form = new FormData();

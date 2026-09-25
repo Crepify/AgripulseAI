@@ -352,8 +352,36 @@ function buildMatchedCrop(detections) {
 /* ------------------------------------------------------------------ */
 /* Public API used by TabScanner                                       */
 /* ------------------------------------------------------------------ */
-// Perform 100% local on-device leaf analysis (cloud fallback only if the model cannot run here).
-export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { conf = 0.25 } = {}) {
+// Perform 100% local on-device leaf analysis (cloud fallback when model can't run OR finds nothing).
+// Adaptive thresholds: tries 0.25 -> 0.15 -> 0.10 -> 0.05 -> 0.01 to improve recall on difficult images
+// (user's apple scab photo was 0 detections at 0.25 but 1 at 0.15).
+const ADAPTIVE_THRESHOLDS = [0.25, 0.15, 0.10, 0.05];
+
+async function detectWithAdaptiveThreshold(detectFn, imageElement, initialConf) {
+  const tried = new Set();
+  const order = [initialConf, ...ADAPTIVE_THRESHOLDS].filter(c => {
+    if (tried.has(c)) return false;
+    tried.add(c);
+    return true;
+  }).sort((a,b) => b-a);
+  let lastResult = null;
+  for (const conf of order) {
+    try {
+      const r = await detectFn(imageElement, { conf });
+      if (r?.detections?.length) return r;
+      lastResult = r;
+    } catch {}
+  }
+  // final ultra-low recall attempt
+  try {
+    const r = await detectFn(imageElement, { conf: 0.01 });
+    if (r?.detections?.length) return r;
+    lastResult = lastResult || r;
+  } catch {}
+  return lastResult;
+}
+
+export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { conf = 0.15 } = {}) {
   const startTime = performance.now();
   let result = null;
   let backend = 'on-device';
@@ -361,16 +389,24 @@ export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { 
   try {
     const ready = await initOnDeviceAI();
     if (!ready) throw new Error(status.error || 'on-device model unavailable');
-    result = await detectDisease(imageElement, { conf });
+    result = await detectWithAdaptiveThreshold(detectDisease, imageElement, conf);
   } catch (err) {
     console.warn('On-device inference failed:', err);
-    if (navigator.onLine) {
-      try {
-        result = await detectDiseaseCloud(imageElement, { conf });
+  }
+
+  // If on-device found nothing and we're online, try cloud as second opinion
+  if ((!result || !result.detections?.length) && navigator.onLine) {
+    try {
+      const cloudResult = await detectWithAdaptiveThreshold(detectDiseaseCloud, imageElement, conf);
+      if (cloudResult?.detections?.length) {
+        result = cloudResult;
         backend = 'cloud';
-      } catch (cloudErr) {
-        console.error('Cloud fallback failed:', cloudErr);
+      } else if (!result) {
+        result = cloudResult; // may be empty but we have a result object
+        if (cloudResult) backend = 'cloud';
       }
+    } catch (cloudErr) {
+      console.warn('Cloud fallback failed or found nothing:', cloudErr);
     }
   }
 
@@ -381,7 +417,7 @@ export async function analyzeLeafOnDevice(imageElement, canvasOverlay = null, { 
     return { matchedCrop: UNAVAILABLE, confidence: 0, latencyMs, backend: 'none', detections: [], metrics: {} };
   }
 
-  const detections = [...result.detections].sort((a, b) => b.confidence - a.confidence);
+  const detections = [...(result.detections || [])].sort((a, b) => b.confidence - a.confidence);
   drawOverlay(canvasOverlay, imageElement, detections);
   const matchedCrop = buildMatchedCrop(detections);
 

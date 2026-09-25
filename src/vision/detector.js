@@ -43,7 +43,7 @@ export function loadDetector(onProgress) {
 }
 
 /** Detect on an <img>, <video>, <canvas>, ImageBitmap or File. Boxes are in source pixels. */
-export async function detectDisease(source, { conf = 0.25, iou = 0.7 } = {}) {
+export async function detectDisease(source, { conf = 0.15, iou = 0.7 } = {}) {
   const model = await loadDetector();
   const results = await model.predict(source, { conf, iou });
   return {
