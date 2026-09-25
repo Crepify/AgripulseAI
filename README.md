@@ -50,7 +50,7 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 │  1. 📷 Real-Time Leaf Scan ──▶ 2. 🧠 Hybrid AI Vision ──▶ 3. 🧴 Bottle-Cap Dosage       │
 │     (Camera / Upload)        (YOLO26 local + cloud safety net) (\"Mix 2 Bottle Caps\") │
 │                                                                        │               │
-│  4. 🛰️ 72h Spore Radar    ◀── 5. 🎙️ Vernacular Voice AI   ◀───────────┘               │
+│  4. 🌦️ 72h Weather Watch  ◀── 5. 🎙️ Vernacular Voice AI   ◀───────────┘               │
 │     (Pre-Symptom Warning)         (Hindi/Tamil/Telugu TTS)                             │
 │                                                                                        │
 │  6. 🛡️ Anti-Fake Shield   ──▶ 7. 📊 Mandi ROI Simulator ──▶ 8. 🤝 20-Farmer Group Buy  │
@@ -77,10 +77,10 @@ AgriPulse AI is an **offline-first, voice-native Progressive Web App (PWA)** tha
 ### 3. 🎙️ "Kisan Sahayak" Voice AI & Auto-Navigator
 - **Speech-to-Text & Text-to-Speech:** Converses in **Hindi, Tamil, Telugu, Kannada, and English** using native Web Speech APIs.
 - **Voice Auto-Navigation:** Ask *"मंडी भाव क्या है?"* $\rightarrow$ AI speaks the answer and **automatically navigates** to the Mandi screen!
-- **🖐️ Wet-Hands / Hands-Free Mode:** Farmers with muddy or wet hands can speak simple commands (*"Scan", "Mandi", "Radar", "Verify"*) to operate the app touch-free.
+- **🖐️ Wet-Hands / Hands-Free Mode:** Farmers with muddy or wet hands can speak simple commands (*"Scan", "Mandi", "Weather", "Verify"*) to operate the app touch-free.
 
-### 4. 🛰️ 72-Hour Pre-Symptom Spore Radar
-- Forecasts fungal spore trajectories and whitefly surges 72 hours before visible symptoms.
+### 4. 🌦️ 72-Hour Pre-Symptom Weather & Disease Risk Forecast
+- Forecasts fungal disease pressure and whitefly surges 72 hours before visible symptoms.
 - **Microclimate Spray Calculator:** Computes safe application hours (e.g. 6:30 AM – 10:30 AM) to eliminate rain chemical washout and wind drift.
 
 ### 5. 🛡️ Anti-Counterfeit Hologram & Pesticide Shield

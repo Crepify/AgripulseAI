@@ -6,7 +6,7 @@ export const T = {
     brandSubtitle: 'Smart Crop Care & Market Copilot',
     askAiBtn: 'Kisan Sahayak (Ask AI)',
     handsFreeMode: 'Hands-Free (Wet Hands)',
-    handsFreeActive: 'Listening for voice commands: Say "Scan", "Mandi", "Radar", "Verify", "Store", "Group"...',
+    handsFreeActive: 'Listening for voice commands: Say "Scan", "Mandi", "Weather", "Verify", "Store", "Group"...',
     highContrast: 'Sunlight Mode',
     offlineMode: 'Offline Mode (No Internet Needed)',
     onlineMode: 'Online',
@@ -14,7 +14,7 @@ export const T = {
     footerText: 'AgriPulse AI • Built for Farmers • Zero Network Overhead',
     tabs: {
       scan: 'Leaf Scanner',
-      radar: 'Spore Radar',
+      radar: 'Weather',
       verify: 'Verify Pesticide',
       profit: 'Mandi & ROI',
       stores: 'Certified Stores',
@@ -62,14 +62,14 @@ export const T = {
     },
     radar: {
       title: 'Microclimate Spray Calculator',
-      riskLabel: 'Spore Risk Level:',
+      riskLabel: 'Disease Risk Level:',
       windLabel: 'Wind Speed',
       humidityLabel: 'Humidity',
       rainLabel: 'Expected Rain',
       safeWindowLabel: 'Recommended Spray Window:',
       safeWindowText: '6:30 AM – 10:30 AM Today',
       safeWindowDesc: 'Low wind prevents drift. Spray before 10:30 AM to allow full leaf absorption before afternoon rain.',
-      sendAlertBtn: 'Send Spore Warning to Village Group',
+      sendAlertBtn: 'Send Disease Warning to Village Group',
       alertSentText: 'Alert Sent to 140 Village Farmers ✓',
       irrigationAlert: '🌧️ Rain Alert: Rain expected in 3 hours. Do NOT irrigate or spray post-noon.',
     },
@@ -159,10 +159,10 @@ export const T = {
       washoutNo: 'No rain expected — safe spray day',
       bestWindow: 'Best spray window today',
       windCaution: 'Wind too strong for drift-safe spraying',
-      riskLow: 'Low fungal spore risk',
-      riskMod: 'Moderate fungal spore risk',
-      riskHigh: 'High fungal spore risk',
-      riskVHigh: 'Very high spore risk — spray preventive today',
+      riskLow: 'Low fungal disease risk',
+      riskMod: 'Moderate fungal disease risk',
+      riskHigh: 'High fungal disease risk',
+      riskVHigh: 'Very high disease risk — spray preventive today',
       notAvailable: 'N/A (needs wind data)',
     },
     auth: {
@@ -188,7 +188,7 @@ export const T = {
     footerText: 'एग्रीपल्स एआई • भारतीय किसानों के लिए समर्पित • 100% मुफ्त व ऑफलाइन',
     tabs: {
       scan: 'पत्ती जांच',
-      radar: 'मौसम व रडार',
+      radar: 'मौसम',
       verify: 'असली दवा जांच',
       profit: 'मंडी भाव व मुनाफा',
       stores: 'सरकारी दुकानें',
@@ -333,9 +333,9 @@ export const T = {
       washoutNo: 'बारिश की संभावना नहीं — छिड़काव सुरक्षित',
       bestWindow: 'आज का सुरक्षित छिड़काव समय',
       windCaution: 'हवा तेज है — छिड़काव मान्यता नहीं',
-      riskLow: 'फफूंद बीजाणु जोखिम कम',
-      riskMod: 'फफूंद बीजाणु जोखिम मध्यम',
-      riskHigh: 'फफूंद बीजाणु जोखिम अधिक',
+      riskLow: 'फफूंद रोग जोखिम कम',
+      riskMod: 'फफूंद रोग जोखिम मध्यम',
+      riskHigh: 'फफूंद रोग जोखिम अधिक',
       riskVHigh: 'बहुत अधिक जोखिम — आज रोकथाम छिड़काव करें',
       notAvailable: 'उपलब्ध नहीं (पवन डेटा चाहिए)',
     },
@@ -363,7 +363,7 @@ export const T = {
     footerText: 'அக்ரிபல்ஸ் ஏஐ • விவசாயிகளுக்கான இலவச தளம்',
     tabs: {
       scan: 'இலை ஸ்கேனர்',
-      radar: 'வானிலை & ரேடார்',
+      radar: 'வானிலை',
       verify: 'மருந்து சரிபார்ப்பு',
       profit: 'மண்டி & லாபம்',
       stores: 'அங்கீகரிக்கப்பட்ட கடைகள்',
@@ -535,7 +535,7 @@ export const T = {
     footerText: 'అగ్రిపల్స్ AI • రైతుల కోసం అంకితం',
     tabs: {
       scan: 'ఆకు స్కానర్',
-      radar: 'వాతావరణం & రాడార్',
+      radar: 'వాతావరణం',
       verify: 'మందుల గుర్తింపు',
       profit: 'మండి ధరలు & లాభం',
       stores: 'ప్రభుత్వ దుకాణాలు',
@@ -707,7 +707,7 @@ export const T = {
     footerText: 'ಅಗ್ರಿಪಲ್ಸ್ AI • ರೈತರಿಗಾಗಿ ಮೀಸಲಾದ ತಂತ್ರಜ್ಞಾನ',
     tabs: {
       scan: 'ಎಲೆ ಸ್ಕ್ಯಾನರ್',
-      radar: 'ಹವಾಮಾನ & ರೇಡಾರ್',
+      radar: 'ಹವಾಮಾನ',
       verify: 'ಔಷಧ ಪರಿಶೀಲನೆ',
       profit: 'ಮಾರುಕಟ್ಟೆ ದರ & ಲಾಭ',
       stores: 'ಅಧಿಕೃತ ಮಳಿಗೆಗಳು',
@@ -880,7 +880,7 @@ export const T = {
     footerText: 'अॅग्रीपल्स AI • शेतकऱ्यांसाठी बनवलेले',
     tabs: {
       scan: 'पान स्कॅनर',
-      radar: 'हवामान रडार',
+      radar: 'हवामान',
       verify: 'औषध तपासा',
       profit: 'मंडी भाव व नफा',
       stores: 'अधिकृत दुकाने',
@@ -1052,7 +1052,7 @@ export const T = {
     footerText: 'ਐਗਰੀਪਲਸ AI • ਕਿਸਾਨਾਂ ਲਈ ਬਣਾਇਆ',
     tabs: {
       scan: 'ਪੱਤਾ ਸਕੈਨਰ',
-      radar: 'ਮੌਸਮ ਰਡਾਰ',
+      radar: 'ਮੌਸਮ',
       verify: 'ਦਵਾਈ ਜਾਂਚ',
       profit: 'ਮੰਡੀ ਭਾਅ ਤੇ ਮੁਨਾਫਾ',
       stores: 'ਸਰਕਾਰੀ ਦੁਕਾਨਾਂ',
@@ -1224,7 +1224,7 @@ export const T = {
     footerText: 'অ্যাগ্রিপালস AI • কৃষকদের জন্য তৈরি',
     tabs: {
       scan: 'পাতা স্ক্যানার',
-      radar: 'আবহাওয়া রাডার',
+      radar: 'আবহাওয়া',
       verify: 'ওষুধ যাচাই',
       profit: 'মান্ডি দর ও লাভ',
       stores: 'সরকারি দোকান',
@@ -1396,7 +1396,7 @@ export const T = {
     footerText: 'એગ્રિપલ્સ AI • ખેડૂતો માટે બનાવેલ',
     tabs: {
       scan: 'પાન સ્કેનર',
-      radar: 'હવામાન રડાર',
+      radar: 'હવામાન',
       verify: 'દવા ચકાસો',
       profit: 'મંડી ભાવ અને નફો',
       stores: 'સરકારી દુકાનો',
@@ -1568,7 +1568,7 @@ export const T = {
     footerText: 'ଆଗ୍ରିପଲ୍ସ AI • ଚାଷୀଙ୍କ ପାଇଁ ତିଆରି',
     tabs: {
       scan: 'ପତ୍ର ସ୍କାନର୍',
-      radar: 'ପାଗ ରାଡାର୍',
+      radar: 'ପାଗ',
       verify: 'ଔଷଧ ଯାଞ୍ଚ',
       profit: 'ମଣ୍ଡି ଦର ଓ ଲାଭ',
       stores: 'ସରକାରୀ ଦୋକାନ',
@@ -1740,7 +1740,7 @@ export const T = {
     footerText: 'അഗ്രിപൾസ് AI • കർഷകർക്കായി നിർമ്മിച്ചത്',
     tabs: {
       scan: 'ഇല സ്കാനർ',
-      radar: 'കാലാവസ്ഥ റഡാർ',
+      radar: 'കാലാവസ്ഥ',
       verify: 'മരുന്ന് പരിശോധന',
       profit: 'മണ്ടി വില & ലാഭം',
       stores: 'സർക്കാർ കടകൾ',
@@ -1912,7 +1912,7 @@ export const T = {
     footerText: 'এগ্ৰিপালছ AI • কৃষকৰ বাবে নিৰ্মিত',
     tabs: {
       scan: 'পাত স্কেনাৰ',
-      radar: 'বতৰ ৰাডাৰ',
+      radar: 'বতৰ',
       verify: 'দৰৱ পৰীক্ষা',
       profit: 'মাণ্ডী দৰ আৰু লাভ',
       stores: 'চৰকাৰী দোকান',
@@ -2084,7 +2084,7 @@ export const T = {
     footerText: 'एग्रीपल्स AI • किसानक लेल बनाओल',
     tabs: {
       scan: 'पत्ता स्कैनर',
-      radar: 'मौसम रडार',
+      radar: 'मौसम',
       verify: 'दवा जांच',
       profit: 'मंडी भाव आ मुनाफा',
       stores: 'सरकारी दुकान',
@@ -2256,7 +2256,7 @@ export const T = {
     footerText: 'ᱟᱜᱨᱤᱯᱟᱞᱥ AI • ᱠᱤᱥᱟᱹᱱ ᱠᱚ ᱞᱟᱹᱜᱤᱫ',
     tabs: {
       scan: 'ᱥᱟᱠᱟᱢ ᱥᱠᱟᱱᱟᱨ',
-      radar: 'ᱦᱚᱭ ᱨᱟᱰᱟᱨ',
+      radar: 'ᱦᱚᱭ',
       verify: 'ᱨᱟᱱ ᱯᱚᱨᱤᱠᱷᱟ',
       profit: 'ᱢᱟᱱᱰᱤ ᱫᱟᱨ',
       stores: 'ᱫᱚᱠᱟᱱ',
@@ -2428,7 +2428,7 @@ export const T = {
     footerText: 'ایگری پلس AI • کسانن باپتھ',
     tabs: {
       scan: 'پتہ سکینر',
-      radar: 'موسم ریڈار',
+      radar: 'موسم',
       verify: 'دوا جانچ',
       profit: 'منڈی بھا تہ منافع',
       stores: 'سرکٲری دکان',
@@ -2601,7 +2601,7 @@ export const T = {
     footerText: 'एग्रिपाल्स AI • आबादगिरिफोरनि थाखाय',
     tabs: {
       scan: 'बिलाइ स्केनार',
-      radar: 'बतास राडार',
+      radar: 'बतास',
       verify: 'मुलि नायगिर',
       profit: 'मान्डि बेसेन आरो लाभ',
       stores: 'सरकारि दुकान',
@@ -2773,7 +2773,7 @@ export const T = {
     footerText: 'एग्रीपल्स AI • किसानें लेई बनाया',
     tabs: {
       scan: 'पत्तर स्कैनर',
-      radar: 'मौसम रडार',
+      radar: 'मौसम',
       verify: 'दवाई ਜਾਂਚ',
       profit: 'मंडी भाव ते मुनाफा',
       stores: 'सरकारी दुकानां',
@@ -2945,7 +2945,7 @@ export const T = {
     footerText: 'अॅग्रीपल्स AI • शेतकऱ्यां खातीर',
     tabs: {
       scan: 'पान स्कॅनर',
-      radar: 'हवामान रडार',
+      radar: 'हवामान',
       verify: 'वखद तपासणी',
       profit: 'मंडी भाव आनी नफो',
       stores: 'सरकारी दुकानां',
@@ -3117,7 +3117,7 @@ export const T = {
     footerText: 'এগ্রিপাল্স AI • লৌমীশিংগীদমক',
     tabs: {
       scan: 'মনা স্কেনর',
-      radar: 'নোং রাদার',
+      radar: 'নোং',
       verify: 'হিদাক য়েংবা',
       profit: 'মন্দি মমল অমসুং কান্নবা',
       stores: 'সরকারগী দোকান',
@@ -3289,7 +3289,7 @@ export const T = {
     footerText: 'एग्रीपल्स AI • किसानका लागि बनाइएको',
     tabs: {
       scan: 'पात स्क्यानर',
-      radar: 'मौसम राडार',
+      radar: 'मौसम',
       verify: 'औषधि जाँच',
       profit: 'मण्डी मूल्य र नाफा',
       stores: 'सरकारी पसल',
@@ -3461,7 +3461,7 @@ export const T = {
     footerText: 'एग्रीपल्स AI • कृषकेभ्यः निर्मितम्',
     tabs: {
       scan: 'पत्र स्कैनर',
-      radar: 'वातावरण रडार',
+      radar: 'वातावरण',
       verify: 'औषध परीक्षा',
       profit: 'मण्डी मूल्य लाभश्च',
       stores: 'सर्वकार आपणः',
@@ -3633,7 +3633,7 @@ export const T = {
     footerText: 'ايگري پلس AI • ھارين لاءِ ٺاھيل',
     tabs: {
       scan: 'پن اسڪينر',
-      radar: 'موسم ريڊار',
+      radar: 'موسم',
       verify: 'دوا جي چڪاس',
       profit: 'منڊي اگھ ۽ نفعو',
       stores: 'سرڪاري دڪان',
@@ -3805,7 +3805,7 @@ export const T = {
     footerText: 'ایگری پلس AI • کسانوں کے لیے بنایا گیا',
     tabs: {
       scan: 'پتہ اسکینر',
-      radar: 'موسم ریڈار',
+      radar: 'موسم',
       verify: 'دوا جانچ',
       profit: 'منڈی بھاؤ اور منافع',
       stores: 'سرکاری دکان',

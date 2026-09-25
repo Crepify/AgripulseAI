@@ -96,7 +96,7 @@ const S = {
     tourDone: 'And there is more — open the tabs and see for yourself. Best wishes!',
     services: [
       ['Crop Check', 'Take a photo of a leaf — the disease and its treatment appear instantly.'],
-      ['Disease Radar', 'Weather for the next three days warns you before disease can strike.'],
+      ['Weather', 'Weather for the next three days warns you before disease can strike.'],
       ['Medicine Check', 'Catches fake pesticides — photograph the bottle to confirm the company.'],
       ['Mandi Prices', 'See today’s prices and sell at the right time for the best profit.'],
       ['Shops', 'Order seeds, medicines and tools at fair prices from home.'],

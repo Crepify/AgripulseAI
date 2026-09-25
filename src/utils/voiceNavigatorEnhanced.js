@@ -115,17 +115,17 @@ export function classifyVoiceIntent(query, lang = 'hi') {
     };
   }
 
-  // Weather / Spray Time / Radar queries
+  // Weather / Spray Time queries
   if (q.includes('weather') || q.includes('rain') || q.includes('मौसम') || q.includes('बारिश') || q.includes('छिड़काव') || q.includes('रडार') || q.includes('radar') || q.includes('spray')) {
     return {
       targetTab: 'radar',
-      tabLabel: { hi: 'मौसम व रडार', en: 'Spore Radar', ta: 'வானிலை & ரேடார்', te: 'వాతావరణం', kn: 'ಹವಾಮಾನ & ರೇಡಾರ್' },
+      tabLabel: { hi: 'मौसम', en: 'Weather', ta: 'வானிலை', te: 'వాతావరణం', kn: 'ಹವಾಮಾನ' },
       speechResponse: {
-        hi: 'मौसम और रडार खोल दिया गया है। सुरक्षित छिड़काव समय सुबह 6:30-10:30, बारिश पुश नोटिफिकेशन, और फसल कैलेंडर — सब ऑटो।',
-        en: 'Opening Weather Radar with safe spray window, rain push notifications, and crop calendar auto-detected for your village.',
-        ta: 'வானிலை ரேடார் திறக்கப்பட்டது.',
-        te: 'వాతావరణ రాడార్ తెరవబడింది.',
-        kn: 'ಹವಾಮಾನ ರೇಡಾರ್ ತೆರೆಯಲಾಗಿದೆ.',
+        hi: 'मौसम खोल दिया गया है। सुरक्षित छिड़काव समय सुबह 6:30-10:30, बारिश पुश नोटिफिकेशन, और फसल कैलेंडर — सब ऑटो।',
+        en: 'Opening Weather with safe spray window, rain push notifications, and crop calendar auto-detected for your village.',
+        ta: 'வானிலை திறக்கப்பட்டது.',
+        te: 'వాతావరణం తెరవబడింది.',
+        kn: 'ಹವಾಮಾನ ತೆರೆಯಲಾಗಿದೆ.',
       }
     };
   }

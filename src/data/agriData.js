@@ -13,8 +13,8 @@ export const CROPS = [
     image: 'https://images.unsplash.com/photo-1536657464919-892534f60d6e?auto=format&fit=crop&w=800&q=80',
     audio: {
       en: {
-        devanagari: 'Rice blast detected with 97% confidence. Apply bio-mix before 10:30 AM before humidity causes spore spread. Mix 2 bottle caps in your 15 liter sprayer.',
-        phonetic: 'Rice blast detected with 97 percent confidence. Apply bio-mix before 10:30 AM before humidity causes spore spread. Mix 2 bottle caps in your 15 liter sprayer.',
+        devanagari: 'Rice blast detected with 97% confidence. Apply bio-mix before 10:30 AM before humidity causes disease spread. Mix 2 bottle caps in your 15 liter sprayer.',
+        phonetic: 'Rice blast detected with 97 percent confidence. Apply bio-mix before 10:30 AM before humidity causes disease spread. Mix 2 bottle caps in your 15 liter sprayer.',
       },
       hi: {
         devanagari: 'धान में ब्लास्ट रोग की पुष्टि हुई है। सुबह 10:30 बजे से पहले 15 लीटर स्प्रेयर में 2 ढक्कन ट्राइकोडर्मा मिलाकर छिड़काव करें।',
@@ -163,8 +163,8 @@ export const CROPS = [
     image: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?auto=format&fit=crop&w=800&q=80',
     audio: {
       en: {
-        devanagari: 'Critical: Yellow rust spores detected. Mix 2 bottle caps of propiconazole in 15L water. Notify neighboring farms immediately.',
-        phonetic: 'Critical: Yellow rust spores detected. Mix 2 bottle caps of propiconazole in 15 liter water. Notify neighboring farms immediately.',
+        devanagari: 'Critical: Yellow rust detected. Mix 2 bottle caps of propiconazole in 15L water. Notify neighboring farms immediately.',
+        phonetic: 'Critical: Yellow rust detected. Mix 2 bottle caps of propiconazole in 15 liter water. Notify neighboring farms immediately.',
       },
       hi: {
         devanagari: 'अति आवश्यक: गेहूं में पीला रतुआ देखा गया है। तुरंत 15 लीटर पानी में 2 ढक्कन प्रोपिकोनाजोल मिलाकर छिड़काव करें।',

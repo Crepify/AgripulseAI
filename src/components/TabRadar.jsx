@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Radio, Wind, Droplets, ShieldCheck, Bell, CloudRain,
+  CloudSun, Wind, Droplets, ShieldCheck, Bell, CloudRain,
   Sunrise, Sunset, RefreshCw, Thermometer, MapPin, AlertTriangle, CalendarDays, LocateFixed, Sparkles, Sprout,
 } from 'lucide-react';
 import { sound } from '../utils/audio';
@@ -144,13 +144,22 @@ export default function TabRadar({ selectedLang, isSunlightMode }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className={`lg:col-span-6 p-6 rounded-2xl border flex flex-col items-center justify-center min-h-[360px] relative overflow-hidden ${isSunlightMode ? 'bg-white border-zinc-300' : 'bg-[#121514] border-[#1f2421]'}`}>
-          <div className="relative w-64 h-64 rounded-full border border-emerald-500/30 flex items-center justify-center"><div className="w-48 h-48 rounded-full border border-emerald-500/40 flex items-center justify-center" /><div className="w-32 h-32 rounded-full border border-emerald-500/50 flex items-center justify-center" /><div className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_10px_#10b981]" /><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 4, ease: 'linear' }} className="absolute inset-0 rounded-full bg-gradient-to-tr from-emerald-500/20 via-transparent to-transparent pointer-events-none" /><div className="absolute top-10 right-14 flex flex-col items-center"><span className={`w-3.5 h-3.5 rounded-full ${riskScore >= 70 ? 'bg-red-500' : 'bg-amber-500'} animate-ping`} /><span className={`text-[10px] font-mono bg-black/85 px-1.5 py-0.5 rounded mt-1 border ${riskScore >= 70 ? 'text-red-300 border-red-500/30' : 'text-amber-300 border-amber-500/30'}`}>{loading ? '…' : `Spores ${riskScore}%`}</span></div></div>
+          <div className="flex flex-col items-center text-center gap-2 w-full">
+            <div className="text-7xl">{loading ? '⏳' : rainToday ? '🌧️' : /cloud/.test(rainDesc) ? '⛅' : '☀️'}</div>
+            <div className={`text-5xl font-black font-mono ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{loading ? '…' : wx?.tempMax != null ? `${Math.round(wx.tempMax)}°C` : '—'}</div>
+            {!loading && wx?.tempMin != null && <div className={`text-xs font-mono font-bold ${isSunlightMode ? 'text-zinc-500' : 'text-zinc-400'}`}>{wl.tempMin}: {Math.round(wx.tempMin)}°C</div>}
+            <div className={`text-xs font-bold capitalize max-w-xs ${isSunlightMode ? 'text-zinc-600' : 'text-zinc-300'}`}>{loading ? '' : wx?.condition || ''}</div>
+            <div className="w-full max-w-[260px] mt-3">
+              <div className="flex items-center justify-between text-[10px] font-mono font-bold mb-1"><span className={isSunlightMode ? 'text-zinc-600' : 'text-zinc-400'}>{t.radar.riskLabel}</span><span className={riskColor}>{loading ? '…' : `${riskScore}%`}</span></div>
+              <div className={`h-2 rounded-full overflow-hidden ${isSunlightMode ? 'bg-zinc-200' : 'bg-zinc-800'}`}><motion.div initial={{ width: 0 }} animate={{ width: `${loading ? 0 : riskScore}%` }} transition={{ duration: 0.8, ease: 'easeOut' }} className={`h-full rounded-full ${riskScore >= 85 ? 'bg-red-500' : riskScore >= 70 ? 'bg-amber-500' : riskScore >= 50 ? 'bg-yellow-500' : 'bg-emerald-500'}`} /></div>
+            </div>
+          </div>
           <div className={`mt-4 flex items-center justify-between w-full text-xs font-mono pt-3 border-t ${isSunlightMode ? 'border-zinc-200 text-zinc-700' : 'border-[#1f2421] text-zinc-400'}`}><span className="truncate">{wl.cityLabel}: <strong>{wx?.city || city}</strong></span><span className={`${riskColor} font-bold shrink-0 pl-2`}>{loading ? '…' : riskLabel}</span></div>
         </div>
 
         <div className="lg:col-span-6 space-y-4">
           <div className={`p-6 rounded-2xl border space-y-4 ${isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-[#121514] border-[#1f2421] text-white'}`}>
-            <div className="flex items-center justify-between"><h3 className="text-sm font-bold font-mono flex items-center gap-2"><Radio className="w-4 h-4 text-emerald-500" />{t.radar.title}</h3><div className="flex items-center gap-2">{wx && <span className={`flex items-center gap-1 text-[9px] font-mono font-black px-2 py-0.5 rounded-full border ${wx.live ? 'text-emerald-500 border-emerald-500/40 bg-emerald-500/10' : 'text-blue-500 border-blue-500/40 bg-blue-500/10'}`}>{wx.live ? wl.liveBadge : wl.simBadge}</span>}<button onClick={() => load(true)} disabled={refreshing || loading} className={`p-1.5 rounded-lg border disabled:opacity-50 ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-[#181c1a] border-[#232925]'}`}><RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /></button></div></div>
+            <div className="flex items-center justify-between"><h3 className="text-sm font-bold font-mono flex items-center gap-2"><CloudSun className="w-4 h-4 text-emerald-500" />{t.radar.title}</h3><div className="flex items-center gap-2">{wx && <span className={`flex items-center gap-1 text-[9px] font-mono font-black px-2 py-0.5 rounded-full border ${wx.live ? 'text-emerald-500 border-emerald-500/40 bg-emerald-500/10' : 'text-blue-500 border-blue-500/40 bg-blue-500/10'}`}>{wx.live ? wl.liveBadge : wl.simBadge}</span>}<button onClick={() => load(true)} disabled={refreshing || loading} className={`p-1.5 rounded-lg border disabled:opacity-50 ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-[#181c1a] border-[#232925]'}`}><RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} /></button></div></div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
               <div className={`p-3 rounded-xl border ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-[#181c1a] border-[#232925]'}`}><Wind className="w-4 h-4 text-cyan-400 mx-auto mb-1" /><div className="text-[10px] text-zinc-500">{t.radar.windLabel}</div><div className="font-bold mt-0.5">{loading ? '…' : wind != null ? `${wind} km/h` : wl.notAvailable}</div></div>
               <div className={`p-3 rounded-xl border ${isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-[#181c1a] border-[#232925]'}`}><Droplets className="w-4 h-4 text-blue-400 mx-auto mb-1" /><div className="text-[10px] text-zinc-500">{wl.humidityM}</div><div className={`font-bold mt-0.5 ${humidity >= 80 ? 'text-amber-500' : ''}`}>{loading ? '…' : humidity != null ? `${humidity}%` : '—'}</div></div>

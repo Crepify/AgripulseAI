@@ -9,7 +9,7 @@
 //  2. Weather (IMD) → https://weather.indianapi.in (needs x-api-key)
 //     Current conditions + 7-day IMD forecast for Indian cities.
 //     Set VITE_WEATHER_API_KEY in .env — without a key we fall back to a
-//     realistic simulated dataset so the Radar UI always stays functional.
+//     realistic simulated dataset so the Weather UI always stays functional.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MANDI_BASE = (import.meta.env.VITE_MANDI_API_BASE || 'https://mandi-api.onrender.com/v1').replace(/\/$/, '');
@@ -385,7 +385,7 @@ async function getWeatherViaProxy(city) {
   return json;
 }
 
-// Realistic monsoon-season simulated data so the Radar stays fully usable
+// Realistic monsoon-season simulated data so the Weather tab stays fully usable
 // until the user pastes their indianapi.in key into .env
 function simulatedWeather(city) {
   const cityName = city || 'Mandya';

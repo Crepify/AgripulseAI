@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Scan, Radio, ShieldCheck, TrendingUp, MapPin, Users, ShoppingBag, MessageSquare, Briefcase, Fuel, Bot, LayoutGrid } from 'lucide-react';
+import { Scan, CloudSun, ShieldCheck, TrendingUp, MapPin, Users, ShoppingBag, MessageSquare, Briefcase, Fuel, Bot, LayoutGrid } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
 
@@ -11,7 +11,7 @@ export default function TabNav({ activeTab, setActiveTab, selectedLang, isSunlig
 
   const tabs = [
     { id: 'scan', label: t.tabs.scan || 'Scan', icon: Scan, emoji: '🌱' },
-    { id: 'radar', label: t.tabs.radar || 'Weather', icon: Radio, emoji: '🌧️' },
+    { id: 'radar', label: t.tabs.radar || 'Weather', icon: CloudSun, emoji: '🌧️' },
     { id: 'verify', label: t.tabs.verify || 'Check', icon: ShieldCheck, emoji: '🧴' },
     { id: 'profit', label: t.tabs.profit || 'Mandi', icon: TrendingUp, emoji: '💰' },
     { id: 'stores', label: t.tabs.stores || 'Shops', icon: MapPin, emoji: '🏪' },
