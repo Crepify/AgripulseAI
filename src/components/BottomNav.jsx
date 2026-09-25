@@ -51,6 +51,7 @@ export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSun
               className={`absolute bottom-0 inset-x-0 mx-auto max-w-md rounded-t-3xl border-t-2 px-4 pt-4 pb-24 ${
                 isSunlightMode ? 'bg-white border-zinc-200' : 'bg-[#101312] border-zinc-800'
               }`}>
+              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-zinc-400/40" />
               <div className="flex items-center justify-between mb-3">
                 <h3 className={`font-black text-base ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{t.saathiHub?.allServices || 'All Services'} • सभी सेवाएं</h3>
                 <button onClick={() => setMoreOpen(false)} aria-label="Close" className={`p-2.5 rounded-full ${isSunlightMode ? 'bg-zinc-100 text-zinc-700' : 'bg-zinc-800 text-zinc-200'}`}><X className="w-5 h-5" /></button>
@@ -109,7 +110,9 @@ export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSun
                     <Icon className="w-6 h-6" />
                   </span>
                 ) : (
-                  <Icon className={`w-6 h-6 ${active ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-500' : 'text-zinc-400'}`} />
+                  <span className={`px-4 py-0.5 rounded-full transition-colors ${active ? 'bg-emerald-500/15' : ''}`}>
+                    <Icon className={`w-6 h-6 ${active ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-500' : 'text-zinc-400'}`} />
+                  </span>
                 )}
                 <span className={`text-[10px] font-black ${active ? 'text-emerald-500' : isSunlightMode ? 'text-zinc-600' : 'text-zinc-400'}`}>{p.label}</span>
               </button>

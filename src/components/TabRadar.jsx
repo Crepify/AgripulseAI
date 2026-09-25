@@ -129,10 +129,10 @@ export default function TabRadar({ selectedLang, isSunlightMode }) {
       {sowingAlert && <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center gap-3 text-emerald-700 text-xs font-bold"><Sprout className="w-5 h-5" /> {sowingAlert} — {calendar.month} • {calendar.season} season in {userState}</div>}
 
       <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-2 text-xs ${isSunlightMode ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300'}`}>
-        <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-emerald-500" /><span className="font-bold">Auto weather + push alerts + crop calendar — zero typing</span>{detectedCity && <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-black text-[10px] font-black">Detected: {detectedCity}</span>}</div>
+        <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-emerald-500" /><span className="font-bold">{wl.autoBanner || 'Auto weather + rain alerts + crop calendar'}</span>{detectedCity && <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-black text-[10px] font-black">Detected: {detectedCity}</span>}</div>
         <div className="flex items-center gap-2">
-          <button onClick={handlePushToggle} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[11px] border ${pushEnabled ? 'bg-emerald-500 text-black border-emerald-300' : 'bg-amber-500 text-black border-amber-300'}`}><Bell className="w-3.5 h-3.5" /> {pushEnabled ? 'Push ON' : 'Enable Rain Push'}</button>
-          <button onClick={handleAutoDetect} disabled={locating} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[11px] border border-emerald-300 shadow-sm disabled:opacity-60"><LocateFixed className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} /><span>{locating ? 'Detecting…' : 'Auto-detect village'}</span></button>
+          <button onClick={handlePushToggle} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[11px] border ${pushEnabled ? 'bg-emerald-500 text-black border-emerald-300' : 'bg-amber-500 text-black border-amber-300'}`}><Bell className="w-3.5 h-3.5" /> {pushEnabled ? (wl.pushOn || 'Push ON') : (wl.pushEnable || 'Enable Rain Push')}</button>
+          <button onClick={handleAutoDetect} disabled={locating} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[11px] border border-emerald-300 shadow-sm disabled:opacity-60"><LocateFixed className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} /><span>{locating ? (wl.detecting || 'Detecting…') : (wl.autoDetectVillage || 'Auto-detect village')}</span></button>
         </div>
       </div>
 
@@ -173,7 +173,7 @@ export default function TabRadar({ selectedLang, isSunlightMode }) {
           </div>
 
           <div className={`p-4 rounded-2xl border ${isSunlightMode ? 'bg-white border-zinc-300' : 'bg-[#121514] border-[#1f2421] text-white'}`}>
-            <h4 className="font-black text-xs flex items-center gap-2"><CalendarDays className="w-4 h-4 text-emerald-500" /> Crop Calendar — {userState} • {calendar.season}</h4>
+            <h4 className="font-black text-xs flex items-center gap-2"><CalendarDays className="w-4 h-4 text-emerald-500" /> {wl.cropCalendar || 'Crop Calendar'} — {userState} • {calendar.season}</h4>
             <div className="mt-2 space-y-1.5">
               {calendar.suggestions.map((s,i)=><div key={i} className={`flex items-center justify-between text-[11px] p-2 rounded-lg ${isSunlightMode ? 'bg-zinc-100' : 'bg-zinc-800'}`}><span className="font-bold">{s.crop}</span><span className="text-zinc-500">Sow {s.sowing} • Harvest {s.harvest}</span></div>)}
             </div>

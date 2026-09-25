@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Wifi, WifiOff, Mic, Sun, Moon, Hand, Download, Globe, LogOut, Eye, SlidersHorizontal, Check, X } from 'lucide-react';
+import { Wifi, WifiOff, Mic, Sun, Moon, Hand, Download, Globe, LogOut, Eye, SlidersHorizontal, Check, X, FlaskConical } from 'lucide-react';
+import { isDemoMode, setDemoMode } from '../utils/authService';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
 
@@ -21,6 +22,7 @@ export default function Header({
 }) {
   const t = T[selectedLang] || T['en'];
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [demoOn, setDemoOn] = useState(() => isDemoMode());
   const settingsRef = useRef(null);
 
   // Close the settings panel on outside tap / Escape
@@ -101,6 +103,16 @@ export default function Header({
       label: t.handsFreeMode || 'Hands-Free (Wet Hands)',
       desc: 'Control the app by voice, no touch needed',
       action: () => setIsHandsFree(!isHandsFree),
+    },
+    {
+      key: 'demo',
+      icon: FlaskConical,
+      iconOn: 'text-black',
+      iconOff: 'text-violet-400',
+      on: demoOn,
+      label: t.demoMode || 'Demo Mode',
+      desc: t.demoModeDesc || 'Presentation mode — any 12-digit Aadhaar accepted, sample data allowed',
+      action: () => { setDemoMode(!demoOn); setDemoOn(!demoOn); },
     },
     {
       key: 'offline',

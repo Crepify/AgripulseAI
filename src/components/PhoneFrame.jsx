@@ -37,7 +37,7 @@ export function StatusBar() {
   );
 }
 
-export default function PhoneFrame({ children }) {
+export default function PhoneFrame({ children, onHome }) {
   const [framed, setFramed] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 520);
   useEffect(() => {
     const onResize = () => setFramed(window.innerWidth >= 520);
@@ -76,8 +76,16 @@ export default function PhoneFrame({ children }) {
             <div className="h-full w-full overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain">
               {children}
             </div>
-            {/* home indicator */}
-            <div className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 z-[80] h-1 w-28 rounded-full bg-white/40" />
+            {/* home indicator — tap to go back to the phone home screen */}
+            <button
+              onClick={onHome}
+              disabled={!onHome}
+              aria-label="Go to home screen"
+              title={onHome ? 'Tap to go Home' : undefined}
+              className={`group absolute bottom-0 left-1/2 -translate-x-1/2 z-[90] flex h-6 w-40 items-end justify-center pb-1.5 ${onHome ? 'cursor-pointer' : 'cursor-default'}`}
+            >
+              <span className={`h-1 w-28 rounded-full bg-white/40 transition-all duration-200 ${onHome ? 'group-hover:w-36 group-hover:h-1.5 group-hover:bg-emerald-300 group-active:scale-90' : ''}`} />
+            </button>
           </div>
         </div>
       </div>

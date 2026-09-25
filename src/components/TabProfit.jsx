@@ -122,7 +122,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
   return (
     <div className="max-w-6xl mx-auto px-4 lg:px-8 py-4 space-y-6">
       <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-2 text-xs ${isSunlightMode ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300'}`}>
-        <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-emerald-500" /><span className="font-bold">Farmer-first: location, crop, land size auto — trend, sell now, subsidy</span></div>
+        <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-emerald-500" /><span className="font-bold">{t.mandiLive.farmerBanner || 'Location, crop & land auto-detected'}</span></div>
         <div className="flex items-center gap-2">
           {detectedInfo && <span className="px-2 py-1 rounded-full bg-emerald-500 text-black text-[10px] font-black border border-emerald-300">{fallbackT.detected}: {detectedInfo.state}{detectedInfo.city ? `, ${detectedInfo.city}` : ''}</span>}
           <button onClick={handleAutoDetect} disabled={locating} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[11px] border border-emerald-300 shadow-sm disabled:opacity-60"><LocateFixed className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} /><span>{locating ? fallbackT.detecting : fallbackT.autoDetect}</span></button>
@@ -158,8 +158,8 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
 
           {topModal > 0 && (
             <div className="flex flex-wrap gap-2">
-              <button onClick={()=>{ sound.playClick(); window.open('tel:18001801551', '_self'); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs border-2 border-emerald-300"><Phone className="w-4 h-4" /> Sell Now — Call APMC Trader</button>
-              <button onClick={()=>{ sound.playClick(); window.open(`https://wa.me/?text=${encodeURIComponent(`I want to sell ${acreage*8} Qtl ${commoditySel} at ₹${topModal}/Qtl from ${stateSel}. Contact me.`)}`, '_blank'); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-black text-xs border-2 border-blue-400"><ShoppingBag className="w-4 h-4" /> Share on WhatsApp</button>
+              <button onClick={()=>{ sound.playClick(); window.open('tel:18001801551', '_self'); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs border-2 border-emerald-300"><Phone className="w-4 h-4" /> {t.mandiLive.sellNowCall || 'Sell Now — Call APMC Trader'}</button>
+              <button onClick={()=>{ sound.playClick(); window.open(`https://wa.me/?text=${encodeURIComponent(`I want to sell ${acreage*8} Qtl ${commoditySel} at ₹${topModal}/Qtl from ${stateSel}. Contact me.`)}`, '_blank'); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white font-black text-xs border-2 border-blue-400"><ShoppingBag className="w-4 h-4" /> {t.mandiLive.shareWhatsApp || 'Share on WhatsApp'}</button>
             </div>
           )}
 
@@ -175,7 +175,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
 
           {/* Subsidy auto-check */}
           <div className={`p-4 rounded-xl border ${isSunlightMode ? 'bg-blue-50 border-blue-200' : 'bg-blue-950/20 border-blue-800/50'}`}>
-            <div className="flex items-center gap-2 font-black text-xs"><BadgeCheck className="w-4 h-4 text-blue-500" /> Subsidy Auto-Check — {stateSel} {aadhaarVerified ? '✓ Aadhaar Verified' : '⚠️ Verify Aadhaar'}</div>
+            <div className="flex items-center gap-2 font-black text-xs"><BadgeCheck className="w-4 h-4 text-blue-500" /> {t.mandiLive.subsidyCheck || 'Subsidy Auto-Check'} — {stateSel} {aadhaarVerified ? '✓ Aadhaar Verified' : '⚠️ Verify Aadhaar'}</div>
             <div className="mt-2 grid grid-cols-1 gap-1.5">
               {subsidies.slice(0,3).map(s=>(
                 <div key={s.id} className="flex items-center justify-between text-[11px]"><span className="font-bold">{s.name}</span><span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-black text-[9px] font-black">{s.amount}</span></div>
@@ -216,7 +216,7 @@ export default function TabProfit({ selectedLang, isSunlightMode }) {
           {/* Trend graph */}
           {trendData.length>0 && (
             <div className={`p-3 rounded-xl border ${isSunlightMode ? 'bg-zinc-50 border-zinc-200' : 'bg-[#181c1a] border-[#232925]'}`}>
-              <div className="flex items-center justify-between text-xs font-black"><span className="flex items-center gap-1"><TrendingUp className="w-4 h-4 text-emerald-500" /> 7-Day Price Trend — Best day to sell</span><button onClick={()=>setShowTrend(!showTrend)} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-white">{showTrend ? 'Hide' : 'Show'}</button></div>
+              <div className="flex items-center justify-between text-xs font-black"><span className="flex items-center gap-1"><TrendingUp className="w-4 h-4 text-emerald-500" /> {t.mandiLive.trendTitle || '7-Day Price Trend'}</span><button onClick={()=>setShowTrend(!showTrend)} className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-white">{showTrend ? 'Hide' : 'Show'}</button></div>
               {showTrend && (
                 <div className="mt-3">
                   <div className="flex items-end gap-1 h-20">

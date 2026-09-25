@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Scan, ShieldCheck, Mic, Leaf, ArrowRight, Handshake, TrendingUp, Languages } from 'lucide-react';
 import LoginPage from './LoginPage';
+import { createDemoSession } from '../utils/authService';
 
 /*
  * CLEAN MOBILE LANDING — app-style onboarding, not a website.
@@ -99,8 +100,14 @@ export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedL
         >
           {hi ? 'शुरू करें' : 'Get Started'} <ArrowRight className="w-5 h-5" strokeWidth={2.6} />
         </motion.button>
+        <button
+          onClick={() => onLoginSuccess(createDemoSession())}
+          className="mt-2.5 w-full min-h-[48px] rounded-2xl bg-white border-2 border-violet-200 text-violet-700 text-sm font-black flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+        >
+          🎬 {hi ? 'डेमो मोड — बिना लॉगिन देखें' : 'Demo Mode — explore without login'}
+        </button>
         <p className="text-center text-[11px] font-bold text-zinc-400 mt-3">
-          {hi ? 'मोबाइल नंबर से 30 सेकंड में लॉगिन' : 'Login with mobile number in 30 seconds'}
+          {hi ? 'मोबाइल नंबर से 30 सेकंड में लॉगिन • डेमो में कोई OTP नहीं' : 'Login with mobile in 30 seconds • no OTP in demo'}
         </p>
       </footer>
     </div>

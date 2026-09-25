@@ -33,6 +33,7 @@ import { classifyVoiceIntent } from './utils/voiceNavigator';
 import { sound } from './utils/audio';
 import { T } from './data/translations';
 import { WifiOff, Mic } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const LANG_MAP = {
   'hi': 'hi','en': 'en','ta': 'ta','te': 'te','kn': 'kn','ml': 'ml','mr': 'mr','pa': 'pa','bn': 'bn','gu': 'gu','or': 'or','as': 'as','mai': 'mai','sat': 'sat','ks': 'ks','brx': 'brx','doi': 'doi','kok': 'kok','mni': 'mni','ne': 'ne','sa': 'sa','sd': 'sd','ur': 'ur',
@@ -165,6 +166,13 @@ export default function App() {
     setActiveTab(targetTab);
   };
 
+  // Playful: tapping the phone's home indicator exits to the home screen.
+  const goHomeScreen = () => {
+    sound.playTransition();
+    try { sessionStorage.setItem('ap_phone_opened', '0'); } catch {}
+    setAppOpened(false);
+  };
+
   // Any component can request navigation: window.dispatchEvent(
   //   new CustomEvent('ap:navigate', { detail: 'saathi' }))
   useEffect(() => {
@@ -194,7 +202,7 @@ export default function App() {
 
   if (!user) {
     return (
-      <PhoneFrame>
+      <PhoneFrame onHome={goHomeScreen}>
       <div className="min-h-dvh w-full bg-black">
         {/* FULL MOBILE MODE — login also lives in the centered phone frame */}
         <div className="relative mx-auto min-h-dvh w-full max-w-md shadow-2xl overflow-x-hidden">
@@ -210,7 +218,7 @@ export default function App() {
   }
 
   return (
-    <PhoneFrame>
+    <PhoneFrame onHome={goHomeScreen}>
     <div className={`min-h-dvh w-full transition-colors ${isSunlightMode ? 'bg-zinc-300' : 'bg-black'}`}>
     {/* FULL MOBILE MODE — the whole app lives in a centered phone frame */}
     <div id="ap-phone-frame" className={`relative mx-auto flex min-h-dvh w-full max-w-md flex-col font-sans shadow-2xl selection:bg-emerald-500 selection:text-black transition-colors ${
@@ -288,6 +296,8 @@ export default function App() {
 
       {/* Main Tab Stage (Full Natural Scroll) */}
       <main className="flex-1 w-full px-3 py-4 pb-28 relative z-10">
+        <AnimatePresence mode="wait">
+        <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.16 }}>
         {activeTab === 'scan' && <TabScanner selectedLang={selectedLang} isSunlightMode={isSunlightMode} isLowLiteracy={isLowLiteracy} setIsLowLiteracy={setIsLowLiteracy} />}
         {activeTab === 'radar' && <TabRadar selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'verify' && <TabVerify selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
@@ -303,6 +313,8 @@ export default function App() {
         {activeTab === 'saathi' && <TabSaathi selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'passbook' && <TabPassbook selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'buyer' && <TabBuyer selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Bottom mobile navigation — primary tabs + More sheet */}

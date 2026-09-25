@@ -101,12 +101,39 @@ function verhoeffCheck(numStr) {
   return c === 0;
 }
 
+// ── Demo / presentation mode ────────────────────────────────────────────────
+// When ON: any 12-digit Aadhaar (first digit 2-9) passes format checks so the
+// full OTP flow can be demonstrated without a real UIDAI number. Real Verhoeff
+// validation stays active whenever demo mode is off.
+const DEMO_KEY = 'ap_demo_mode';
+
+export function isDemoMode() {
+  try { return localStorage.getItem(DEMO_KEY) === '1'; } catch { return false; }
+}
+
+export function setDemoMode(on) {
+  try { localStorage.setItem(DEMO_KEY, on ? '1' : '0'); } catch {}
+}
+
+/** One-tap presentation login: verified sample farmer, no OTP typing. */
+export function createDemoSession() {
+  setDemoMode(true);
+  const user = registerUser({
+    name: 'Ramesh Patil', mobile: '9876543210',
+    village: 'Khed', state: 'Maharashtra', aadhaar: '234123412346',
+  });
+  return saveSession({ ...user, aadhaarVerified: true, authProvider: 'demo' });
+}
+
 export function normalizeAadhaar(input) {
   return String(input || '').replace(/\D/g, '').slice(0,12);
 }
 
 export function isValidAadhaar(input) {
   const digits = normalizeAadhaar(input);
+  // Demo mode: accept any well-formed 12-digit number so juries/presenters
+  // can walk the whole Aadhaar OTP flow without a real UIDAI number.
+  if (isDemoMode()) return /^[2-9]\d{11}$/.test(digits);
   if (!/^[2-9]\d{11}$/.test(digits)) return false;
   // Verhoeff checksum for Aadhaar
   return verhoeffCheck(digits);
