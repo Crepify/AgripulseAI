@@ -24,8 +24,7 @@ import LandingPage from './components/LandingPage';
 import { initOnDeviceAI } from './utils/onDeviceModel';
 import { initOfflineDB } from './utils/offlineStore';
 import { getSession, clearSession } from './utils/authService';
-import { voiceGuide } from './utils/voiceGuide';
-import { classifyVoiceIntent } from './utils/voiceNavigator';
+import { voiceGuide, matchTabCommand } from './utils/voiceGuide';
 import { sound } from './utils/audio';
 import { T } from './data/translations';
 import { WifiOff, Mic } from 'lucide-react';
@@ -122,26 +121,27 @@ export default function App() {
     // subscribe (not a single callback slot) so the login page's subscription
     // is never stolen and both components stay in sync
     const unsubscribe = voiceGuide.subscribe(() => setGuideActive(voiceGuide.active));
-    if (user && voiceGuide.tourPending) {
-      voiceGuide.tourPending = false;
-      // While the guide waits for an answer, the farmer can just SAY an
-      // action ("open mandi prices") — we do it, then ask to continue.
+    // Voice control of the whole app — registered for the ENTIRE logged-in
+    // session (not just at tour time), so 'farmer group kholo' works anytime,
+    // even mid-sentence (barge-in) or in companion mode after the tour.
+    if (user) {
       voiceGuide.onCommand = (transcript) => {
         try {
-          const intent = classifyVoiceIntent(transcript, selectedLang);
-          if (intent && intent.targetTab) {
-            setActiveTab(intent.targetTab);
-            const line = (intent.speechResponse && (intent.speechResponse[selectedLang] || intent.speechResponse.hi || intent.speechResponse.en));
-            voiceGuide.say(line || intent.tabLabel?.hi || 'ठीक है।');
+          const m = matchTabCommand(transcript);
+          if (m && m.tab) {
+            setActiveTab(m.tab);
+            voiceGuide.announceTab(m.tab);
             return true;
           }
         } catch { /* unknown speech — ignore */ }
         return false;
       };
-      setTimeout(() => { voiceGuide.runServiceTour(); }, 1200);
-    }
-    if (!user) {
+    } else {
       voiceGuide.onCommand = null;
+    }
+    if (user && voiceGuide.tourPending) {
+      voiceGuide.tourPending = false;
+      setTimeout(() => { voiceGuide.runServiceTour(); }, 1200);
     }
     return unsubscribe;
   }, [user, selectedLang]);

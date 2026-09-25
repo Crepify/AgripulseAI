@@ -51,6 +51,7 @@ const S = {
     askNext: 'आगे की सेवा सुनेंगे? हाँ बोलिए।',
     langSwitched: 'ठीक है, अब मैं हिंदी में बात करूँगा।',
     ready: 'मैं तैयार हूँ। बोलिए।',
+    tabOpened: 'खोल दिया।',
     tourStopAsk: 'क्या मैं सेवाएँ बंद कर दूँ? हाँ या नहीं बोलिए।',
     langUnavailable: 'माफ़ कीजिए, वह भाषा इस फ़ोन पर उपलब्ध नहीं है। मैं इसी भाषा में बात करता हूँ।',
     langFallbackAsk: 'माफ़ कीजिए, यह फ़ोन उस भाषा में नहीं बोल सकता। क्या मैं अंग्रेज़ी में बात करूँ?',
@@ -92,6 +93,7 @@ const S = {
     langSwitched: 'Alright — from now on I will speak in English.',
     langSwitchedFallback: 'Alright, I have switched the language.',
     ready: 'I am ready. Go ahead.',
+    tabOpened: 'Opened for you.',
     tourStopAsk: 'Should I stop explaining the services? Say yes or no.',
     langUnavailable: 'Sorry, that language is not available on this phone. I will keep speaking this language.',
     langFallbackAsk: 'Sorry, this phone cannot speak that language. Shall I talk in English instead?',
@@ -132,6 +134,7 @@ const S = {
     askNext: 'அடுத்த சேவையைப் பற்றி கேக்க விரும்புகிறீர்களா?',
     langSwitched: 'சரி — இனிமேல் நான் தமிழில் பேசுவேன்.',
     ready: 'நான் தயார். சொல்லுங்கள்.',
+    tabOpened: 'திறக்கப்பட்டது.',
     tourStopAsk: 'சேவைகளை நிறுத்தவா? ஆம் அல்லது இல்லை சொல்லுங்கள்.',
     langUnavailable: 'மன்னிக்கவும், அந்த மொழி இந்த போனில் இல்லை. இதே மொழியில் பேசுகிறேன்.',
     langFallbackAsk: 'மன்னிக்கவும், இந்த போன் அந்த மொழியில் பேச முடியாது. ஆங்கிலத்தில் பேசலாமா?',
@@ -172,6 +175,7 @@ const S = {
     askNext: 'తర్వాత సేవ గురించి వినాలా?',
     langSwitched: 'సరే — ఇకపై నేను తెలుగులో మాట్లాడతాను.',
     ready: 'నేను సిద్ధంగా ఉన్నాను. చెప్పండి.',
+    tabOpened: 'తెరవబడింది.',
     tourStopAsk: 'సేవలు ఆపిదామా? అవును లేదా కాదు చెప్పండి.',
     langUnavailable: 'క్షమించండి, ఆ భాష ఈ ఫోన్‌లో లేదు. ఇదే భాషలో మాట్లాడతాను.',
     langFallbackAsk: 'క్షమించండి, ఈ ఫోన్ ఆ భాషలో మాట్లాడలేదు. ఇంగ్లీషులో మాట్లాడనా?',
@@ -212,6 +216,7 @@ const S = {
     askNext: 'ಮುಂದಿನ ಸೇವೆಯ ಬಗ್ಗೆ ಕೇಳಲು ಬಯಸುವಿರಾ?',
     langSwitched: 'ಸರಿ — ಈಗ ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
     ready: 'ನಾನು ಸಿದ್ಧ. ಹೇಳಿ.',
+    tabOpened: 'ತೆರೆಯಲಾಗಿದೆ.',
     tourStopAsk: 'ಸೇವೆಗಳನ್ನು ನಿಲ್ಲಿಸಬೇಕೆ? ಹೌದು ಇಲ್ಲವೆ ಹೇಳಿ.',
     langUnavailable: 'ಕ್ಷಮಿಸಿ, ಆ ಭಾಷೆ ಈ ಫೋನ್‌ನಲ್ಲಿ ಇಲ್ಲ. ಇದೇ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
     langFallbackAsk: 'ಕ್ಷಮಿಸಿ, ಈ ಫೋನ್ ಆ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡಲಾರದು. ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಮಾತನಾಡಲಾಮಾ?',
@@ -252,6 +257,7 @@ const S = {
     askNext: 'पुढच्या सेवेबद्दल ऐकू इच्छिता?',
     langSwitched: 'ठीक आहे — आता मी मराठीत बोलेन.',
     ready: 'मी तयार आहे. सांगा.',
+    tabOpened: 'उघडले आहे.',
     tourStopAsk: 'सेवा सांगणे बंद करू का? हो किंवा नाही म्हणा.',
     langUnavailable: 'क्षमस्व, ती भाषा या फोनवर नाही. मी याच भाषेत बोलतो.',
     langFallbackAsk: 'क्षमस्व, हा फोन त्या भाषेत बोलू शकत नाही. मी इंग्रजीत बोलू का?',
@@ -293,6 +299,7 @@ const PHON = {
     askNext: 'Aage ki seva sunenge? Haan boliye.',
     langSwitched: 'Theek hai, ab main Hindi mein baat karunga.',
     ready: 'Main taiyaar hoon. Boliye.',
+    tabOpened: 'Khol diya.',
     tourStopAsk: 'Kya main sevaayein band kar doon? Haan ya nahin boliye.',
     langUnavailable: 'Maaf kijiye, woh bhaasha is phone par uplabdh nahin hai. Main isi bhaasha mein baat karta hoon.',
     langFallbackAsk: 'Maaf kijiye, yeh phone us bhaasha mein nahin bol sakta. Kya main angrezi mein baat karoon?',
@@ -591,6 +598,60 @@ export function detectSpokenLanguage(q, currentLang) {
   if (tokens.some((t) => ROMANIZED_HINDI.has(t))) return null; // romanized Hindi
   if (tokens.some((t) => STRONG_ENGLISH.has(t))) return 'en';
   return null;
+}
+
+// ── Voice control of the whole app ─────────────────────────────────────────
+// Tab order matches the tour's service list exactly. Names come from the
+// translated script itself, so every language works out of the box.
+const TAB_IDS = ['scan', 'radar', 'verify', 'profit', 'stores', 'group', 'marketplace', 'community', 'jobs', 'fuel', 'chatbot', 'services'];
+const TAB_EXTRA_ALIASES = {
+  scan: ['scan', 'scanner', 'स्कैन', 'camera', 'कैमरा', 'leaf', 'पत्ती', 'photo', 'फोटो', 'இலை', 'ఆకు', 'ಎಲೆ'],
+  radar: ['radar', 'रडार', 'weather', 'मौसम', 'spore', 'ரேடார்', 'வானிலை', 'రాడార్', 'వాతావరణం', 'ರೇಡಾರ್', 'ಹವಾಮಾನ'],
+  verify: ['verify', 'medicine', 'dava', 'दवा', 'pesticide', 'कीटनाशक', 'bottle', 'बोतल', 'fake', 'नकली', 'மருந்து', 'మందు', 'ಔಷಧಿ'],
+  profit: ['mandi', 'मंडी', 'profit', 'मुनाफा', 'price', 'prices', 'bhaav', 'bhav', 'भाव', 'மண்டி', 'మండి', 'ಮಂಡಿ'],
+  stores: ['store', 'stores', 'shop', 'shops', 'dukaan', 'दुकान', 'கடை', 'దుకాణం', 'ಅಂಗಡಿ'],
+  group: ['group', 'farmer group', 'साझा', 'saajha', 'saajha khareed', 'group buying', 'किसान समूह', 'கூட்டு', 'కలెక్టివ్', 'ಜಂಟಿ'],
+  marketplace: ['market', 'marketplace', 'bazaar', 'बाज़ार', 'बाजार', 'sell', 'बेचो', 'tractor', 'ट्रैक्टर', 'சந்தை', 'మార్కెట్', 'ಮಾರುಕಟ್ಟೆ'],
+  community: ['community', 'समुदाय', 'samudaay', 'forum', 'सवाल', 'சமூகம்', 'సంఘం', 'ಸಮುದಾಯ'],
+  jobs: ['job', 'jobs', 'kaam', 'काम', 'mazdoor', 'मजदूर', 'मज़दूर', 'labour', 'labor', 'வேலை', 'పని', 'ಕೆಲಸ'],
+  fuel: ['fuel', 'diesel', 'डीजल', 'petrol', 'पेट्रोल', 'ईंधन', 'எரிபொருள்', 'ఇంధనం', 'ಇಂಧನ'],
+  chatbot: ['chat', 'chatbot', 'assistant', 'sahayak', 'सहायक', 'ask ai', 'அரட்டை', 'చాట్', 'ಸಹಾಯಕ'],
+  services: ['services', 'service', 'seva', 'sevaayein', 'सेवाएँ', 'सेवा', 'sarkari', 'सरकारी', 'government', 'govt', 'subsidy', 'सब्सिडी', 'yojana', 'योजना', 'அரசு', 'ప్రభుత్వ', 'ಸರ್ಕಾರಿ'],
+};
+
+function _tabAliases() {
+  const aliases = {};
+  TAB_IDS.forEach((tab, i) => {
+    const list = new Set(TAB_EXTRA_ALIASES[tab] || []);
+    Object.keys(S).forEach((lang) => {
+      const svc = S[lang].services && S[lang].services[i];
+      if (svc) list.add(String(svc[0]).toLowerCase());
+      const phon = PHON[lang] && PHON[lang].services && PHON[lang].services[i];
+      if (phon) list.add(String(phon[0]).toLowerCase());
+    });
+    aliases[tab] = [...list];
+  });
+  return aliases;
+}
+
+// Match a spoken command to a tab: 'farmer group kholo', 'मंडी भाव दिखाओ',
+// 'diesel', 'மண்டி விலை காட்டு' — any language, with or without an action
+// verb. The most specific (longest) alias wins.
+export function matchTabCommand(q) {
+  const s = String(q || '').toLowerCase().trim();
+  if (!s) return null;
+  const tokens = s.split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
+  if (!tokens.length) return null;
+  const aliases = _tabAliases();
+  let best = null; let bestLen = 0;
+  for (const [tab, list] of Object.entries(aliases)) {
+    for (const a of list) {
+      const al = a.toLowerCase();
+      const hit = al.includes(' ') ? s.includes(al) : tokens.includes(al);
+      if (hit && al.length > bestLen) { best = tab; bestLen = al.length; }
+    }
+  }
+  return best ? { tab: best } : null;
 }
 
 // The farmer's explicitly chosen language ("English mein bolo") outranks
@@ -927,6 +988,20 @@ export class VoiceGuide {
     }
   }
 
+  // Voice control: open a tab and announce it in the farmer's language.
+  announceTab(tab) {
+    const i = TAB_IDS.indexOf(tab);
+    if (i < 0) return Promise.resolve(false);
+    const L = this.script();
+    const vi = this._voiceInfo();
+    let name;
+    if (vi && vi.isNative) name = L.services[i][0];
+    else if (PHON[this.lang] && PHON[this.lang].services && PHON[this.lang].services[i]) name = PHON[this.lang].services[i][0];
+    else name = S.en.services[i][0];
+    const opened = this._renderPair('tabOpened').main;
+    return this.say(`${name}. ${opened}`);
+  }
+
   // Ask a yes/no question and wait for the answer (or timeout → 'timeout').
   ask(text, timeoutMs = 16000) {
     this._askPending = true;
@@ -1118,9 +1193,20 @@ export class VoiceGuide {
       // Use a neutral line instead.
       const pair = this._renderPair('langSwitched');
       this.say(pair.main, { fallback: S.en.langSwitchedFallback || pair.fallback }).then(() => {
+        // The utterance that triggered the switch may still contain a
+        // command ('மண்டி விலை' = open mandi prices) — don't drop it: open
+        // the tab and announce it in the NEW language.
+        const runCommand = () => {
+          try {
+            if (this.onCommand && matchTabCommand(q)) this.onCommand(q);
+          } catch { /* noop */ }
+        };
         if (outer) {
+          runCommand();
           // re-ask the pending question in the new language, snappily
           this.askKey('askResume', 6000).then((ans) => outer(ans === 'no' ? 'no' : 'yes'));
+        } else {
+          runCommand();
         }
       });
       return;
