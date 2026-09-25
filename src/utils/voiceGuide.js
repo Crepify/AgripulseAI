@@ -773,8 +773,8 @@ export class VoiceGuide {
     return this.say(p.main, { ...opts, fallback: p.fallback });
   }
 
-  askKey(key, timeoutMs = 16000) {
-    return this.ask(this._renderLine(key), timeoutMs);
+  askKey(key, timeoutMs = 16000, opts) {
+    return this.ask(this._renderPair(key).main, timeoutMs, opts);
   }
 
   // ── Patient step reminders ─────────────────────────────────────────────
@@ -1003,7 +1003,7 @@ export class VoiceGuide {
   }
 
   // Ask a yes/no question and wait for the answer (or timeout → 'timeout').
-  ask(text, timeoutMs = 16000) {
+  ask(text, timeoutMs = 16000, { invert = false } = {}) {
     this._askPending = true;
     return this.say(text).then(() => new Promise((resolve) => {
       this._askPending = false;
@@ -1025,6 +1025,8 @@ export class VoiceGuide {
           resolve(v);
         },
         cancel: () => clearTimeout(timer),
+        invert, // 'yes' means STOP (stop-confirmation): a resume 'yes' (carry
+                // on) must be translated to 'no', or the tour dies inverted
       };
       // The farmer answered BEFORE the question finished — replay it now.
       if (this._bargeStash) {
@@ -1118,17 +1120,30 @@ export class VoiceGuide {
 
   // Is this transcript just our own voice coming back through the mic?
   // (token overlap with the line being spoken)
+  // Action verbs that our own spoken lines don't use — if the mic 'hears'
+  // one of these mid-speech it's the farmer commanding, not our echo.
+  static BARGE_VERBS = ['kholo', 'khol', 'open', 'dikhao', 'dikha', 'show', 'display',
+    'खोलो', 'खोल', 'दिखाओ', 'दिखा', 'காட்டு', 'చూపించు', 'ತೋರಿಸು'];
+
   _similarToSpeech(q) {
     const norm = (s) => String(s || '').toLowerCase().split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
     const a = norm(q);
     const b = norm(this.lastLine);
     if (!a.length || !b.length) return true;
+    // A command with an action verb ('मंडी भाव दिखाओ') overlapping the spoken
+    // line's topic words is a REAL interruption, never an echo.
+    if (VoiceGuide.BARGE_VERBS.some((v) => a.includes(v))) return false;
     const B = new Set(b);
     let inter = 0;
     a.forEach((t) => { if (B.has(t)) inter += 1; });
-    if (inter >= 2) return true;
+    // Echo = the transcript is nearly CONTAINED in the spoken line (the mic
+    // caught a chunk of our own sentence). Raw overlap ≥2 used to swallow
+    // commands whose subject matched the line ('मंडी भाव दिखाओ' vs the mandi
+    // description).
+    const ratioIn = inter / a.length;
+    if (inter >= 2 && ratioIn >= 0.75) return true;
     const union = new Set([...a, ...b]).size;
-    return union > 0 && (inter / union) >= 0.2;
+    return union > 0 && (inter / union) >= 0.4;
   }
 
   // The farmer talked over the guide — stop talking NOW and listen.
@@ -1168,8 +1183,10 @@ export class VoiceGuide {
     // the farmer talks, switching immediately.
     const switchTo = matchLangSwitch(q, this.lang) || detectSpokenLanguage(q, this.lang);
     if (switchTo) {
-      const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
-      if (this._ackWaiter) { this._ackWaiter.cancel(); this._ackWaiter = null; }
+      const pending = this._ackWaiter;
+      const outer = pending ? pending.resolve : null;
+      const invert = !!(pending && pending.invert);
+      if (pending) { pending.cancel(); this._ackWaiter = null; }
       if (!this._canSpeak(switchTo)) {
         // Chrome desktop often has NO Tamil/Telugu/Kannada/Marathi voice —
         // only Hindi + English among Indian languages. Don't dead-end: say
@@ -1180,10 +1197,11 @@ export class VoiceGuide {
           console.info('[AgriPulse guide] TTS voices on this device:', vs.map((v) => v.lang).join(', ') || 'none');
         } catch { /* diagnostics only */ }
         this.askKey('langFallbackAsk', 8000).then((ans) => {
+          const done = () => { if (outer) outer(invert ? 'no' : 'yes'); }; // keep moving either way
           if (ans === 'yes' && this.setLanguage('en')) {
-            return this.sayKey('langSwitched').then(() => { if (outer) outer('yes'); });
+            return this.sayKey('langSwitched').then(done);
           }
-          if (outer) outer('yes'); // stay in the current language, keep moving
+          done(); // stay in the current language, keep moving
         });
         return;
       }
@@ -1203,8 +1221,11 @@ export class VoiceGuide {
         };
         if (outer) {
           runCommand();
-          // re-ask the pending question in the new language, snappily
-          this.askKey('askResume', 6000).then((ans) => outer(ans === 'no' ? 'no' : 'yes'));
+          // re-ask the pending question in the new language, snappily.
+          // Translate through the pending question's semantics (invert).
+          this.askKey('askResume', 6000).then((ans) => {
+            outer(invert ? (ans === 'no' ? 'yes' : 'no') : (ans === 'no' ? 'no' : 'yes'));
+          });
         } else {
           runCommand();
         }
@@ -1219,7 +1240,7 @@ export class VoiceGuide {
       // The tour WAITS on this gate — it must not race ahead into the next
       // service (and retire this question) before the farmer answers.
       this._confirmGate = new Promise((res) => { this._confirmGateResolve = res; });
-      this.askKey('tourStopAsk', 8000).then((ans) => {
+      this.askKey('tourStopAsk', 8000, { invert: true }).then((ans) => {
         if (this._confirmGateResolve) { this._confirmGateResolve(); this._confirmGateResolve = null; }
         this._confirmGate = null;
         if (ans === 'yes') {
@@ -1240,10 +1261,16 @@ export class VoiceGuide {
       if (this.onCommand && this.onCommand(q)) {
         // …then politely ask whether to continue. Hand the outer question's
         // waiter over explicitly — the inner ask() owns the ack slot meanwhile.
-        const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
-        if (this._ackWaiter) { this._ackWaiter.cancel(); this._ackWaiter = null; }
+        const pending = this._ackWaiter;
+        const outer = pending ? pending.resolve : null;
+        const invert = !!(pending && pending.invert);
+        if (pending) { pending.cancel(); this._ackWaiter = null; }
         this.askKey('askResume', 8000).then((ans) => {
-          if (outer) outer(ans === 'no' ? 'no' : 'yes');
+          if (outer) {
+            // askResume 'yes' = carry on. For an inverted question (stop-
+            // confirmation) carrying on means 'no, don't stop'.
+            outer(invert ? (ans === 'no' ? 'yes' : 'no') : (ans === 'no' ? 'no' : 'yes'));
+          }
         });
         return;
       }
@@ -1311,7 +1338,7 @@ export class VoiceGuide {
         // A single stray 'no' (noise, a bystander, a breath finalized by
         // the recognizer) must NEVER end the tour and silence the app —
         // confirm it. A real stop is two words: बस … हाँ.
-        const sure = await this.askKey('tourStopAsk', 8000);
+        const sure = await this.askKey('tourStopAsk', 8000, { invert: true });
         if (this._confirmGate) await this._confirmGate;
         if (!this._tourRunning) return;
         if (sure === 'yes') {
