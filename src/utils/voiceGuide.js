@@ -245,6 +245,146 @@ const S = {
   },
 };
 
+// Romanized Hindi — same keys as S.hi. On devices without a native Devanagari
+// voice the guide speaks these through the English voice, so the farmer still
+// hears fluent Hindi instead of silence or garbled script.
+const PHON = {
+  hi: {
+    greet: 'Namaste! Main aapke saath hoon, ek-ek kadam batata chaloonga. Chaliye shuru karte hain.',
+    phone: 'Sabse pehle, neeche bade khaali box mein apna mobile number likhiye. Poore das ank.',
+    phoneComplete: 'Bahut badhiya! Ab neeche hare rang ka bada button dabaiye.',
+    otp: 'Aapke phone par chhah ankon ka code aaya hai. Wahi code neeche chhah chhote box mein bhariye.',
+    register: 'Ab bas apna naam, gaon aur rajya bhar dijiye, phir aage badhein dabaa dijiye.',
+    aadhaar_login: 'Apna barah ankon ka Aadhaar number likhiye, phir OTP se satyapit karein.',
+    aadhaar_otp: 'Aapke phone par aaya chhah ankon ka code neeche likhiye.',
+    success: 'Badhai ho! Aap login ho gaye. Ab main aapko dheere-dheere batata hoon ki yeh app kya-kya seva deta hai.',
+    didntCatch: 'Maaf kijiye, phir se boliye.',
+    askNext: 'Kya agli seva ke baare mein sunna chahenge?',
+    askResume: 'Kya main jaari rakhun?',
+    tourIntro: 'To suniye, is app mein kya-kya hai. Har seva ke baad main poochhoonga, tab tak aaraam se sunte rahiye.',
+    tourBye: 'Jab bhi zaroorat ho, mic dabakar mujhe bulaa lijiye. Aapka din shubh ho!',
+    tourDone: 'Bas itni hi nahin, aur bhi bahut kuch hai. Khud tab kholkar dekhiye. Shubhkaamnaayein!',
+    services: [
+      ['Fasal jaanch', 'Patte ki photo kheenchiye, bimaari aur ilaaj turant mil jaayega.'],
+      ['Bimaari radar', 'Agle teen din ke mausam se fasal ko khatra hai ya nahin, bimaari aane se pehle batata hai.'],
+      ['Dava jaanch', 'Nakli keetnashak pakadta hai, bottle ki photo se company ki pushti hoti hai.'],
+      ['Mandi bhaav', 'Aaj ke bhaav dekhiye aur sahi samay par bechkar munafa nikaliye.'],
+      ['Dukaanein', 'Beej, dava aur auzar sahi daam par ghar baithe mangwaiye.'],
+      ['Saajha khareed', 'Aas-paas ke kisaanon ke saath milkar thok bhaav par saaman mangwaiye.'],
+      ['Kisaan baazaar', 'Atirikt beej, tractor ya auzar doosre kisaanon ko bechiye ya khareediye.'],
+      ['Kisaan samudaay', 'Apni bhaasha mein sawaal poochhiye, saathi kisaan jawaab denge.'],
+      ['Kaam aur madad', 'Mazdoor chahiye ya kaam dena hai, yahan post kijiye.'],
+      ['Eendhan', 'Aas-paas ke pumpon ka diesel petrol bhaav dekhiye.'],
+      ['Sahaayak baatcheet', 'Koi bhi sawaal bolkar poochhiye, jawaab turant milega.'],
+      ['Sarkaari sevaayein', 'Yojanaayein, subsidy aur aavedan, sab ek jagah.'],
+    ],
+  },
+};
+
+// ── location → language ───────────────────────────────────────────────────────
+// Indian states whose primary language is one we support; everything else in
+// India falls back to Hindi. Non-India → English.
+
+const STATE_LANG = {
+  'tamil nadu': 'ta', 'puducherry': 'ta', 'pondicherry': 'ta',
+  'andhra pradesh': 'te', 'telangana': 'te',
+  'karnataka': 'kn',
+  'maharashtra': 'mr', 'goa': 'mr',
+};
+
+export function langFromRegion(countryCode, state) {
+  const cc = String(countryCode || '').toUpperCase();
+  if (cc === 'IN' || cc === 'IND') {
+    return STATE_LANG[String(state || '').toLowerCase().trim()] || 'hi';
+  }
+  return 'en';
+}
+
+const GEO_CACHE_KEY = 'ap_guide_geo_lang';
+const GEO_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // re-check weekly
+
+function geoCache() {
+  try {
+    const raw = localStorage.getItem(GEO_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.at > GEO_CACHE_TTL_MS) return null;
+    return GUIDE_LANGS.includes(parsed.lang) ? parsed.lang : null;
+  } catch { return null; }
+}
+function setGeoCache(lang) {
+  try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify({ lang, at: Date.now() })); } catch { /* private mode */ }
+}
+
+function geolocate(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      reject(new Error('no_geolocation'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      (err) => reject(err),
+      { timeout: timeoutMs, maximumAge: 10 * 60 * 1000 },
+    );
+  });
+}
+
+async function reverseGeocode(lat, lon) {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&accept-language=en`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('nominatim_failed');
+  const data = await res.json();
+  return { country: data?.address?.country_code, state: data?.address?.state || data?.address?.region };
+}
+
+async function ipLocate() {
+  const res = await fetch('https://ipwho.is/?fields=country_code,region');
+  if (!res.ok) throw new Error('ipwho_failed');
+  const data = await res.json();
+  return { country: data?.country_code, state: data?.region };
+}
+
+/**
+ * Where is the farmer, and what language do they speak there?
+ *   1. browser language already a supported Indian language → trust it
+ *   2. GPS position → reverse-geocoded state (e.g. Delhi → hi, Karnataka → kn)
+ *   3. IP location → state
+ *   4. browser language / English
+ * Cached for a week so we don't ping services on every visit.
+ */
+export async function detectLanguageByLocation() {
+  const cached = geoCache();
+  if (cached) return cached;
+
+  let base = 'en';
+  try {
+    base = String(navigator.language || 'en').toLowerCase().split('-')[0];
+  } catch { /* ssr */ }
+  if (['hi', 'ta', 'te', 'kn', 'mr'].includes(base)) return base; // strong signal, no lookup needed
+
+  let lang = null;
+  // GPS (precise — a farmer in Tamil Nadu gets Tamil even on an English phone)
+  try {
+    const pos = await geolocate();
+    const region = await reverseGeocode(pos.lat, pos.lon);
+    lang = langFromRegion(region.country, region.state);
+  } catch { /* denied / timeout → fall through to IP */ }
+
+  // IP (approximate but permission-free)
+  if (!lang) {
+    try {
+      const region = await ipLocate();
+      lang = langFromRegion(region.country, region.state);
+    } catch { /* offline → browser language */ }
+  }
+
+  if (!lang) lang = GUIDE_LANGS.includes(base) ? base : 'en';
+  if (lang === 'en' && base === 'en') setGeoCache(lang);
+  else if (lang !== 'en') setGeoCache(lang);
+  return lang;
+}
+
 // voice-control intents per language (matched as substrings, lowercase)
 const INTENTS = {
   hi: {
@@ -325,6 +465,34 @@ export class VoiceGuide {
   _emit() { if (this.onStateChange) this.onStateChange(); }
 
   script() { return S[this.lang] || S.hi; }
+
+  _voiceInfo() {
+    try {
+      return this.engine.getBestVoice ? this.engine.getBestVoice(`${this.lang}-IN`) : null;
+    } catch { return null; }
+  }
+
+  // Best render of a known line for THIS device:
+  //   native voice → native script · else romanized (hi) · else English
+  _renderLine(key) {
+    const L = this.script();
+    const vi = this._voiceInfo();
+    const native = L[key];
+    if (typeof native !== 'string') return String(native ?? '');
+    if (!vi || vi.isNative) return native;
+    const phon = PHON[this.lang] && PHON[this.lang][key];
+    if (phon) return phon;
+    if (this.lang !== 'en' && typeof S.en[key] === 'string') return S.en[key];
+    return native;
+  }
+
+  sayKey(key, opts = {}) {
+    return this.say(this._renderLine(key), opts);
+  }
+
+  askKey(key, timeoutMs = 16000) {
+    return this.ask(this._renderLine(key), timeoutMs);
+  }
 
   start(lang) {
     this.lang = GUIDE_LANGS.includes(lang) ? lang : 'hi';
@@ -465,7 +633,7 @@ export class VoiceGuide {
         // waiter over explicitly — the inner ask() owns the ack slot meanwhile.
         const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
         this._ackWaiter = null;
-        this.ask(this.script().askResume).then((ans) => {
+        this.askKey('askResume').then((ans) => {
           if (outer) outer(ans === 'no' ? 'no' : 'yes');
         });
         return;
@@ -487,21 +655,31 @@ export class VoiceGuide {
     this.active = true;
     this._emit();
 
-    await this.say(L.tourIntro);
-    for (const [name, desc] of L.services) {
+    await this.sayKey('tourIntro');
+    const vi = this._voiceInfo();
+    for (let i = 0; i < L.services.length; i++) {
       if (!this._tourRunning) return;
-      await this.say(`${name}. ${desc}`);
+      let line;
+      if (!vi || vi.isNative) {
+        line = `${L.services[i][0]}. ${L.services[i][1]}`;
+      } else if (PHON[this.lang] && PHON[this.lang].services && PHON[this.lang].services[i]) {
+        const [pn, pd] = PHON[this.lang].services[i];
+        line = `${pn}. ${pd}`;
+      } else {
+        line = `${S.en.services[i][0]}. ${S.en.services[i][1]}`;
+      }
+      await this.say(line);
       if (!this._tourRunning) return;
-      const ans = await this.ask(L.askNext);
+      const ans = await this.askKey('askNext');
       if (!this._tourRunning) return;
       if (ans === 'no') {
-        await this.say(L.tourBye, { listenAfter: false });
+        await this.sayKey('tourBye', { listenAfter: false });
         this.stop();
         return;
       }
       // yes / timeout / unrecognized → continue at their pace
     }
-    await this.say(L.tourDone, { listenAfter: false });
+    await this.sayKey('tourDone', { listenAfter: false });
     this.stop();
   }
 

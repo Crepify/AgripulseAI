@@ -7,7 +7,7 @@ import {
   ChevronDown, ArrowRight, X,} from 'lucide-react';
 import { sound } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
-import { voiceGuide, detectGuideLanguage } from '../utils/voiceGuide';
+import { voiceGuide, detectGuideLanguage, detectLanguageByLocation } from '../utils/voiceGuide';
 import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, getUserByAadhaar, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
@@ -384,35 +384,60 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     setError(res.error === 'offline' ? l.otpOffline : l.googleFailed);
   };
 
-  // ── Voice guide: detect the visitor's language and walk them through ──
+  // ── Voice guide: speak the LOCAL language of wherever the farmer is ──
   useEffect(() => {
-    const detected = detectGuideLanguage();
-    voiceGuide.lang = detected;
-    // sync the visible UI where we have translations for it
-    if ((detected === 'hi' || detected === 'en') && detected !== selectedLang && setSelectedLang) {
-      setSelectedLang(detected);
-    }
-    // Try speaking right away; if the browser blocks audio before any tap,
-    // the offer chip below doubles as the one-gesture unlock.
-    const t = setTimeout(() => {
-      if (!voiceGuide.active) {
-        voiceGuide.start(detected);
-        voiceGuide.onStateChange = () => setGuideActive(voiceGuide.active);
-        Promise.all([
-          voiceGuide.say(voiceGuide.script().greet),
-          voiceGuide.say(voiceGuide.script().phone),
-        ]).then(([ok]) => {
-          if (!ok && voiceGuide.blocked) {
-            voiceGuide.stop();
-            setGuideOffer(true); // show the tap-to-start chip
-          } else {
-            setGuideOffer(false);
-          }
-        });
+    let cancelled = false;
+
+    const syncUi = (lang) => {
+      if ((lang === 'hi' || lang === 'en') && lang !== selectedLang && setSelectedLang) {
+        setSelectedLang(lang);
       }
-    }, 900);
+    };
+
+    const startGuide = () => {
+      if (cancelled || voiceGuide.active) return;
+      voiceGuide.start(voiceGuide.lang);
+      voiceGuide.onStateChange = () => setGuideActive(voiceGuide.active);
+      Promise.all([
+        voiceGuide.sayKey('greet'),
+        voiceGuide.sayKey('phone'),
+      ]).then(([ok]) => {
+        if (cancelled) return;
+        if (!ok && voiceGuide.blocked) {
+          voiceGuide.stop();
+          setGuideOffer(true); // browser needs one tap before it may speak
+        } else {
+          setGuideOffer(false);
+        }
+      });
+    };
+
+    // Provisional: browser language (instant)
+    voiceGuide.lang = detectGuideLanguage();
+    syncUi(voiceGuide.lang);
+
+    // Real location (GPS → reverse-geocoded state → IP fallback), cached a
+    // week. A Delhi farmer on an English phone hears Hindi, not English.
+    const located = detectLanguageByLocation()
+      .then((loc) => { if (!cancelled && loc) { voiceGuide.lang = loc; syncUi(loc); } })
+      .catch(() => {});
+
+    // Don't make them wait on the GPS prompt forever — 2.5s cap, then start;
+    // if the location lands later and we're still on step one, restart in the
+    // right language (speech cuts over cleanly).
+    Promise.race([located, new Promise((r) => setTimeout(r, 2500))]).then(() => {
+      if (cancelled) return;
+      startGuide();
+      located.then(() => {
+        if (cancelled || !voiceGuide.active) return;
+        if (step === 'phone' && phone.length === 0) {
+          voiceGuide.sayKey('greet').then(() => voiceGuide.sayKey('phone'));
+        }
+      });
+    });
+
     return () => {
-      clearTimeout(t);
+      cancelled = true;
       voiceGuide.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -432,10 +457,10 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     if (step === 'phone') { guideSpokeComplete.current = false; return; }
     if (step === 'success') {
       voiceGuide.requestTour(); // App picks this up after login
-      voiceGuide.say(L.success, { listenAfter: false });
+      voiceGuide.sayKey('success', { listenAfter: false });
       return;
     }
-    if (lines[step]) voiceGuide.say(lines[step]);
+    if (lines[step]) voiceGuide.sayKey(step);
   }, [step, guideActive]);
 
   // "Very good! Now press the green button" — once the number is complete
@@ -443,7 +468,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     if (!guideActive || step !== 'phone') return;
     if (phone.length === 10 && !guideSpokeComplete.current) {
       guideSpokeComplete.current = true;
-      voiceGuide.say(voiceGuide.script().phoneComplete);
+      voiceGuide.sayKey('phoneComplete');
     }
     if (phone.length < 10) guideSpokeComplete.current = false;
   }, [phone, step, guideActive]);
@@ -923,8 +948,8 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                   setGuideOffer(false);
                   voiceGuide.start(voiceGuide.lang);
                   Promise.all([
-                    voiceGuide.say(voiceGuide.script().greet),
-                    voiceGuide.say(voiceGuide.script().phone),
+                    voiceGuide.sayKey('greet'),
+                    voiceGuide.sayKey('phone'),
                   ]);
                 }}
                 className="px-3 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black"
