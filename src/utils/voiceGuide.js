@@ -462,6 +462,7 @@ export class VoiceGuide {
     this._tourRunning = false;
     this._speechQueue = Promise.resolve(); // serialize lines — never cancel mid-word
     this._voicesReady = false;
+    this._reminderTimers = [];             // patient step reminders
   }
 
   _emit() { if (this.onStateChange) this.onStateChange(); }
@@ -496,6 +497,30 @@ export class VoiceGuide {
     return this.ask(this._renderLine(key), timeoutMs);
   }
 
+  // ── Patient step reminders ─────────────────────────────────────────────
+  // A step instruction is spoken once; if the farmer hasn't acted after a
+  // minute it is repeated, once more after another minute — then the guide
+  // stays quiet (never nags forever). Moving to any new step clears it.
+  clearReminder() {
+    this._reminderTimers.forEach((t) => clearTimeout(t));
+    this._reminderTimers = [];
+  }
+
+  guideStep(key, { repeats = 2, delayMs = 60_000 } = {}) {
+    this.clearReminder();
+    this.sayKey(key).then(() => {
+      if (!this.active) return;
+      for (let i = 1; i <= repeats; i++) {
+        this._reminderTimers.push(setTimeout(() => {
+          // skip politely if another feature owns the mic or a question is pending
+          if (!this.active || this.suspended || this._ackWaiter) return;
+          this.sayKey(key);
+        }, delayMs * i));
+      }
+    });
+    return undefined;
+  }
+
   start(lang) {
     this.lang = GUIDE_LANGS.includes(lang) ? lang : 'hi';
     this.active = true;
@@ -506,6 +531,7 @@ export class VoiceGuide {
   stop() {
     this.active = false;
     this._tourRunning = false;
+    this.clearReminder();
     this._listenToken += 1;
     this._resolveAck(null);
     try {
