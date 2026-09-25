@@ -551,6 +551,41 @@ export default function TabScanner({ selectedLang, isSunlightMode }) {
               <div className="text-xs text-zinc-300 font-medium">
                 🛡️ {selectedCrop.dosage[dosageType].safety}
               </div>
+
+              {/* Detailed Pesticide Info from 52-class database */}
+              {selectedCrop.pesticideInfo && (
+                <div className={`p-3.5 rounded-xl border-2 space-y-2.5 text-xs ${isSunlightMode ? 'bg-white border-zinc-300' : 'bg-zinc-900 border-zinc-700'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-emerald-400">🧪 {dosageType === 'bio' ? 'Organic' : 'Chemical'} Details</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${dosageType === 'bio' ? 'bg-emerald-400 text-black' : 'bg-amber-400 text-black'}`}>
+                      {dosageType === 'bio' ? selectedCrop.pesticideInfo.organic.efficiency : selectedCrop.pesticideInfo.chemical.efficiency} Efficient
+                    </span>
+                  </div>
+                  <div className={`p-2.5 rounded-lg ${isSunlightMode ? 'bg-zinc-50' : 'bg-zinc-950'}`}>
+                    <div className="font-bold text-[11px] text-zinc-400">Active Ingredient</div>
+                    <div className={`font-black ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{dosageType === 'bio' ? selectedCrop.pesticideInfo.organic.active : selectedCrop.pesticideInfo.chemical.active}</div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className={`p-2.5 rounded-lg ${isSunlightMode ? 'bg-red-50 border border-red-200' : 'bg-red-950/30 border border-red-800/50'}`}>
+                      <div className="font-black text-[10px] text-red-400">⚠️ Side Effects</div>
+                      <div className={`mt-1 font-medium leading-relaxed ${isSunlightMode ? 'text-zinc-700' : 'text-zinc-300'}`}>{dosageType === 'bio' ? selectedCrop.pesticideInfo.organic.sideEffects : selectedCrop.pesticideInfo.chemical.sideEffects}</div>
+                    </div>
+                    <div className={`p-2.5 rounded-lg ${isSunlightMode ? 'bg-amber-50 border border-amber-200' : 'bg-amber-950/30 border border-amber-800/50'}`}>
+                      <div className="font-black text-[10px] text-amber-500">🌱 Soil Suitability</div>
+                      <div className={`mt-1 font-bold ${isSunlightMode ? 'text-zinc-800' : 'text-zinc-200'}`}>{selectedCrop.pesticideInfo.soilTypes.join(', ')}</div>
+                    </div>
+                  </div>
+                  <div className={`p-2.5 rounded-lg ${isSunlightMode ? 'bg-emerald-50 border border-emerald-200' : 'bg-emerald-950/30 border border-emerald-800/50'}`}>
+                    <div className="font-black text-[10px] text-emerald-600">✅ Verification (Genuine Check)</div>
+                    <div className={`mt-1 font-mono text-[11px] leading-relaxed ${isSunlightMode ? 'text-zinc-700' : 'text-zinc-300'}`}>{dosageType === 'bio' ? selectedCrop.pesticideInfo.organic.verification : selectedCrop.pesticideInfo.chemical.verification}</div>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-zinc-500">
+                    <span>🔬 Pathogen: {selectedCrop.pesticideInfo.pathogen}</span>
+                    <span>•</span>
+                    <span>Severity: {selectedCrop.pesticideInfo.severity}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Field Size Mixing Multiplier Tool */}

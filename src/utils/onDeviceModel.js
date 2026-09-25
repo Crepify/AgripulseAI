@@ -4,6 +4,7 @@
 // If the model cannot run on a device and the phone is online, /api/predict (Ultralytics cloud) is used.
 
 import { CROPS } from '../data/agriData';
+import { PESTICIDE_DB } from '../data/pesticideDatabase.js';
 import { loadDetector, detectDisease } from '../vision/detector';
 import { detectDiseaseCloud } from '../vision/cloud-detector';
 
@@ -305,45 +306,79 @@ function buildMatchedCrop(detections) {
   const { crop, disease } = describeLabel(top.label);
 
   if (isHealthyLabel(top.label)) {
+    const db = PESTICIDE_DB[top.label];
     return {
       ...HEALTHY,
       id: `det-${top.label}`,
-      name: crop || HEALTHY.name,
+      name: crop || db?.crop || HEALTHY.name,
+      localName: db ? db.crop : HEALTHY.localName,
+      disease: db ? `${db.disease} ✅ Healthy` : HEALTHY.disease,
       pathogen: top.label,
       confidence: pct,
-      symptoms: `${crop ? `${crop} leaf` : 'Leaf'} looks healthy — no disease lesions detected. ${HEALTHY.symptoms}`,
+      symptoms: db ? `${db.crop} leaf looks healthy — no disease lesions. ${HEALTHY.symptoms}` : `${crop ? `${crop} leaf` : 'Leaf'} looks healthy — no disease lesions detected. ${HEALTHY.symptoms}`,
+      image: db?.image || HEALTHY.image,
+      dosage: db ? { bio: { name: db.organic.name, measure: db.organic.measure, tank: db.organic.tank, cost: db.organic.cost, safety: db.organic.safety }, chemical: { name: db.chemical.name, measure: db.chemical.measure, tank: db.chemical.tank, cost: db.chemical.cost, safety: db.chemical.safety } } : HEALTHY.dosage,
+      sprayTime: db ? db.organic.bestTime : HEALTHY.sprayTime,
+      pesticideInfo: db || null,
     };
   }
 
-  const tpl = TEMPLATE[FAMILY_OVERRIDES[top.label] || 'blight'] || TEMPLATE.blight || FALLBACK_CROP;
+  // Try to get full pesticide info from DB for this exact label
+  const dbEntry = PESTICIDE_DB[top.label];
+  const tpl = dbEntry ? {
+    ...TEMPLATE[FAMILY_OVERRIDES[top.label] || 'blight'],
+    name: dbEntry.crop,
+    disease: dbEntry.disease,
+    pathogen: dbEntry.pathogen,
+    symptoms: dbEntry.symptoms,
+    image: dbEntry.image,
+    dosage: {
+      bio: { name: dbEntry.organic.name, measure: dbEntry.organic.measure, tank: dbEntry.organic.tank, cost: dbEntry.organic.cost, safety: dbEntry.organic.safety },
+      chemical: { name: dbEntry.chemical.name, measure: dbEntry.chemical.measure, tank: dbEntry.chemical.tank, cost: dbEntry.chemical.cost, safety: dbEntry.chemical.safety }
+    },
+    sprayTime: dbEntry.organic.bestTime,
+    audio: TEMPLATE.blight.audio,
+  } : (TEMPLATE[FAMILY_OVERRIDES[top.label] || 'blight'] || TEMPLATE.blight || FALLBACK_CROP);
+  
   const lowConf = top.confidence < 0.5;
-  const name = crop || tpl?.name || 'Leaf';
+  const name = crop || dbEntry?.crop || tpl?.name || 'Leaf';
   const regions = detections.filter((d) => d.label === top.label).length;
   const others = [...new Set(
     detections.filter((d) => d.label !== top.label && !isHealthyLabel(d.label)).map((d) => d.label),
   )].slice(0, 2).map((l) => describeLabel(l).disease);
 
-  const diseaseText = `${lowConf ? 'Possible: ' : ''}${disease}`;
+  const diseaseText = `${lowConf ? 'Possible: ' : ''}${dbEntry?.disease || disease}`;
+  const baseSymptoms = dbEntry?.symptoms || tpl.symptoms;
   const symptoms =
-    `${disease} detected on ${name} — ${regions} affected region${regions > 1 ? 's' : ''} marked on the photo.` +
-    (lowConf ? ' Low confidence: retake in daylight with one leaf filling the frame.' : '') +
+    `${diseaseText} detected on ${name} — ${regions} affected region${regions > 1 ? 's' : ''} marked on the photo.` +
+    (lowConf ? ' Low confidence: retake in daylight with one leaf filling the frame, white paper background.' : '') +
     (others.length ? ` Also seen: ${others.join(', ')}.` : '') +
-    ` Typical signs: ${tpl.symptoms}`;
+    ` Typical signs: ${baseSymptoms}` +
+    (dbEntry ? ` Soil: ${dbEntry.soilTypes.join(', ')}. Organic side effects: ${dbEntry.organic.sideEffects}. Chemical side effects: ${dbEntry.chemical.sideEffects}. Verify: ${dbEntry.organic.verification} / ${dbEntry.chemical.verification}` : '');
 
   const spoken =
     `${diseaseText} detected on ${name} with ${Math.round(pct)} percent confidence. ` +
-    `Recommended: ${tpl.dosage.bio.name}, ${tpl.dosage.bio.measure} in a ${tpl.dosage.bio.tank}. ` +
-    `Best spray time ${tpl.sprayTime}.`;
+    `Recommended organic: ${dbEntry ? dbEntry.organic.name + ', ' + dbEntry.organic.measure : tpl.dosage.bio.name + ', ' + tpl.dosage.bio.measure} in a ${dbEntry ? dbEntry.organic.tank : tpl.dosage.bio.tank}. ` +
+    `Chemical: ${dbEntry ? dbEntry.chemical.name + ', ' + dbEntry.chemical.measure : tpl.dosage.chemical.name}. ` +
+    `Best spray time ${dbEntry ? dbEntry.organic.bestTime : tpl.sprayTime}.`;
 
   return {
     ...tpl,
     id: `det-${top.label}`,
     name,
+    localName: dbEntry?.crop || tpl.localName,
     disease: diseaseText,
-    pathogen: top.label,
+    pathogen: dbEntry?.pathogen || top.label,
     confidence: pct,
     severity: lowConf ? 'Possible' : top.confidence >= 0.75 ? 'High' : 'Moderate',
     symptoms,
+    image: dbEntry?.image || tpl.image,
+    dosage: {
+      bio: dbEntry ? { name: dbEntry.organic.name, measure: dbEntry.organic.measure, tank: dbEntry.organic.tank, cost: dbEntry.organic.cost, safety: dbEntry.organic.safety } : tpl.dosage.bio,
+      chemical: dbEntry ? { name: dbEntry.chemical.name, measure: dbEntry.chemical.measure, tank: dbEntry.chemical.tank, cost: dbEntry.chemical.cost, safety: dbEntry.chemical.safety } : tpl.dosage.chemical
+    },
+    sprayTime: dbEntry?.organic.bestTime || tpl.sprayTime,
+    pesticideInfo: dbEntry || null,
     // English voice is generated from the real detection; other languages keep the closest curated advisory.
     audio: { ...tpl.audio, en: { devanagari: spoken, phonetic: spoken } },
   };
