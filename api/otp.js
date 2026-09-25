@@ -137,15 +137,21 @@ async function sendSms(mobile, code, provider) {
   }
 
   if (provider === 'fast2sms') {
+    // Dedicated OTP route — delivers to DND numbers too (the promotional
+    // 'q' route gets rejected with "Number blocked in Fast2SMS DND list").
+    // The SMS arrives as "Your OTP: 123456".
     const res = await fetch('https://www.fast2sms.com/dev/bulkV2', {
       method: 'POST',
       headers: {
         authorization: process.env.FAST2SMS_API_KEY,
-        'content-type': 'application/json',
+        'content-type': 'application/x-www-form-urlencoded',
       },
-      body: JSON.stringify({ route: 'q', message: text, numbers: mobile }),
+      body: new URLSearchParams({ route: 'otp', variables_values: code, numbers: mobile }),
     });
-    if (!res.ok) throw new Error(`fast2sms ${res.status}: ${(await res.text()).slice(0, 180)}`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || data?.return === false) {
+      throw new Error(`fast2sms ${res.status}: ${JSON.stringify(data || {}).slice(0, 180)}`);
+    }
     return;
   }
 
