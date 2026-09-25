@@ -7,6 +7,7 @@ import {
   ChevronDown, ArrowRight, X,} from 'lucide-react';
 import { sound } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
+import { voiceGuide, detectGuideLanguage } from '../utils/voiceGuide';
 import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, getUserByAadhaar, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
@@ -229,6 +230,9 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [phone, setPhone] = useState('');
   const [showMore, setShowMore] = useState(false); // advanced sign-in options
   const [showHelp, setShowHelp] = useState(false);     // pictured help sheet
+  const [guideActive, setGuideActive] = useState(false);
+  const [guideOffer, setGuideOffer] = useState(true);  // one-tap start (also unlocks TTS)
+  const guideSpokeComplete = useRef(false);            // "press the green button" said once
   const [name, setName] = useState('');
   const [village, setVillage] = useState('');
   const [stateName, setStateName] = useState('Karnataka');
@@ -379,6 +383,70 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     sound.playTransition();
     setError(res.error === 'offline' ? l.otpOffline : l.googleFailed);
   };
+
+  // ── Voice guide: detect the visitor's language and walk them through ──
+  useEffect(() => {
+    const detected = detectGuideLanguage();
+    voiceGuide.lang = detected;
+    // sync the visible UI where we have translations for it
+    if ((detected === 'hi' || detected === 'en') && detected !== selectedLang && setSelectedLang) {
+      setSelectedLang(detected);
+    }
+    // Try speaking right away; if the browser blocks audio before any tap,
+    // the offer chip below doubles as the one-gesture unlock.
+    const t = setTimeout(() => {
+      if (!voiceGuide.active) {
+        voiceGuide.start(detected);
+        voiceGuide.onStateChange = () => setGuideActive(voiceGuide.active);
+        Promise.all([
+          voiceGuide.say(voiceGuide.script().greet),
+          voiceGuide.say(voiceGuide.script().phone),
+        ]).then(([ok]) => {
+          if (!ok && voiceGuide.blocked) {
+            voiceGuide.stop();
+            setGuideOffer(true); // show the tap-to-start chip
+          } else {
+            setGuideOffer(false);
+          }
+        });
+      }
+    }, 900);
+    return () => {
+      clearTimeout(t);
+      voiceGuide.stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Narrate each step ONLY when the farmer actually reaches it —
+  // the guide never runs ahead of what they have done.
+  useEffect(() => {
+    if (!guideActive) return;
+    const L = voiceGuide.script();
+    const lines = {
+      register: L.register,
+      otp: L.otp,
+      aadhaar_login: L.aadhaar_login,
+      aadhaar_otp: L.aadhaar_otp,
+    };
+    if (step === 'phone') { guideSpokeComplete.current = false; return; }
+    if (step === 'success') {
+      voiceGuide.requestTour(); // App picks this up after login
+      voiceGuide.say(L.success, { listenAfter: false });
+      return;
+    }
+    if (lines[step]) voiceGuide.say(lines[step]);
+  }, [step, guideActive]);
+
+  // "Very good! Now press the green button" — once the number is complete
+  useEffect(() => {
+    if (!guideActive || step !== 'phone') return;
+    if (phone.length === 10 && !guideSpokeComplete.current) {
+      guideSpokeComplete.current = true;
+      voiceGuide.say(voiceGuide.script().phoneComplete);
+    }
+    if (phone.length < 10) guideSpokeComplete.current = false;
+  }, [phone, step, guideActive]);
 
   // Probe /api/google once: with GOOGLE_CLIENT_ID set we render the real
   // "Continue with Google" button; otherwise we keep the demo button.
@@ -766,6 +834,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     sound.playClick();
     if (isVoiceListening && voiceField === field) {
       speechEngine.stopListening();
+      voiceGuide.resume();
       setIsVoiceListening(false);
       setVoiceField(null);
       return;
@@ -774,10 +843,11 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     const code = langMap[selectedLang] || 'hi-IN';
     setVoiceField(field);
     setIsVoiceListening(true);
+    voiceGuide.suspend(); // the field-fill owns the mic for a moment
     speechEngine.startListening(code, (transcript) => {
       if (field === 'name') setName(transcript);
       if (field === 'village') setVillage(transcript);
-    }, () => { setIsVoiceListening(false); setVoiceField(null); }, () => { setIsVoiceListening(false); setVoiceField(null); });
+    }, () => { setIsVoiceListening(false); setVoiceField(null); voiceGuide.resume(); }, () => { setIsVoiceListening(false); setVoiceField(null); voiceGuide.resume(); });
   };
 
   const maskedPhone = `+91 ${normalizeMobile(phone).slice(0, 2)}•••••${normalizeMobile(phone).slice(7)}`;
@@ -841,6 +911,44 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
         )}
 
         <div className="min-w-0 px-5 py-8 pt-14 sm:px-8 flex flex-col items-center text-center">
+
+          {/* Voice guide: one-tap start (also unlocks browser speech) */}
+          {!guideActive && guideOffer && (
+            <div className="w-full mb-3 flex items-center justify-center gap-2 flex-wrap">
+              <span className="text-[11px] font-black text-zinc-600">{voiceGuide.script().offer}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  sound.playClick();
+                  setGuideOffer(false);
+                  voiceGuide.start(voiceGuide.lang);
+                  Promise.all([
+                    voiceGuide.say(voiceGuide.script().greet),
+                    voiceGuide.say(voiceGuide.script().phone),
+                  ]);
+                }}
+                className="px-3 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black"
+              >
+                🔊 {voiceGuide.script().offerYes}
+              </button>
+              <button
+                type="button"
+                onClick={() => { sound.playClick(); setGuideOffer(false); }}
+                className="px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 text-[11px] font-black"
+              >
+                {voiceGuide.script().offerNo}
+              </button>
+            </div>
+          )}
+          {guideActive && (
+            <button
+              type="button"
+              onClick={() => { sound.playClick(); voiceGuide.stop(); }}
+              className="mb-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-600 text-[10px] font-black animate-pulse"
+            >
+              🎙️ {voiceGuide.script().activeLabel} · {voiceGuide.script().stopGuide}
+            </button>
+          )}
 
           {/* Farmer help bar — voice guide + pictured steps (on every screen) */}
           <div className="w-full flex items-center justify-center gap-2 mb-3">

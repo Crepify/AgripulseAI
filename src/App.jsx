@@ -23,6 +23,8 @@ import LandingPage from './components/LandingPage';
 import { initOnDeviceAI } from './utils/onDeviceModel';
 import { initOfflineDB } from './utils/offlineStore';
 import { getSession, clearSession } from './utils/authService';
+import { voiceGuide } from './utils/voiceGuide';
+import { classifyVoiceIntent } from './utils/voiceNavigator';
 import { sound } from './utils/audio';
 import { T } from './data/translations';
 import { WifiOff, Mic, Download } from 'lucide-react';
@@ -66,6 +68,7 @@ export default function App() {
   // Real persistent session — restored from localStorage (30-day validity)
   const [user, setUser] = useState(() => getSession());
   const [isHandsFree, setIsHandsFree] = useState(false);
+  const [guideActive, setGuideActive] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   const t = T[selectedLang] || T['en'];
@@ -110,6 +113,38 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem('ap_low_literacy', String(isLowLiteracy)); } catch {}
   }, [isLowLiteracy]);
+
+  // ── Voice guide: run the service tour once the farmer logs in ──────────
+  useEffect(() => {
+    voiceGuide.onStateChange = () => setGuideActive(voiceGuide.active);
+    if (user && voiceGuide.tourPending) {
+      voiceGuide.tourPending = false;
+      // While the guide waits for an answer, the farmer can just SAY an
+      // action ("open mandi prices") — we do it, then ask to continue.
+      voiceGuide.onCommand = (transcript) => {
+        try {
+          const intent = classifyVoiceIntent(transcript, selectedLang);
+          if (intent && intent.targetTab) {
+            setActiveTab(intent.targetTab);
+            const line = (intent.speechResponse && (intent.speechResponse[selectedLang] || intent.speechResponse.hi || intent.speechResponse.en));
+            voiceGuide.say(line || intent.tabLabel?.hi || 'ठीक है।');
+            return true;
+          }
+        } catch { /* unknown speech — ignore */ }
+        return false;
+      };
+      setTimeout(() => { voiceGuide.runServiceTour(); }, 1200);
+    }
+    if (!user) {
+      voiceGuide.onCommand = null;
+    }
+  }, [user, selectedLang]);
+
+  // The modal assistant / hands-free mode own the mic — pause the guide then.
+  useEffect(() => {
+    if (isVoiceOpen || isHandsFree) voiceGuide.suspend();
+    else voiceGuide.resume();
+  }, [isVoiceOpen, isHandsFree]);
 
   const handleAutoNavigate = (targetTab) => {
     setActiveTab(targetTab);
@@ -167,6 +202,25 @@ export default function App() {
         isLowLiteracy={isLowLiteracy}
         setIsLowLiteracy={setIsLowLiteracy}
       />
+
+      {/* Voice guide companion — replay the service tour or stop it */}
+      <div className="fixed bottom-20 right-3 z-40 flex flex-col items-end gap-2">
+        {guideActive ? (
+          <button
+            onClick={() => { sound.playClick(); voiceGuide.stopTour(); }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-[11px] font-black shadow-lg animate-pulse"
+          >
+            ⏹ {t.voiceGuideStop || 'Stop guide'}
+          </button>
+        ) : (
+          <button
+            onClick={() => { sound.playClick(); voiceGuide.runServiceTour(); }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black shadow-lg"
+          >
+            🔊 {t.voiceGuideReplay || 'सेवाएँ सुनें'}
+          </button>
+        )}
+      </div>
 
       {/* Wet-Hands / Hands-Free Voice Navigation Active Banner */}
       <HandsFreeVoiceBanner
