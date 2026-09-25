@@ -1,26 +1,40 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import QRCode from 'qrcode';
 import {
   ArrowLeft, KeyRound, ShieldCheck, Smartphone, MessageSquareText,
-  RefreshCw, Timer, User, MapPin, AlertTriangle, CheckCircle2, Leaf, QrCode,
-  Fingerprint, BadgeCheck, LocateFixed, Mic, MicOff,} from 'lucide-react';
+  RefreshCw, Timer, User, MapPin, AlertTriangle, CheckCircle2, Leaf,
+  Fingerprint, BadgeCheck, LocateFixed, Mic, MicOff, Volume2, HelpCircle,
+  ChevronDown, ArrowRight, X,} from 'lucide-react';
 import { sound } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
+import { voiceGuide, detectGuideLanguage, detectLanguageByLocation } from '../utils/voiceGuide';
 import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, getUserByAadhaar, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
-  enableTotp, setTotpSkipped, verifyUserTotp, isTotpEnabled,
   serverSendOtp, serverVerifyOtp, fetchGoogleConfig, serverVerifyGoogle,
   upsertGoogleUser,
   OTP_RESEND_COOLDOWN_S,
   normalizeAadhaar, isValidAadhaar, formatAadhaar, maskAadhaar,
   requestAadhaarOtp, verifyAadhaarOtp, linkAadhaarToUser,
 } from '../utils/authService';
-import {
-  generateSecret, buildOtpAuthUri, verifyTotpCode, formatSecretForHumans,
-  totpSecondsRemaining, totpNow, TOTP_PERIOD_S,
-} from '../utils/totp';
+// Voice guidance per step — Hindi carries a phonetic fallback so devices
+// without a native Devanagari voice still speak clearly.
+const VOICE = {
+  en: {
+    phone: 'Welcome to AgriPulse. Type your ten digit mobile number and press the green button. A six digit code will come on your phone.',
+    register: 'Please type your name and village. Then press continue.',
+    otp: 'Open the SMS on your phone and type the six digit code here.',
+    aadhaar: 'Type your twelve digit Aadhaar number, then verify with the OTP.',
+    success: 'You are logged in. Welcome!',
+  },
+  hi: {
+    phone: { devanagari: 'अग्रीपल्स में आपका स्वागत है। अपना दस अंकों का मोबाइल नंबर लिखें और हरे बटन को दबाएं। छह अंकों का कोड आपके फोन पर आ जाएगा।', phonetic: 'Agripulse mein aapka swagat hai. Apna das ankon ka mobile number likhein aur hare button ko dabayein. Chhah ankon ka code aapke phone par aa jayega.' },
+    register: { devanagari: 'कृपया अपना नाम और गांव लिखें। फिर आगे बढ़ें दबाएं।', phonetic: 'Kripya apna naam aur gaon likhein. Phir aage badhein dabayein.' },
+    otp: { devanagari: 'अपने फोन का SMS खोलें और छह अंकों का कोड यहां लिखें।', phonetic: 'Apne phone ka SMS kholein aur chhah ankon ka code yahan likhein.' },
+    aadhaar: { devanagari: 'अपना बारह अंकों का आधार नंबर लिखें, फिर OTP से सत्यापित करें।', phonetic: 'Apna barah ankon ka Aadhaar number likhein, phir OTP se satyapit karein.' },
+    success: { devanagari: 'आप लॉगिन हो गए हैं। स्वागत है!', phonetic: 'Aap login ho gaye hain. Swagat hai!' },
+  },
+};
 
 const INDIAN_STATES = [
   'Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Goa','Gujarat','Haryana','Himachal Pradesh',
@@ -41,6 +55,18 @@ const L = {
     googleRealNote: 'Verified by Google — no password needed.',
     googleVerified: 'Google account verified',
     googleFailed: 'Google sign-in failed. Please try again.',
+    // Farmer guidance (voice + pictured help)
+    howTitle: 'How to login — 3 steps',
+    how1: 'Type your mobile number',
+    how2: 'Enter the 6-digit code from SMS',
+    how3: 'Add name & village — done!',
+    listenBtn: 'Listen',
+    helpBtn: 'How to use?',
+    helpTitle: 'Step-by-step help',
+    moreOptions: 'Other ways to sign in',
+    helpOtp: 'Type the 6-digit code you received by SMS.',
+    helpReg: 'Type your name and village — that is all we need.',
+    helpAadhaar: 'Type your 12-digit Aadhaar number and verify with the OTP.',
     orMobile: 'or continue with mobile / Aadhaar',    phoneLabel: 'Mobile Number',
     phonePlaceholder: '98765 43210',
     phoneHint: '10-digit Indian mobile number',
@@ -81,30 +107,6 @@ const L = {
     verified: 'Demo OTP accepted · offline verified',
     loading: 'Please wait…',
     secNote: 'Your data never leaves this device — login works fully offline.',
-    // Google Authenticator (TOTP 2FA)
-    methodSms: 'SMS OTP',
-    methodTotp: 'Authenticator',
-    totpContinueBtn: 'Continue with Authenticator',
-    totpMethodHint: 'Set up once with a QR scan — then log in with offline 6-digit codes.',
-    regContinueTotp: 'Continue to Authenticator setup',
-    useTotpInstead: 'Use Google Authenticator instead',
-    totp2faTag: 'Two-Factor Security',
-    totpSetupTitle: 'Add Google Authenticator',
-    totpSetupSub: 'Extra protection for your account. Codes are generated on your phone — no internet needed.',
-    totpStep1: 'Install Google Authenticator (free, works offline)',
-    totpStep2: 'Tap “+” → “Scan a QR code”',
-    totpStep3: 'Enter the 6-digit code below to confirm',
-    totpManualKey: 'Can’t scan? Enter this key in the app',
-    totpConfirmHint: 'Enter the code shown in the app',
-    totpConfirmBtn: 'Verify & Enable',
-    totpSkip: 'Skip for now',
-    totpSkippedNote: 'You can enable it after your next login.',
-    totpWrongCode: 'That code didn’t match. Check your phone’s clock and try again.',
-    totpVerifyTitle: 'Authenticator code',
-    totpVerifySub: 'Open Google Authenticator and enter the current 6-digit code for',
-    totpNewCodeIn: 'New code in {s}s',
-    totp2faOn: 'Google Authenticator verified · 2FA active',
-    totpMaxAttempts: 'Too many wrong codes. Please restart login.',
     aadhaarLabel: 'Aadhaar Number',
     aadhaarPlaceholder: '1234 5678 9012',
     aadhaarHint: '12-digit Aadhaar (Verhoeff checksum verified offline)',
@@ -131,6 +133,18 @@ const L = {
     googleRealNote: 'Google द्वारा सत्यापित — पासवर्ड की ज़रूरत नहीं।',
     googleVerified: 'Google खाता सत्यापित',
     googleFailed: 'Google साइन-इन विफल। दोबारा कोशिश करें।',
+    // किसान मार्गदर्शन (आवाज़ + चित्र सहायता)
+    howTitle: 'लॉगिन कैसे करें — 3 कदम',
+    how1: 'अपना मोबाइल नंबर लिखें',
+    how2: 'SMS में आया 6-अंकों का कोड भरें',
+    how3: 'नाम और गांव भरें — बस!',
+    listenBtn: 'सुनें',
+    helpBtn: 'कैसे इस्तेमाल करें?',
+    helpTitle: 'कदम-दर-कदम मदद',
+    moreOptions: 'साइन-इन के और तरीके',
+    helpOtp: 'SMS पर आया 6-अंकों का कोड नीचे लिखें।',
+    helpReg: 'अपना नाम और गांव लिखें — बस इतना ही।',
+    helpAadhaar: 'अपना 12-अंकों का आधार नंबर लिखें और OTP से सत्यापित करें।',
     orMobile: 'या मोबाइल / आधार से जारी रखें',    phoneLabel: 'मोबाइल नंबर',
     phonePlaceholder: '98765 43210',
     phoneHint: '10 अंकों का भारतीय मोबाइल नंबर',
@@ -171,30 +185,6 @@ const L = {
     verified: 'डेमो OTP स्वीकार · ऑफलाइन सत्यापित',
     loading: 'कृपया प्रतीक्षा करें…',
     secNote: 'आपका डेटा इसी डिवाइस पर रहता है — लॉगिन पूरी तरह ऑफलाइन चलता है।',
-    // Google Authenticator (TOTP 2FA)
-    methodSms: 'SMS OTP',
-    methodTotp: 'ऑथेंटिकेटर',
-    totpContinueBtn: 'ऑथेंटिकेटर से जारी रखें',
-    totpMethodHint: 'एक बार QR स्कैन से सेटअप — फिर ऑफलाइन 6-अंकों के कोड से लॉगिन।',
-    regContinueTotp: 'ऑथेंटिकेटर सेटअप पर आगे बढ़ें',
-    useTotpInstead: 'इसके बजाय Google Authenticator इस्तेमाल करें',
-    totp2faTag: 'दो-चरणीय सुरक्षा',
-    totpSetupTitle: 'Google Authenticator जोड़ें',
-    totpSetupSub: 'आपके खाते के लिए अतिरिक्त सुरक्षा। कोड आपके फोन पर बनते हैं — इंटरनेट की ज़रूरत नहीं।',
-    totpStep1: 'Google Authenticator इंस्टॉल करें (मुफ़्त, ऑफलाइन चलता है)',
-    totpStep2: '“+” दबाएं → “QR कोड स्कैन करें”',
-    totpStep3: 'पुष्टि के लिए नीचे 6-अंकों का कोड डालें',
-    totpManualKey: 'स्कैन नहीं हो पा रहा? ऐप में यह कुंजी दर्ज करें',
-    totpConfirmHint: 'ऐप में दिख रहा कोड दर्ज करें',
-    totpConfirmBtn: 'सत्यापित करें और चालू करें',
-    totpSkip: 'अभी छोड़ें',
-    totpSkippedNote: 'अगले लॉगिन के बाद भी चालू कर सकते हैं।',
-    totpWrongCode: 'कोड मेल नहीं खाया। फोन का समय जांचकर दोबारा कोशिश करें।',
-    totpVerifyTitle: 'प्रमाणीकरण कोड',
-    totpVerifySub: 'Google Authenticator खोलें और इसके लिए मौजूदा 6-अंकों का कोड दर्ज करें:',
-    totpNewCodeIn: 'नया कोड {s} सेकंड में',
-    totp2faOn: 'Google Authenticator सत्यापित · 2FA सक्रिय',
-    totpMaxAttempts: 'बहुत गलत कोड। लॉगिन फिर से शुरू करें।',
     aadhaarLabel: 'आधार नंबर',
     aadhaarPlaceholder: '1234 5678 9012',
     aadhaarHint: '12 अंकों का आधार (ऑफलाइन Verhoeff जांच)',
@@ -213,81 +203,6 @@ const L = {
     locationDetected: 'लोकेशन मिल गई',
     locationFailed: 'लोकेशन नहीं मिली — मैन्युअली चुनें',  },
 };
-
-// ── Reusable 6-digit code input (used by the authenticator screens) ──────────
-// The parent remounts this via `key` to clear the boxes (e.g. after a wrong
-// code) — remount resets the state and autoFocus re-focuses the first box.
-function CodeBoxes({ onComplete, disabled = false }) {
-  const [digits, setDigits] = useState(['', '', '', '', '', '']);
-  const refs = useRef([]);
-
-  const handleChange = (i, value) => {
-    const digit = value.replace(/\D/g, '').slice(-1);
-    const next = [...digits];
-    next[i] = digit;
-    setDigits(next);
-    sound.playClick();
-    if (digit && i < 5) refs.current[i + 1]?.focus();
-    if (digit && i === 5 && next.every((d) => d !== '')) onComplete(next.join(''));
-  };
-
-  const handleKeyDown = (i, e) => {
-    if (e.key === 'Backspace' && !digits[i] && i > 0) refs.current[i - 1]?.focus();
-  };
-
-  const handlePaste = (e) => {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (pasted.length === 6) {
-      const next = pasted.split('');
-      setDigits(next);
-      onComplete(next.join(''));
-      e.preventDefault();
-    }
-  };
-
-  return (
-    <div className="flex w-full min-w-0 gap-1 sm:gap-2 justify-center" onPaste={handlePaste}>
-      {digits.map((digit, i) => (
-        <input
-          key={i}
-          ref={(el) => { refs.current[i] = el; }}
-          type="tel"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={1}
-          value={digit}
-          disabled={disabled}
-          autoFocus={i === 0}
-          onChange={(e) => handleChange(i, e.target.value)}
-          onKeyDown={(e) => handleKeyDown(i, e)}
-          className="box-border w-10 max-w-11 min-w-0 flex-1 h-12 sm:h-13 bg-white text-zinc-900 py-2 px-0 text-center text-xl font-black border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none transition-colors disabled:opacity-60"
-        />
-      ))}
-    </div>
-  );
-}
-
-// ── QR code canvas for the otpauth:// provisioning URI ───────────────────────
-function TotpQr({ uri, size = 208 }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    if (!canvasRef.current || !uri) return undefined;
-    QRCode.toCanvas(canvasRef.current, uri, {
-      width: size,
-      margin: 2,                 // quiet zone — required for reliable scanning
-      errorCorrectionLevel: 'M',
-      color: { dark: '#090a09', light: '#ffffff' },
-    }).catch(() => {});           // non-fatal: manual key entry remains available
-    return undefined;
-  }, [uri, size]);
-
-  return (
-    <div className="p-3 bg-white rounded-2xl border-2 border-zinc-200 shadow-inner">
-      <canvas ref={canvasRef} className="block rounded-lg" style={{ width: size, height: size }} />
-    </div>
-  );
-}
 
 // ── Google Identity Services script loader (module-level cache) ──────────────
 let gsiPromise = null;
@@ -313,7 +228,11 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
 
   const [step, setStep] = useState('phone'); // phone | register | aadhaar_login | aadhaar_otp | otp | success
   const [phone, setPhone] = useState('');
-  const [loginMethod, setLoginMethod] = useState('sms'); // 'sms' | 'totp' (Google Authenticator)
+  const [showMore, setShowMore] = useState(false); // advanced sign-in options
+  const [showHelp, setShowHelp] = useState(false);     // pictured help sheet
+  const [guideActive, setGuideActive] = useState(false);
+  const [guideOffer, setGuideOffer] = useState(true);  // one-tap start (also unlocks TTS)
+  const guideSpokeComplete = useRef(false);            // "press the green button" said once
   const [name, setName] = useState('');
   const [village, setVillage] = useState('');
   const [stateName, setStateName] = useState('Karnataka');
@@ -343,35 +262,8 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const [voiceField, setVoiceField] = useState(null); // 'name' | 'village' | null
   const [isVoiceListening, setIsVoiceListening] = useState(false);
 
-  // ── Google Authenticator (TOTP 2FA) state ──────────────────────────────
-  const [pendingProfile, setPendingProfile] = useState(null); // authenticated, awaiting 2FA
-  const [totpSecret, setTotpSecret] = useState('');           // not yet persisted (enrollment)
-  const [totpResetKey, setTotpResetKey] = useState(0);         // clears the code boxes
-  const [totpAttempts, setTotpAttempts] = useState(5);
-  const [totpVerified, setTotpVerified] = useState(false);
-  const [totpSecLeft, setTotpSecLeft] = useState(totpSecondsRemaining());
-
   const otpRefs = useRef([]);
   const aadhaarOtpRefs = useRef([]);
-
-  // 30-second code-rotation ticker (authenticator apps rotate codes)
-  useEffect(() => {
-    const id = setInterval(() => setTotpSecLeft(totpSecondsRemaining()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  // DEV ONLY: print the current authenticator code so the team can demo the
-  // 2FA screen without a phone. Stripped from production builds by the bundler.
-  useEffect(() => {
-    if (step !== 'totp' || !import.meta.env.DEV) return;
-    const secret = pendingProfile?.totp?.secret;
-    if (secret) {
-      console.log(
-        `%c[AgriPulse DEV] current authenticator code: ${totpNow(secret)}`,
-        'background:#10b981;color:#000;padding:4px 8px;border-radius:4px;font-weight:bold',
-      );
-    }
-  }, [step, pendingProfile]);
 
   // Resend cooldown ticker
   useEffect(() => {
@@ -480,7 +372,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
       const session = saveSession({ ...profile, authProvider: 'google' });
       setLoginProvider('google');
       setIsDemoLogin(false);
-      setTotpVerified(false);
       setWelcomeName(profile.name);
       setWelcomeEmail(profile.email);
       setIsReturning(true);
@@ -492,6 +383,95 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     sound.playTransition();
     setError(res.error === 'offline' ? l.otpOffline : l.googleFailed);
   };
+
+  // ── Voice guide: speak the LOCAL language of wherever the farmer is ──
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncUi = (lang) => {
+      if ((lang === 'hi' || lang === 'en') && lang !== selectedLang && setSelectedLang) {
+        setSelectedLang(lang);
+      }
+    };
+
+    const startGuide = () => {
+      if (cancelled || voiceGuide.active) return;
+      voiceGuide.start(voiceGuide.lang);
+      voiceGuide.onStateChange = () => setGuideActive(voiceGuide.active);
+      Promise.all([
+        voiceGuide.sayKey('greet'),
+        voiceGuide.sayKey('phone'),
+      ]).then(([ok]) => {
+        if (cancelled) return;
+        if (!ok && voiceGuide.blocked) {
+          voiceGuide.stop();
+          setGuideOffer(true); // browser needs one tap before it may speak
+        } else {
+          setGuideOffer(false);
+        }
+      });
+    };
+
+    // Provisional: browser language (instant)
+    voiceGuide.lang = detectGuideLanguage();
+    syncUi(voiceGuide.lang);
+
+    // Real location (GPS → reverse-geocoded state → IP fallback), cached a
+    // week. A Delhi farmer on an English phone hears Hindi, not English.
+    const located = detectLanguageByLocation()
+      .then((loc) => { if (!cancelled && loc) { voiceGuide.lang = loc; syncUi(loc); } })
+      .catch(() => {});
+
+    // Don't make them wait on the GPS prompt forever — 2.5s cap, then start;
+    // if the location lands later and we're still on step one, restart in the
+    // right language (speech cuts over cleanly).
+    Promise.race([located, new Promise((r) => setTimeout(r, 2500))]).then(() => {
+      if (cancelled) return;
+      startGuide();
+      located.then(() => {
+        if (cancelled || !voiceGuide.active) return;
+        if (step === 'phone' && phone.length === 0) {
+          voiceGuide.sayKey('greet').then(() => voiceGuide.sayKey('phone'));
+        }
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      voiceGuide.stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Narrate each step ONLY when the farmer actually reaches it —
+  // the guide never runs ahead of what they have done.
+  useEffect(() => {
+    if (!guideActive) return;
+    const L = voiceGuide.script();
+    const lines = {
+      register: L.register,
+      otp: L.otp,
+      aadhaar_login: L.aadhaar_login,
+      aadhaar_otp: L.aadhaar_otp,
+    };
+    if (step === 'phone') { guideSpokeComplete.current = false; return; }
+    if (step === 'success') {
+      voiceGuide.requestTour(); // App picks this up after login
+      voiceGuide.sayKey('success', { listenAfter: false });
+      return;
+    }
+    if (lines[step]) voiceGuide.sayKey(step);
+  }, [step, guideActive]);
+
+  // "Very good! Now press the green button" — once the number is complete
+  useEffect(() => {
+    if (!guideActive || step !== 'phone') return;
+    if (phone.length === 10 && !guideSpokeComplete.current) {
+      guideSpokeComplete.current = true;
+      voiceGuide.sayKey('phoneComplete');
+    }
+    if (phone.length < 10) guideSpokeComplete.current = false;
+  }, [phone, step, guideActive]);
 
   // Probe /api/google once: with GOOGLE_CLIENT_ID set we render the real
   // "Continue with Google" button; otherwise we keep the demo button.
@@ -528,6 +508,27 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, googleCfg]);
+
+  // ── Farmer guidance: voice + pictured help ─────────────────────────────
+  const speakHelp = () => {
+    sound.playClick();
+    const lang = selectedLang === 'hi' ? 'hi' : 'en';
+    const keyMap = {
+      phone: 'phone', register: 'register', otp: 'otp', aadhaar_login: 'aadhaar',
+      aadhaar_otp: 'otp', success: 'success',
+    };
+    const script = VOICE[lang][keyMap[step] || 'phone'];
+    speechEngine.speak(script, selectedLang === 'hi' ? 'hi-IN' : 'en-IN');
+  };
+
+  const HELP = {
+    phone: [l.how1, l.how2, l.how3],
+    register: [l.helpReg],
+    otp: [l.helpOtp],
+    aadhaar_login: [l.helpAadhaar],
+    aadhaar_otp: [l.helpOtp],
+    success: [l.how3],
+  };
 
   const handleGoogleDemoLogin = () => {
     sound.playClick();
@@ -574,27 +575,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     setTimeout(async () => {
       setBusy(false);
       const existing = getUser(mobile);
-      if (loginMethod === 'totp') {
-        // Authenticator path: the rotating code IS the verification.
-        if (existing && isTotpEnabled(existing)) {
-          setIsReturning(true);
-          setPendingProfile(existing);
-          setTotpAttempts(5);
-          setTotpResetKey((k) => k + 1);
-          setStep('totp');
-        } else if (existing) {
-          // Known number, no authenticator yet → offer enrollment now
-          setIsReturning(true);
-          setPendingProfile(existing);
-          setTotpSecret(generateSecret());
-          setTotpResetKey((k) => k + 1);
-          setStep('totp-setup');
-        } else {
-          setIsReturning(false);
-          setStep('register');
-        }
-        return;
-      }
       if (existing) {
         setIsReturning(true);
         if (await sendOtpFlow(mobile)) setStep('otp');
@@ -620,7 +600,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     setTimeout(() => onSuccess(session), 1500);
   };
 
-  // Shared post-OTP-success routing (2FA enrollment / verification / plain login)
+  // Shared post-OTP-success routing — register/link as needed, then log in
   const completeOtpSuccess = (mobile) => {
     const profile = isReturning
       ? getUser(mobile)
@@ -632,23 +612,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     if (aadhaarVerified && aadhaar) {
       linkAadhaarToUser(mobile, aadhaar);
     }
-    if (isTotpEnabled(profile)) {
-      setPendingProfile(profile);
-      setTotpAttempts(5);
-      setTotpResetKey((k) => k + 1);
-      setError('');
-      setStep('totp');
-      return;
-    }
-    if (profile.totpSkipped) {
-      finalizeLogin(profile);
-      return;
-    }
-    setPendingProfile(profile);
-    setTotpSecret(generateSecret());
-    setTotpResetKey((k) => k + 1);
-    setError('');
-    setStep('totp-setup');
+    finalizeLogin(profile);
   };
 
   const handleVerifyFail = (res) => {
@@ -699,13 +663,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     setBusy(true);
     setTimeout(async () => {
       setBusy(false);
-      if (loginMethod === 'totp') {
-        // Authenticator path: enroll straight after registration — no SMS involved
-        setPendingProfile(null);
-        setTotpSecret(generateSecret());
-        setTotpResetKey((k) => k + 1);
-        setStep('totp-setup');
-      } else {
         // Aadhaar (if entered) is verified first via its own demo OTP
         if (aadhaar && isValidAadhaar(aadhaar) && !aadhaarVerified) {
           if (sendAadhaarOtpFlow(aadhaar)) {
@@ -714,7 +671,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
           }
         }
         if (await sendOtpFlow(normalizeMobile(phone))) setStep('otp');
-      }
     }, 700);
   };
 
@@ -751,73 +707,15 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }, 600);
   };
 
-  // ── Google Authenticator (TOTP 2FA) handlers ───────────────────────────
-
-  const handleTotpFail = () => {
-    const left = totpAttempts - 1;
-    setTotpAttempts(left);
-    if (left <= 0) {
-      setError(l.totpMaxAttempts);
-      setTimeout(() => {
-        setStep('phone');
-        setError('');
-        setTotpAttempts(5);
-        setPendingProfile(null);
-        setTotpSecret('');
-      }, 1600);
-      return false;
-    }
-    setError(`${l.totpWrongCode} ${left} ${l.attemptsLeft}.`);
-    setTotpResetKey((k) => k + 1);
-    return false;
-  };
-
-  // Enrollment: the secret is only persisted after a live code matches
-  const handleTotpSetupConfirm = (code) => {
-    if (busy) return;
-    setBusy(true);
-    setTimeout(() => {
-      setBusy(false);
-      const res = verifyTotpCode(totpSecret, code);
-      if (res.ok) {
-        const mobile = normalizeMobile(phone);
-        // Direct-authenticator sign-ups register here (the SMS path registers after its OTP)
-        if (!getUser(mobile)) registerUser({ name, mobile, village, state: stateName });
-        const profile = enableTotp(mobile, totpSecret) || pendingProfile;
-        setTotpVerified(true);
-        finalizeLogin(profile);        return;
-      }
-      sound.playTransition();
-      handleTotpFail();
-    }, 450);
-  };
-
-  const handleTotpSkip = () => {
+  const handleOtpChange = (i, value) => {
+    const digit = value.replace(/\D/g, '').slice(-1);
+    const next = [...otpDigits];
+    next[i] = digit;
+    setOtpDigits(next);
+    setError('');
     sound.playClick();
-    const mobile = normalizeMobile(phone);
-    const profile = setTotpSkipped(mobile)
-      || getUser(mobile)
-      || registerUser({ name, mobile, village, state: stateName });
-    setTotpVerified(false);
-    finalizeLogin(profile);
-  };
-
-  // Login: verify the code from the authenticator app against the stored secret
-  const handleTotpVerify = (code) => {
-    if (busy) return;
-    setBusy(true);
-    setTimeout(() => {
-      setBusy(false);
-      const mobile = normalizeMobile(phone);
-      const res = verifyUserTotp(mobile, code);
-      if (res.ok) {
-        setTotpVerified(true);
-        finalizeLogin(pendingProfile);
-        return;
-      }
-      sound.playTransition();
-      handleTotpFail();
-    }, 450);
+    if (digit && i < 5) otpRefs.current[i + 1]?.focus();
+    if (digit && i === 5 && next.every((d) => d !== '')) handleVerify(next);
   };
 
   const handleAadhaarVerify = (digits) => {
@@ -865,17 +763,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
         setError(l.maxAttempts);
       }
     }, 600);
-  };
-
-  const handleOtpChange = (i, value) => {
-    const digit = value.replace(/\D/g, '').slice(-1);
-    const next = [...otpDigits];
-    next[i] = digit;
-    setOtpDigits(next);
-    setError('');
-    sound.playClick();
-    if (digit && i < 5) otpRefs.current[i + 1]?.focus();
-    if (digit && i === 5 && next.every((d) => d !== '')) handleVerify(next);
   };
 
   const handleAadhaarOtpChange = (i, value) => {
@@ -972,6 +859,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     sound.playClick();
     if (isVoiceListening && voiceField === field) {
       speechEngine.stopListening();
+      voiceGuide.resume();
       setIsVoiceListening(false);
       setVoiceField(null);
       return;
@@ -980,10 +868,11 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     const code = langMap[selectedLang] || 'hi-IN';
     setVoiceField(field);
     setIsVoiceListening(true);
+    voiceGuide.suspend(); // the field-fill owns the mic for a moment
     speechEngine.startListening(code, (transcript) => {
       if (field === 'name') setName(transcript);
       if (field === 'village') setVillage(transcript);
-    }, () => { setIsVoiceListening(false); setVoiceField(null); }, () => { setIsVoiceListening(false); setVoiceField(null); });
+    }, () => { setIsVoiceListening(false); setVoiceField(null); voiceGuide.resume(); }, () => { setIsVoiceListening(false); setVoiceField(null); voiceGuide.resume(); });
   };
 
   const maskedPhone = `+91 ${normalizeMobile(phone).slice(0, 2)}•••••${normalizeMobile(phone).slice(7)}`;
@@ -1024,14 +913,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
             else if (step === 'aadhaar_otp') { setStep(aadhaar ? 'aadhaar_login' : 'register'); setAadhaarOtpDigits(['', '', '', '', '', '']); setError(''); }
             else if (step === 'aadhaar_login') { setStep('phone'); setError(''); }
             else if (step === 'register') { setStep('phone'); setError(''); }
-            else if (step === 'totp' || step === 'totp-setup') {
-              setStep('phone');
-              setError('');
-              setBusy(false);
-              setTotpAttempts(5);
-              setPendingProfile(null);
-              setTotpSecret('');
-            }
             else onCancel();
           }}
           className="absolute top-4 left-4 p-2 text-zinc-500 hover:text-zinc-600 rounded-full hover:bg-zinc-100 z-10"
@@ -1055,6 +936,62 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
         )}
 
         <div className="min-w-0 px-5 py-8 pt-14 sm:px-8 flex flex-col items-center text-center">
+
+          {/* Voice guide: one-tap start (also unlocks browser speech) */}
+          {!guideActive && guideOffer && (
+            <div className="w-full mb-3 flex items-center justify-center gap-2 flex-wrap">
+              <span className="text-[11px] font-black text-zinc-600">{voiceGuide.script().offer}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  sound.playClick();
+                  setGuideOffer(false);
+                  voiceGuide.start(voiceGuide.lang);
+                  Promise.all([
+                    voiceGuide.sayKey('greet'),
+                    voiceGuide.sayKey('phone'),
+                  ]);
+                }}
+                className="px-3 py-1.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black"
+              >
+                🔊 {voiceGuide.script().offerYes}
+              </button>
+              <button
+                type="button"
+                onClick={() => { sound.playClick(); setGuideOffer(false); }}
+                className="px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 text-[11px] font-black"
+              >
+                {voiceGuide.script().offerNo}
+              </button>
+            </div>
+          )}
+          {guideActive && (
+            <button
+              type="button"
+              onClick={() => { sound.playClick(); voiceGuide.stop(); }}
+              className="mb-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-600 text-[10px] font-black animate-pulse"
+            >
+              🎙️ {voiceGuide.script().activeLabel} · {voiceGuide.script().stopGuide}
+            </button>
+          )}
+
+          {/* Farmer help bar — voice guide + pictured steps (on every screen) */}
+          <div className="w-full flex items-center justify-center gap-2 mb-3">
+            <button
+              type="button"
+              onClick={speakHelp}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-black shadow-sm transition-colors"
+            >
+              <Volume2 className="w-3.5 h-3.5" /> {l.listenBtn}
+            </button>
+            <button
+              type="button"
+              onClick={() => { sound.playClick(); setShowHelp(true); }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white border-2 border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[11px] font-black transition-colors"
+            >
+              <HelpCircle className="w-3.5 h-3.5" /> {l.helpBtn}
+            </button>
+          </div>
           {/* ── STEP: phone ─────────────────────────────── */}
           {step === 'phone' && (
             <>
@@ -1065,30 +1002,31 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <h2 className="text-2xl font-black text-zinc-900 mb-2">{l.phoneTitle}</h2>
               <p className="text-sm text-zinc-500 mb-5">{l.phoneSub}</p>
 
-              {googleCfg?.configured ? (
-                <>
-                  <div ref={googleBtnRef} className="w-full min-h-11 flex justify-center" />
-                  <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleRealNote}</p>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleGoogleDemoLogin}
-                    disabled={busy}
-                    className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
-                  >
-                    <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
-                    <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
-                  </button>
-                  <p className="w-full text-center text-[10px] text-zinc-500 mt-2">{l.googleDemoNote}</p>
-                </>
-              )}
-
-              <div className="w-full flex items-center gap-3 my-5" aria-hidden="true">
-                <span className="h-px flex-1 bg-zinc-200" />
-                <span className="text-[10px] font-bold text-zinc-500">{l.orMobile}</span>
-                <span className="h-px flex-1 bg-zinc-200" />
+              {/* Pictured 3-step guide — what will happen */}
+              <div className="w-full mb-5 p-3 rounded-2xl bg-emerald-50 border border-emerald-100 text-left">
+                <div className="text-[10px] font-black tracking-[0.15em] text-emerald-700 uppercase mb-2.5">{l.howTitle}</div>
+                <div className="flex items-start justify-between gap-0.5">
+                  <div className="flex-1 flex flex-col items-center text-center gap-1.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center shrink-0">
+                      <Smartphone className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 leading-tight">{l.how1}</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400 mt-3 shrink-0" />
+                  <div className="flex-1 flex flex-col items-center text-center gap-1.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center shrink-0">
+                      <KeyRound className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 leading-tight">{l.how2}</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-400 mt-3 shrink-0" />
+                  <div className="flex-1 flex flex-col items-center text-center gap-1.5 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-white border-2 border-emerald-300 flex items-center justify-center shrink-0">
+                      <User className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <span className="text-[9px] sm:text-[10px] font-bold text-emerald-900 leading-tight">{l.how3}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="w-full text-left mb-1.5">
@@ -1113,24 +1051,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               </div>
               <div className="w-full text-left text-[11px] text-zinc-500 mb-3">{l.phoneHint} · {phone.length}/10</div>
 
-              {/* Verification method — pick SMS or Google Authenticator */}
-              <div className="w-full grid grid-cols-2 gap-1 p-1 mb-4 bg-zinc-100 rounded-xl border border-zinc-200" role="tablist" aria-label="Verification method">
-                {['sms', 'totp'].map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    role="tab"
-                    aria-selected={loginMethod === m}
-                    onClick={() => { sound.playClick(); setLoginMethod(m); setError(''); }}
-                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-black transition-colors ${loginMethod === m ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
-                  >
-                    {m === 'sms'
-                      ? <Smartphone className="w-4 h-4 shrink-0" />
-                      : <QrCode className="w-4 h-4 shrink-0" />}
-                    {m === 'sms' ? l.methodSms : l.methodTotp}
-                  </button>
-                ))}
-              </div>
               {error && (
                 <div className="w-full flex items-center gap-2 p-2.5 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
                   <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
@@ -1140,19 +1060,51 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
               <button
                 onClick={handlePhoneSubmit}
                 disabled={busy}
-                className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-sm shadow-md transition-colors"
+                className="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-base shadow-md transition-colors"
               >
-                {busy ? l.loading : loginMethod === 'totp' ? l.totpContinueBtn : l.sendOtp}
+                {busy ? l.loading : l.sendOtp}
               </button>
-              <p className="text-[11px] text-zinc-500 mt-4">{loginMethod === 'totp' ? l.totpMethodHint : l.newHere}</p>
+              <p className="text-[11px] text-zinc-500 mt-4">{l.newHere}</p>
 
-
+              {/* Advanced options — collapsed by default. The mobile+SMS path above
+                  is the one every farmer already knows from UPI, so it stays alone. */}
               <button
-                onClick={() => { sound.playClick(); setStep('aadhaar_login'); setError(''); }}
-                className="mt-3 w-full py-3 rounded-xl bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 text-blue-700 font-black text-sm flex items-center justify-center gap-2"
+                type="button"
+                onClick={() => { sound.playClick(); setShowMore(!showMore); }}
+                className="mt-4 flex items-center gap-1 text-[11px] font-black text-zinc-500 hover:text-zinc-700"
               >
-                <Fingerprint className="w-4 h-4" /> {l.aadhaarLoginTitle}
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMore ? 'rotate-180' : ''}`} /> {l.moreOptions}
               </button>
+              {showMore && (
+                <div className="w-full mt-3 pt-4 border-t border-zinc-100 space-y-3">
+                  {googleCfg?.configured ? (
+                    <>
+                      <div ref={googleBtnRef} className="w-full min-h-11 flex justify-center" />
+                      <p className="w-full text-center text-[10px] text-zinc-500">{l.googleRealNote}</p>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleGoogleDemoLogin}
+                        disabled={busy}
+                        className="w-full min-h-12 flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-zinc-800 border-2 border-zinc-300 hover:bg-zinc-50 disabled:opacity-60 font-bold text-sm shadow-sm transition-colors"
+                      >
+                        <span aria-hidden="true" className="font-black text-xl leading-none text-[#4285F4]">G</span>
+                        <span>{busy && isDemoLogin ? l.loading : l.googleDemo}</span>
+                      </button>
+                      <p className="w-full text-center text-[10px] text-zinc-500">{l.googleDemoNote}</p>
+                    </>
+                  )}
+
+                  <button
+                    onClick={() => { sound.playClick(); setStep('aadhaar_login'); setError(''); }}
+                    className="w-full py-3 rounded-xl bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 text-blue-700 font-black text-sm flex items-center justify-center gap-2"
+                  >
+                    <Fingerprint className="w-4 h-4" /> {l.aadhaarLoginTitle}
+                  </button>
+                </div>
+              )}
             </>
           )}
 
@@ -1317,7 +1269,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 disabled={busy}
                 className="mt-6 w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-sm shadow-md transition-colors"
               >
-                {busy ? l.loading : loginMethod === 'totp' ? l.regContinueTotp : l.continueBtn}
+                {busy ? l.loading : l.continueBtn}
               </button>
 
               <button
@@ -1501,106 +1453,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 {busy ? l.loading : l.verifyBtn}
               </button>
 
-              {/* Enrolled users can switch to their authenticator instead of the SMS code */}
-              {isTotpEnabled(isReturning ? getUser(normalizeMobile(phone)) : null) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    sound.playClick();
-                    setPendingProfile(getUser(normalizeMobile(phone)));
-                    setTotpAttempts(5);
-                    setTotpResetKey((k) => k + 1);
-                    setError('');
-                    setStep('totp');
-                  }}
-                  className="mt-3 w-full py-3 rounded-xl bg-white border-2 border-emerald-200 hover:bg-emerald-50 text-emerald-700 font-black text-xs transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <QrCode className="w-4 h-4" /> {l.useTotpInstead}
-                </button>
-              )}
-            </>
-          )}
-
-          {/* ── STEP: totp-setup (enroll Google Authenticator) ── */}
-          {step === 'totp-setup' && (
-            <>
-              <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
-                <QrCode className="w-8 h-8 text-emerald-600" />
-              </div>
-              <div className="text-[10px] font-black tracking-[0.2em] text-emerald-600 uppercase mb-1">{l.totp2faTag}</div>
-              <h2 className="text-2xl font-black text-zinc-900 mb-1">{l.totpSetupTitle}</h2>
-              <p className="text-xs text-zinc-500 mb-4">{l.totpSetupSub}</p>
-
-              <TotpQr uri={totpSecret ? buildOtpAuthUri({ secret: totpSecret, account: `+91${normalizeMobile(phone)}` }) : ''} />
-
-              <ol className="w-full text-left text-[11px] font-bold text-zinc-600 space-y-1.5 my-4 list-none">
-                {[l.totpStep1, l.totpStep2, l.totpStep3].map((s, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="shrink-0 w-4 h-4 mt-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black flex items-center justify-center">{i + 1}</span>
-                    <span>{s}</span>
-                  </li>
-                ))}
-              </ol>
-
-              <div className="w-full mb-4">
-                <div className="text-[10px] font-black text-zinc-500 mb-1">{l.totpManualKey}</div>
-                <div className="font-mono text-[11px] leading-relaxed tracking-wider bg-zinc-100 border border-zinc-200 rounded-lg px-2.5 py-2 break-all text-zinc-700 select-all cursor-text">
-                  {formatSecretForHumans(totpSecret)}
-                </div>
-              </div>
-
-              <div className="w-full text-xs font-black text-zinc-700 mb-2">{l.totpConfirmHint}</div>
-              <CodeBoxes key={`setup-${totpResetKey}`} onComplete={handleTotpSetupConfirm} disabled={busy} />
-
-              {error && (
-                <div className="w-full flex items-center gap-2 p-2.5 mt-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
-                  <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
-                </div>
-              )}
-
-              <button
-                onClick={handleTotpSkip}
-                disabled={busy}
-                className="mt-4 w-full py-3 rounded-xl bg-white border-2 border-zinc-200 hover:bg-zinc-50 disabled:opacity-60 text-zinc-500 font-black text-xs transition-colors"
-              >
-                {l.totpSkip}
-              </button>
-              <p className="text-[10px] text-zinc-400 mt-1.5">{l.totpSkippedNote}</p>
-            </>
-          )}
-
-          {/* ── STEP: totp (verify authenticator code) ─────── */}
-          {step === 'totp' && (
-            <>
-              <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
-                <Smartphone className="w-8 h-8 text-emerald-600" />
-              </div>
-              <div className="text-[10px] font-black tracking-[0.2em] text-emerald-600 uppercase mb-1">{l.totp2faTag}</div>
-              <h2 className="text-2xl font-black text-zinc-900 mb-1">{l.totpVerifyTitle}</h2>
-              <p className="text-xs text-zinc-500 mb-1">{l.totpVerifySub}</p>
-              <p className="text-xs font-mono font-bold text-zinc-800 mb-5">{maskedPhone}</p>
-
-              <CodeBoxes key={`verify-${totpResetKey}`} onComplete={handleTotpVerify} disabled={busy} />
-
-              {error && (
-                <div className="w-full flex items-center gap-2 p-2.5 mt-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
-                  <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
-                </div>
-              )}
-
-              {/* Code rotation countdown — matches the authenticator app */}
-              <div className="w-full flex items-center justify-between text-[11px] font-bold text-zinc-500 mt-4 mb-1.5">
-                <span className="flex items-center gap-1"><Timer className="w-3.5 h-3.5" /> {l.totpNewCodeIn.replace('{s}', totpSecLeft)}</span>
-                <span className="flex items-center gap-1 text-emerald-600"><ShieldCheck className="w-3.5 h-3.5" /> 2FA</span>
-              </div>
-              <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden" aria-hidden="true">
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-1000 ease-linear"
-                  style={{ width: `${(totpSecLeft / TOTP_PERIOD_S) * 100}%` }}
-                />
-              </div>
-
-              <p className="text-[10px] text-zinc-400 mt-4">{l.secNote}</p>
             </>
           )}
 
@@ -1631,11 +1483,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                   ? l.demoStatus
                   : loginProvider === 'google' ? l.googleVerified : l.verified}
               </p>
-              {totpVerified && (
-                <p className="mt-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-black text-emerald-700 flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5" /> {l.totp2faOn}
-                </p>
-              )}
               {aadhaarVerified && (
                 <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-black">
                   <Fingerprint className="w-3.5 h-3.5" /> {l.aadhaarVerified} · {maskedAadhaar}
@@ -1644,6 +1491,51 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
             </motion.div>
           )}
         </div>
+
+        {/* Farmer help sheet — pictured, bilingual, voice-enabled */}
+        <AnimatePresence>
+          {showHelp && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4"
+              onClick={() => { setShowHelp(false); speechEngine.stopSpeaking(); }}
+            >
+              <motion.div
+                initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                className="w-full max-w-sm bg-white rounded-2xl p-5 text-left shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-black text-zinc-900 flex items-center gap-1.5">
+                    <HelpCircle className="w-4 h-4 text-emerald-600" /> {l.helpTitle}
+                  </h3>
+                  <button
+                    onClick={() => { sound.playClick(); setShowHelp(false); speechEngine.stopSpeaking(); }}
+                    className="p-1.5 rounded-lg hover:bg-zinc-100 text-zinc-500"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-2.5">
+                  {(HELP[step] || HELP.phone).map((s, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-black flex items-center justify-center">{i + 1}</span>
+                      <p className="text-xs font-bold text-zinc-700 leading-relaxed">{s}</p>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => { setShowHelp(false); speakHelp(); }}
+                  className="mt-4 w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black flex items-center justify-center gap-1.5"
+                >
+                  <Volume2 className="w-3.5 h-3.5" /> {l.listenBtn}
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="px-6 py-3 bg-zinc-50 border-t border-zinc-100 flex items-center justify-center gap-1.5 text-[10px] font-bold text-zinc-600">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> {l.secNote}
