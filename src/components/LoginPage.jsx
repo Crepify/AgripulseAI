@@ -7,7 +7,7 @@ import {
   ChevronDown, ArrowRight, X,} from 'lucide-react';
 import { sound } from '../utils/audio';
 import { speechEngine } from '../utils/speech';
-import { voiceGuide, detectGuideLanguage, detectLanguageByLocation } from '../utils/voiceGuide';
+import { voiceGuide, detectGuideLanguage, detectLanguageByLocation, savedLangPref } from '../utils/voiceGuide';
 import {
   isValidIndianMobile, isValidName, normalizeMobile, getUser, getUserByAadhaar, registerUser,
   updateLastLogin, requestOtp, verifyOtp, saveSession,
@@ -416,14 +416,18 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
       return startedLang;
     };
 
+    // A language the farmer explicitly asked for earlier ("English mein
+    // bolo") always wins — it's their app, their choice.
+    const pref = savedLangPref();
+
     // Provisional: browser language (instant)
-    voiceGuide.lang = detectGuideLanguage();
+    voiceGuide.lang = pref || detectGuideLanguage();
     syncUi(voiceGuide.lang);
 
     // Real location (GPS → reverse-geocoded state → IP fallback), cached a
-    // week. A Delhi farmer on an English phone hears Hindi, not English.
-    let locatedLang = null;
-    const located = detectLanguageByLocation()
+    // week — skipped when the farmer already picked a language themselves.
+    let locatedLang = pref || null;
+    const located = (pref ? Promise.resolve(pref) : detectLanguageByLocation())
       .then((loc) => { locatedLang = loc; if (!cancelled && loc) { voiceGuide.lang = loc; syncUi(loc); } })
       .catch(() => {});
 

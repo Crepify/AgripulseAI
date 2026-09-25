@@ -49,6 +49,7 @@ const S = {
     success: 'बधाई हो! आप लॉगिन हो गए। अब मैं आपको धीरे-धीरे बताता हूँ कि यह ऐप क्या-क्या सेवा देता है।',
     didntCatch: 'माफ़ कीजिए, फिर से बोलिए।',
     askNext: 'आगे की सेवा सुनेंगे? हाँ बोलिए।',
+    langSwitched: 'ठीक है, अब मैं हिंदी में बात करूँगा।',
     askResume: 'क्या मैं जारी रखूँ?',
     tourIntro: 'तो सुनिए, इस ऐप में क्या-क्या है। हर सेवा के बाद मैं पूछूँगा, तब तक आराम से सुनते रहिए।',
     tourBye: 'जब भी ज़रूरत हो, माइक दबाकर मुझे बुला लीजिए। आपका दिन शुभ हो!',
@@ -84,6 +85,7 @@ const S = {
     success: 'Congratulations, you are logged in! Now let me slowly tell you what this app can do for you.',
     didntCatch: 'Sorry, please say that again.',
     askNext: 'Want to hear the next service? Just say yes.',
+    langSwitched: 'Alright — from now on I will speak in English.',
     askResume: 'Shall I continue?',
     tourIntro: 'Listen — here is what is inside this app. After each one I will ask, so relax and listen.',
     tourBye: 'Whenever you need me, press the mic and call me. Have a good day!',
@@ -119,6 +121,7 @@ const S = {
     success: 'வாழ்த்துகள்! நீங்கள் உள்நுழைந்துவிட்டீர்கள். இப்போது சேவைகளை மெதுவாக சொல்கிறேன்.',
     didntCatch: 'மன்னிக்கவும், மீண்டும் சொல்லுங்கள்.',
     askNext: 'அடுத்த சேவையைப் பற்றி கேக்க விரும்புகிறீர்களா?',
+    langSwitched: 'சரி — இனிமேல் நான் தமிழில் பேசுவேன்.',
     askResume: 'தொடரலாமா?',
     tourIntro: 'இந்த செயலியில் என்னென்ன இருக்கிறது என்று ஒவ்வொன்றாக சொல்கிறேன். ஒவ்வொன்றுக்குப் பிறகு கேட்பேன்.',
     tourBye: 'தேவைப்படும்போது மைக்கை அழுத்தி என்னை அழையுங்கள். இனிய நாள்!',
@@ -154,6 +157,7 @@ const S = {
     success: 'అభినందనలు! మీరు లాగిన్ అయ్యారు. ఇప్పుడు సేవల గురించి నెమ్మదిగా చెబుతాను.',
     didntCatch: 'క్షమించండి, మళ్ళీ చెప్పండి.',
     askNext: 'తర్వాత సేవ గురించి వినాలా?',
+    langSwitched: 'సరే — ఇకపై నేను తెలుగులో మాట్లాడతాను.',
     askResume: 'కొనసాగించమంటారా?',
     tourIntro: 'ఈ యాప్‌లో ఏముందో ఒక్కొక్కటి చెబుతాను. ఒక్కో దాని తర్వాత నేను అడుగుతాను.',
     tourBye: 'ఎప్పుడు కావాలంటే మైక్ నొక్కి నన్ను పిలవండి. శుభ దినం!',
@@ -189,6 +193,7 @@ const S = {
     success: 'ಅಭಿನಂದನೆಗಳು! ನೀವು ಲಾಗಿನ್ ಆಗಿದ್ದೀರಿ. ಈಗ ಸೇವೆಗಳನ್ನು ನಿಧಾನವಾಗಿ ಹೇಳುತ್ತೇನೆ.',
     didntCatch: 'ಕ್ಷಮಿಸಿ, ಇನ್ನೊಮ್ಮೆ ಹೇಳಿ.',
     askNext: 'ಮುಂದಿನ ಸೇವೆಯ ಬಗ್ಗೆ ಕೇಳಲು ಬಯಸುವಿರಾ?',
+    langSwitched: 'ಸರಿ — ಈಗ ನಾನು ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
     askResume: 'ಮುಂದುವರಿಸಲಿಯಾ?',
     tourIntro: 'ಈ ಆ್ಯಪ್‌ನಲ್ಲಿ ಏನೇನಿದೆ ಎಂದು ಒಂದೊಂದಾಗಿ ಹೇಳುತ್ತೇನೆ. ಪ್ರತಿಯೊಂದರ ನಂತರ ಕೇಳುತ್ತೇನೆ.',
     tourBye: 'ಬೇಕಾದಾಗ ಮೈಕ್ ಒತ್ತಿ ನನ್ನನ್ನು ಕರೆಯಿರಿ. ಶುಭ ದಿನ!',
@@ -224,6 +229,7 @@ const S = {
     success: 'अभिनंदन! तुम्ही लॉगिन झालात. आता सेवा सांगतो.',
     didntCatch: 'क्षमस्व, पुन्हा सांगा.',
     askNext: 'पुढच्या सेवेबद्दल ऐकू इच्छिता?',
+    langSwitched: 'ठीक आहे — आता मी मराठीत बोलेन.',
     askResume: 'सुरू ठेवू का?',
     tourIntro: 'या ॲपमध्ये काय काय आहे ते एकेक सांगतो. प्रत्येकानंतर मी विचारीन.',
     tourBye: 'गरज असल्यास मायक दाबून मला बोलावा. शुभ दिवस!',
@@ -260,6 +266,7 @@ const PHON = {
     success: 'Badhai ho! Aap login ho gaye. Ab main aapko dheere-dheere batata hoon ki yeh app kya-kya seva deta hai.',
     didntCatch: 'Maaf kijiye, phir se boliye.',
     askNext: 'Aage ki seva sunenge? Haan boliye.',
+    langSwitched: 'Theek hai, ab main Hindi mein baat karunga.',
     askResume: 'Kya main jaari rakhun?',
     tourIntro: 'To suniye, is app mein kya-kya hai. Har seva ke baad main poochhoonga, tab tak aaraam se sunte rahiye.',
     tourBye: 'Jab bhi zaroorat ho, mic dabakar mujhe bulaa lijiye. Aapka din shubh ho!',
@@ -389,7 +396,7 @@ export async function detectLanguageByLocation() {
 const INTENTS = {
   hi: {
     yes: ['हां', 'हाँ', 'haan', 'yes', 'चलिए', 'ठीक', 'सुनाओ', 'सुनाना', 'आगे'],
-    no: ['नहीं', 'ना', 'no', 'बस', 'रुकना', 'Enough'],
+    no: ['नहीं', 'ना', 'no', 'बस', 'रुकना', 'Enough', 'nahi', 'nahin'],
     stop: ['बंद करो', 'बंद', 'रुको', 'रुक जाओ', 'stop', 'चुप'],
     repeat: ['फिर से', 'दोहरा', 'फिर बोलो', 'repeat', 'पुनः'],
     skip: ['अगला', 'छोड़ो', 'skip', 'next', 'स्किप'],
@@ -433,7 +440,6 @@ const INTENTS = {
 
 // Pure intent matcher (exported for tests)
 export function matchIntent(lang, q) {
-  const I = INTENTS[lang] || INTENTS.en;
   const s = String(q || '').toLowerCase();
   // Whole-word matching. Substring matching let random chatter hijack the
   // guide ("know"/"now" counted as "no", 'ना' inside longer words, "stop"
@@ -443,12 +449,59 @@ export function matchIntent(lang, q) {
     const wl = String(w).toLowerCase();
     return wl.includes(' ') ? s.includes(wl) : tokens.includes(wl);
   });
-  if (has(I.stop)) return 'stop';
-  if (has(I.repeat)) return 'repeat';
-  if (has(I.yes)) return 'yes';
-  if (has(I.no)) return 'no';
-  if (has(I.skip)) return 'skip';
+  // The farmer may answer in ANY language while the guide keeps speaking its
+  // own — check the guide's language first, then every other language.
+  const own = INTENTS[lang] || INTENTS.en;
+  const others = Object.keys(INTENTS).map((k) => INTENTS[k]).filter((I) => I !== own);
+  for (const I of [own, ...others]) {
+    if (has(I.stop)) return 'stop';
+    if (has(I.repeat)) return 'repeat';
+    if (has(I.yes)) return 'yes';
+    if (has(I.no)) return 'no';
+    if (has(I.skip)) return 'skip';
+  }
   return null;
+}
+
+// "English mein bolo" / "speak hindi" / "தமிழில் பேசு" — switch the guide's
+// language on request. Requires a language name AND a speak/change verb, so
+// plain mentions ("tamil nadu mein bhaav") never trigger a switch.
+const LANG_SWITCH_NAMES = {
+  en: ['english', 'angrezi', 'अंग्रेज़ी', 'अंग्रेजी', 'ஆங்கில', 'ఇంగ్లీష్', 'ಇಂಗ್ಲಿಷ್'],
+  hi: ['hindi', 'हिंदी'],
+  ta: ['tamil', 'tamizh', 'तमिल', 'தமிழ'],
+  te: ['telugu', 'तेलुगु', 'తెలుగు'],
+  kn: ['kannada', 'कन्नड', 'ಕನ್ನಡ'],
+  mr: ['marathi', 'मराठी'],
+};
+const LANG_SWITCH_VERBS = [
+  'bolo', 'bol', 'बोलो', 'बोल', 'speak', 'talk', 'reply', 'respond', 'answer',
+  'say', 'karo', 'करो', 'badlo', 'बदलो', 'change', 'switch', 'baat', 'बात',
+  'kaho', 'कहो', 'samjhao', 'समझाओ', 'explain', 'பேசு', 'சொல்லு',
+  'చెప్పు', 'చెప్పండి', 'ಹೇಳು', 'ಹೇಳಿ',
+];
+
+export function matchLangSwitch(q, currentLang) {
+  const s = String(q || '').toLowerCase();
+  if (!s) return null;
+  const tokens = s.split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean);
+  const hasVerb = LANG_SWITCH_VERBS.some((v) =>
+    tokens.includes(v) || (v.length >= 4 && s.includes(v)));
+  if (!hasVerb) return null;
+  for (const [lang, names] of Object.entries(LANG_SWITCH_NAMES)) {
+    if (lang === currentLang) continue;
+    if (names.some((n) => s.includes(n.toLowerCase()))) return lang;
+  }
+  return null;
+}
+
+// The farmer's explicitly chosen language ("English mein bolo") outranks
+// browser/location detection on every later visit.
+export function savedLangPref() {
+  try {
+    const v = localStorage.getItem('ap_guide_lang_pref');
+    return GUIDE_LANGS.includes(v) ? v : null;
+  } catch { return null; }
 }
 
 // ── the guide ────────────────────────────────────────────────────────────────
@@ -544,6 +597,16 @@ export class VoiceGuide {
       }
     });
     return undefined;
+  }
+
+  // Farmer asked for another language ("English mein bolo") — switch now and
+  // remember it: next visit it outranks browser + location detection.
+  setLanguage(lang) {
+    if (!GUIDE_LANGS.includes(lang) || lang === this.lang) return false;
+    this.lang = lang;
+    try { localStorage.setItem('ap_guide_lang_pref', lang); } catch { /* private mode */ }
+    this._emit();
+    return true;
   }
 
   start(lang) {
@@ -714,6 +777,22 @@ export class VoiceGuide {
       return;
     }
 
+    // Explicit language request ("English mein bolo") — works any time. The
+    // guide keeps speaking its regional language until the farmer asks.
+    const switchTo = matchLangSwitch(q, this.lang);
+    if (switchTo) {
+      const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
+      this._ackWaiter = null;
+      this.setLanguage(switchTo);
+      this.sayKey('langSwitched').then(() => {
+        if (outer) {
+          // re-ask the pending question in the new language
+          this.askKey('askResume').then((ans) => outer(ans === 'no' ? 'no' : 'yes'));
+        }
+      });
+      return;
+    }
+
     // If we asked a question ("continue?"), the answer decides the flow.
     if (this._ackWaiter) {
       if (intent === 'yes' || intent === 'skip') { this._resolveAck('yes'); return; }
@@ -750,14 +829,15 @@ export class VoiceGuide {
   async runServiceTour() {
     if (this._tourRunning) return;
     this._tourRunning = true;
-    const L = this.script();
     this.active = true;
     this._emit();
 
     await this.sayKey('tourIntro');
-    const vi = this._voiceInfo();
-    for (let i = 0; i < L.services.length; i++) {
+    for (let i = 0; i < this.script().services.length; i++) {
       if (!this._tourRunning) return;
+      // re-read per iteration — the farmer may switch language mid-tour
+      const L = this.script();
+      const vi = this._voiceInfo();
       let line;
       if (vi && vi.isNative) {
         line = `${L.services[i][0]}. ${L.services[i][1]}`;
