@@ -35,18 +35,27 @@ class SpeechEngine {
     }
   }
 
+  // Cloud/neural voices (Google, Microsoft Natural, etc.) sound dramatically
+  // better than the first local voice in the list — prefer them when present.
+  static PREMIUM = /google|natural|neural|premium|enhanced|online/i;
+
   getBestVoice(langCode) {
     this.loadVoices();
     if (!this.voices || this.voices.length === 0) return null;
 
     const baseLang = langCode.split('-')[0].toLowerCase();
+    const pickBest = (list) => {
+      if (!list || list.length === 0) return null;
+      const premium = list.find(v => SpeechEngine.PREMIUM.test(v.name));
+      return premium || list[0];
+    };
 
     // 1. Exact match (e.g. 'hi-IN', 'ta-IN')
-    let matched = this.voices.find(v => v.lang.toLowerCase() === langCode.toLowerCase());
+    let matched = pickBest(this.voices.filter(v => v.lang.toLowerCase() === langCode.toLowerCase()));
     if (matched) return { voice: matched, isNative: true };
 
     // 2. Starts with base language (e.g. 'hi', 'ta', 'te', 'kn')
-    matched = this.voices.find(v => v.lang.toLowerCase().startsWith(baseLang));
+    matched = pickBest(this.voices.filter(v => v.lang.toLowerCase().startsWith(baseLang)));
     if (matched) return { voice: matched, isNative: true };
 
     // 3. Name contains language name (e.g. 'Google हिन्दी', 'Hindi', 'Lekha')

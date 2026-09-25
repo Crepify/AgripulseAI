@@ -460,6 +460,8 @@ export class VoiceGuide {
     this._ackWaiter = null;
     this._listenToken = 0;
     this._tourRunning = false;
+    this._speechQueue = Promise.resolve(); // serialize lines — never cancel mid-word
+    this._voicesReady = false;
   }
 
   _emit() { if (this.onStateChange) this.onStateChange(); }
@@ -479,11 +481,11 @@ export class VoiceGuide {
     const vi = this._voiceInfo();
     const native = L[key];
     if (typeof native !== 'string') return String(native ?? '');
-    if (!vi || vi.isNative) return native;
+    if (vi && vi.isNative) return native; // CONFIRMED native voice → native script
     const phon = PHON[this.lang] && PHON[this.lang][key];
-    if (phon) return phon;
+    if (phon) return phon;                // no/unknown native voice → romanized
     if (this.lang !== 'en' && typeof S.en[key] === 'string') return S.en[key];
-    return native;
+    return native;                         // english
   }
 
   sayKey(key, opts = {}) {
@@ -527,18 +529,56 @@ export class VoiceGuide {
     this._emit();
   }
 
-  // Speak one line; resolves true if it actually played. Re-opens the mic
-  // afterwards (that is the barge-in window where the farmer may speak).
+  // Wait (once) for the browser to load its voice list — Chrome populates
+  // speechSynthesis.getVoices() asynchronously, and speaking before it is
+  // ready silently falls back to a terrible default voice.
+  async _ensureVoices() {
+    if (this._voicesReady) return;
+    const e = this.engine;
+    const count = () => (e && e.voices ? e.voices.length : 0);
+    if (count() > 0) { this._voicesReady = true; return; }
+    await new Promise((res) => {
+      const done = () => { this._voicesReady = true; res(); };
+      const t = setTimeout(done, 2000); // don't stall the guide forever
+      try {
+        if (typeof window !== 'undefined' && window.speechSynthesis) {
+          const handler = () => { if (count() > 0) { clearTimeout(t); window.speechSynthesis.removeEventListener('voiceschanged', handler); done(); } };
+          window.speechSynthesis.addEventListener('voiceschanged', handler);
+        } else {
+          clearTimeout(t);
+          setTimeout(done, 50);
+        }
+      } catch { clearTimeout(t); done(); }
+    });
+    try { if (e && e.loadVoices) e.loadVoices(); } catch { /* noop */ }
+  }
+
+  // Speak one line; resolves true if it actually played. Lines are QUEUED —
+  // a new line never cancels the one before it mid-word.
   say(text, { listenAfter = true } = {}) {
-    this.lastLine = text;
     if (!this.active) return Promise.resolve(false);
+    let resolve;
+    const p = new Promise((res) => { resolve = res; });
+    const run = () => this._sayNow(text, listenAfter).then(
+      (v) => { resolve(v); return v; },
+      () => { resolve(false); return false; },
+    );
+    // small natural gap between consecutive lines
+    this._speechQueue = this._speechQueue.then(() => new Promise((r) => setTimeout(r, 250))).then(run, run);
+    return p;
+  }
+
+  async _sayNow(text, listenAfter) {
+    this.lastLine = text;
+    if (!this.active) return false;
+    await this._ensureVoices();
     try { this.engine.stopListening(); } catch { /* noop */ }
 
     const langCode = `${this.lang}-IN`;
     let spoke = false;
     let settled = false;
 
-    return new Promise((resolve) => {
+    return await new Promise((resolve) => {
       const finish = (ok) => {
         if (settled) return;
         settled = true;
@@ -660,7 +700,7 @@ export class VoiceGuide {
     for (let i = 0; i < L.services.length; i++) {
       if (!this._tourRunning) return;
       let line;
-      if (!vi || vi.isNative) {
+      if (vi && vi.isNative) {
         line = `${L.services[i][0]}. ${L.services[i][1]}`;
       } else if (PHON[this.lang] && PHON[this.lang].services && PHON[this.lang].services[i]) {
         const [pn, pd] = PHON[this.lang].services[i];
