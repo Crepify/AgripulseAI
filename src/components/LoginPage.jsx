@@ -71,7 +71,12 @@ const L = {
     loading: 'Please wait…',
     secNote: 'Your data never leaves this device — login works fully offline.',
     // Google Authenticator (TOTP 2FA)
-    totpBadge: 'Google Authenticator 2FA supported',
+    methodSms: 'SMS OTP',
+    methodTotp: 'Authenticator',
+    totpContinueBtn: 'Continue with Authenticator',
+    totpMethodHint: 'Set up once with a QR scan — then log in with offline 6-digit codes.',
+    regContinueTotp: 'Continue to Authenticator setup',
+    useTotpInstead: 'Use Google Authenticator instead',
     totp2faTag: 'Two-Factor Security',
     totpSetupTitle: 'Add Google Authenticator',
     totpSetupSub: 'Extra protection for your account. Codes are generated on your phone — no internet needed.',
@@ -135,6 +140,12 @@ const L = {
     loading: 'कृपया प्रतीक्षा करें…',
     secNote: 'आपका डेटा इसी डिवाइस पर रहता है — लॉगिन पूरी तरह ऑफलाइन चलता है।',
     // Google Authenticator (TOTP 2FA)
+    methodSms: 'SMS OTP',
+    methodTotp: 'ऑथेंटिकेटर',
+    totpContinueBtn: 'ऑथेंटिकेटर से जारी रखें',
+    totpMethodHint: 'एक बार QR स्कैन से सेटअप — फिर ऑफलाइन 6-अंकों के कोड से लॉगिन।',
+    regContinueTotp: 'ऑथेंटिकेटर सेटअप पर आगे बढ़ें',
+    useTotpInstead: 'इसके बजाय Google Authenticator इस्तेमाल करें',
     totp2faTag: 'दो-चरणीय सुरक्षा',
     totpSetupTitle: 'Google Authenticator जोड़ें',
     totpSetupSub: 'आपके खाते के लिए अतिरिक्त सुरक्षा। कोड आपके फोन पर बनते हैं — इंटरनेट की ज़रूरत नहीं।',
@@ -235,6 +246,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
 
   const [step, setStep] = useState('phone'); // phone | register | otp | success
   const [phone, setPhone] = useState('');
+  const [loginMethod, setLoginMethod] = useState('sms'); // 'sms' | 'totp' (Google Authenticator)
   const [name, setName] = useState('');
   const [village, setVillage] = useState('');
   const [stateName, setStateName] = useState('Karnataka');
@@ -348,10 +360,31 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     }
     setError('');
     setBusy(true);
-    // Simulate network dispatch latency of an SMS gateway
+    // Simulate network dispatch latency of an SMS gateway / lookup
     setTimeout(() => {
       setBusy(false);
       const existing = getUser(mobile);
+      if (loginMethod === 'totp') {
+        // Authenticator path: the rotating code IS the verification.
+        if (existing && isTotpEnabled(existing)) {
+          setIsReturning(true);
+          setPendingProfile(existing);
+          setTotpAttempts(5);
+          setTotpResetKey((k) => k + 1);
+          setStep('totp');
+        } else if (existing) {
+          // Known number, no authenticator yet → offer enrollment now
+          setIsReturning(true);
+          setPendingProfile(existing);
+          setTotpSecret(generateSecret());
+          setTotpResetKey((k) => k + 1);
+          setStep('totp-setup');
+        } else {
+          setIsReturning(false);
+          setStep('register');
+        }
+        return;
+      }
       if (existing) {
         setIsReturning(true);
         if (sendOtpFlow(mobile)) setStep('otp');
@@ -482,7 +515,9 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
   const handleTotpSkip = () => {
     sound.playClick();
     const mobile = normalizeMobile(phone);
-    const profile = setTotpSkipped(mobile) || pendingProfile;
+    const profile = setTotpSkipped(mobile)
+      || getUser(mobile)
+      || registerUser({ name, mobile, village, state: stateName });
     setTotpVerified(false);
     finalizeLogin(profile);
   };
@@ -648,7 +683,26 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                   className="phone-number-input block box-border w-full min-w-0 max-w-full bg-white text-zinc-900 placeholder:text-zinc-400 px-2.5 sm:px-4 py-3 text-base sm:text-lg font-black tracking-[0.12em] sm:tracking-[0.18em] border-2 border-zinc-200 rounded-xl focus:border-emerald-500 focus:outline-none"
                 />
               </div>
-              <div className="w-full text-left text-[11px] text-zinc-500 mb-4">{l.phoneHint} · {phone.length}/10</div>
+              <div className="w-full text-left text-[11px] text-zinc-500 mb-3">{l.phoneHint} · {phone.length}/10</div>
+
+              {/* Verification method — pick SMS or Google Authenticator */}
+              <div className="w-full grid grid-cols-2 gap-1 p-1 mb-4 bg-zinc-100 rounded-xl border border-zinc-200" role="tablist" aria-label="Verification method">
+                {['sms', 'totp'].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={loginMethod === m}
+                    onClick={() => { sound.playClick(); setLoginMethod(m); setError(''); }}
+                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-[11px] font-black transition-colors ${loginMethod === m ? 'bg-white text-emerald-700 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'}`}
+                  >
+                    {m === 'sms'
+                      ? <Smartphone className="w-4 h-4 shrink-0" />
+                      : <QrCode className="w-4 h-4 shrink-0" />}
+                    {m === 'sms' ? l.methodSms : l.methodTotp}
+                  </button>
+                ))}
+              </div>
 
               {error && (
                 <div className="w-full flex items-center gap-2 p-2.5 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold text-left">
@@ -661,14 +715,9 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 disabled={busy}
                 className="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-sm shadow-md transition-colors"
               >
-                {busy ? l.loading : l.sendOtp}
+                {busy ? l.loading : loginMethod === 'totp' ? l.totpContinueBtn : l.sendOtp}
               </button>
-              <p className="text-[11px] text-zinc-500 mt-4">{l.newHere}</p>
-
-              {/* Visible 2FA indicator — enrollment happens after OTP verification */}
-              <div className="mt-3 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-black text-emerald-700">
-                <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> {l.totpBadge}
-              </div>
+              <p className="text-[11px] text-zinc-500 mt-4">{loginMethod === 'totp' ? l.totpMethodHint : l.newHere}</p>
             </>
           )}
 
@@ -728,7 +777,7 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
                 disabled={busy}
                 className="mt-6 w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-black text-sm shadow-md transition-colors"
               >
-                {busy ? l.loading : l.continueBtn}
+                {busy ? l.loading : loginMethod === 'totp' ? l.regContinueTotp : l.continueBtn}
               </button>
             </>
           )}
