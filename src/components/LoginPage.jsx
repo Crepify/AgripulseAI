@@ -302,11 +302,8 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
       setError(l.resendMax);
       return false;
     }
-    if (srv.error === 'sms_failed') {
-      setError(l.otpSendFailed);
-      return false;
-    }
-    // 2) No gateway configured / offline → on-screen demo OTP (offline-first)
+    // 2) Gateway failed / not configured / offline → on-screen demo OTP
+    //    (offline-first: a gateway outage must never lock the farmer out)
     setServerOtp(null);    const res = requestOtp(mobile);
     if (!res.ok) {
       if (res.error === 'max_sends') {
