@@ -647,8 +647,8 @@ export class VoiceGuide {
     return this.say(this._renderLine(key), opts);
   }
 
-  askKey(key, timeoutMs = 16000) {
-    return this.ask(this._renderLine(key), timeoutMs);
+  askKey(key, timeoutMs = 16000, opts = null) {
+    return this.ask(this._renderLine(key), timeoutMs, opts);
   }
 
   // ── Patient step reminders ─────────────────────────────────────────────
@@ -842,7 +842,7 @@ export class VoiceGuide {
   }
 
   // Ask a yes/no question and wait for the answer (or timeout → 'timeout').
-  ask(text, timeoutMs = 16000) {
+  ask(text, timeoutMs = 16000, opts = null) {
     return this.say(text).then(() => new Promise((resolve) => {
       if (!this.active) { resolve(null); return; }
       // A previous question may still be pending (language switch re-ask,
@@ -856,6 +856,7 @@ export class VoiceGuide {
       }
       const timer = setTimeout(() => this._resolveAck('timeout'), timeoutMs);
       this._ackWaiter = {
+        invert: !!(opts && opts.invert),
         resolve: (v) => {
           clearTimeout(timer);
           this._ackWaiter = null;
@@ -934,20 +935,26 @@ export class VoiceGuide {
     const switchTo = matchLangSwitch(q, this.lang) || detectSpokenLanguage(q, this.lang);
     if (switchTo) {
       const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
+      // The retired question may be an INVERTED one (the stop-confirmation):
+      // its 'yes' means STOP. A resume answer must be translated through the
+      // pending question's own semantics or "हाँ (carry on)" would kill the tour.
+      const inv = this._ackWaiter ? !!this._ackWaiter.invert : false;
       if (this._ackWaiter) { this._ackWaiter.cancel(); this._ackWaiter = null; }
       if (!this._canSpeak(switchTo)) {
         // Asked for e.g. Tamil on a phone with no Tamil voice — say so
         // honestly and carry on in the current language. No fake switch
         // that silently becomes English.
         this.sayKey('langUnavailable');
-        if (outer) outer('yes'); // whatever was pending keeps moving
+        if (outer) outer(inv ? 'no' : 'yes'); // whatever was pending keeps moving
         return;
       }
       this.setLanguage(switchTo);
       this.sayKey('langSwitched').then(() => {
         if (outer) {
           // re-ask the pending question in the new language, snappily
-          this.askKey('askResume', 6000).then((ans) => outer(ans === 'no' ? 'no' : 'yes'));
+          this.askKey('askResume', 6000).then((ans) => {
+            if (outer) outer(inv ? (ans === 'no' ? 'yes' : 'no') : (ans === 'no' ? 'no' : 'yes'));
+          });
         }
       });
       return;
@@ -960,7 +967,7 @@ export class VoiceGuide {
       // The tour WAITS on this gate — it must not race ahead into the next
       // service (and retire this question) before the farmer answers.
       this._confirmGate = new Promise((res) => { this._confirmGateResolve = res; });
-      this.askKey('tourStopAsk', 8000).then((ans) => {
+      this.askKey('tourStopAsk', 8000, { invert: true }).then((ans) => {
         if (this._confirmGateResolve) { this._confirmGateResolve(); this._confirmGateResolve = null; }
         this._confirmGate = null;
         if (ans === 'yes') {
@@ -982,9 +989,12 @@ export class VoiceGuide {
         // …then politely ask whether to continue. Hand the outer question's
         // waiter over explicitly — the inner ask() owns the ack slot meanwhile.
         const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
+        // Translate through the pending question's semantics (the stop-
+        // confirmation is inverted: 'yes' to "continue?" must mean 'no, don't stop').
+        const inv = this._ackWaiter ? !!this._ackWaiter.invert : false;
         if (this._ackWaiter) { this._ackWaiter.cancel(); this._ackWaiter = null; }
         this.askKey('askResume', 8000).then((ans) => {
-          if (outer) outer(ans === 'no' ? 'no' : 'yes');
+          if (outer) outer(inv ? (ans === 'no' ? 'yes' : 'no') : (ans === 'no' ? 'no' : 'yes'));
         });
         return;
       }
@@ -1044,7 +1054,7 @@ export class VoiceGuide {
         // A single stray 'no' (noise, a bystander, a breath finalized by
         // the recognizer) must NEVER end the tour and silence the app —
         // confirm it. A real stop is two words: बस … हाँ.
-        const sure = await this.askKey('tourStopAsk', 8000);
+        const sure = await this.askKey('tourStopAsk', 8000, { invert: true });
         if (this._confirmGate) await this._confirmGate;
         if (!this._tourRunning) return;
         if (sure === 'yes') {
