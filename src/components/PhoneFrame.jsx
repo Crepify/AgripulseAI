@@ -37,24 +37,35 @@ export function StatusBar() {
   );
 }
 
-export default function PhoneFrame({ children, onHome }) {
+export default function PhoneFrame({ children, onHome, companion }) {
   const [framed, setFramed] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 520);
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1000);
   useEffect(() => {
-    const onResize = () => setFramed(window.innerWidth >= 520);
+    const onResize = () => {
+      setFramed(window.innerWidth >= 520);
+      setWide(window.innerWidth >= 1000);
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Second WhatsApp device only in wide presentation mode, and only for the
+  // main app frame (not landing / phone home screen).
+  const showCompanion = framed && wide && companion;
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('ap:wa-side', { detail: { side: showCompanion } }));
+  }, [showCompanion]);
 
   // Real phones: the device IS the frame.
   if (!framed) return children;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-hidden select-none"
+    <div className="fixed inset-0 flex items-center justify-center gap-10 overflow-hidden select-none"
       style={{ background: 'radial-gradient(1100px 700px at 50% -8%, #14432f 0%, #0b1c14 45%, #050807 100%)' }}>
 
       {/* desk branding */}
       <div className="absolute bottom-5 inset-x-0 text-center text-emerald-500/40 text-xs font-mono font-bold tracking-[0.35em]">
-        AGRIPULSE AI • FARMER COMMERCE OS
+        AGRIPULSE AI • FARMER COMMERCE OS{showCompanion ? ' • WHATSAPP LIVE FEED' : ''}
       </div>
 
       {/*
@@ -94,6 +105,29 @@ export default function PhoneFrame({ children, onHome }) {
           </div>
         </div>
       </div>
+
+      {/* SECOND DEVICE — dedicated WhatsApp phone (side-by-side demo mode).
+          WhatsAppScreen portals its hub into #ap-wa-screen. */}
+      {showCompanion && (
+        <div className="relative" style={{ height: 'min(86vh, 800px)', aspectRatio: '9 / 19', maxWidth: '44vw' }}>
+          <div className="absolute -left-[3px] top-[20%] h-16 w-[4px] rounded-l-md bg-zinc-800" />
+          <div className="absolute -right-[3px] top-[24%] h-20 w-[4px] rounded-r-md bg-zinc-800" />
+          <div className="h-full w-full rounded-[42px] bg-zinc-950 p-[8px] ring-1 ring-zinc-600/50 shadow-[0_30px_90px_-15px_rgba(0,0,0,0.9),0_0_60px_rgba(37,211,102,0.10)]">
+            <div className="ap-in-frame relative h-full w-full overflow-hidden rounded-[35px] bg-[#0b141a]" style={{ transform: 'translateZ(0)' }}>
+              <StatusBar />
+              <div className="pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 z-[80] h-[22px] w-[84px] rounded-full bg-black shadow-inner flex items-center justify-end pr-2">
+                <span className="h-2 w-2 rounded-full bg-zinc-800 ring-1 ring-zinc-700" />
+              </div>
+              {/* WhatsApp hub mounts here via portal */}
+              <div id="ap-wa-screen" className="h-full w-full" />
+              <div className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 z-[90] h-1 w-24 rounded-full bg-white/40" />
+            </div>
+          </div>
+          <div className="absolute -bottom-8 inset-x-0 text-center text-[#25D366]/50 text-[10px] font-mono font-black tracking-[0.3em]">
+            FARMER'S WHATSAPP
+          </div>
+        </div>
+      )}
     </div>
   );
 }

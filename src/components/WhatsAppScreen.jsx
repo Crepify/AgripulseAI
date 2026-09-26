@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Phone, Video, MoreVertical, Check, CheckCheck, ExternalLink, Lock, Search, Camera, Users, ArrowUpRight } from 'lucide-react';
 import { sound } from '../utils/audio';
@@ -90,12 +91,27 @@ export default function WhatsAppScreen() {
   });
   const [typingChat, setTypingChat] = useState(null);
   const [toast, setToast] = useState(null);           // banner for messages arriving while hub is closed
+  // Side-by-side mode: PhoneFrame renders a dedicated WhatsApp phone with a
+  // #ap-wa-screen mount point — the hub portals onto that second device.
+  const [sideEl, setSideEl] = useState(null);
   const toastTimer = useRef(null);
   const timers = useRef([]);
   const openRef = useRef({ open: false, view: 'list' });
   const scrollRef = useRef(null);
+  const side = Boolean(sideEl);
 
-  useEffect(() => { openRef.current = { open, view }; }, [open, view]);
+  useEffect(() => { openRef.current = { open: open || side, view }; }, [open, view, side]);
+
+  useEffect(() => {
+    const check = () => setSideEl(document.getElementById('ap-wa-screen') || null);
+    check();
+    window.addEventListener('ap:wa-side', check);
+    window.addEventListener('resize', check);
+    return () => {
+      window.removeEventListener('ap:wa-side', check);
+      window.removeEventListener('resize', check);
+    };
+  }, []);
   const later = (fn, ms) => timers.current.push(setTimeout(fn, ms));
 
   const pushMessage = (chatId, msg, { silent } = {}) => {
@@ -209,45 +225,22 @@ export default function WhatsAppScreen() {
       ? <Check className="w-3.5 h-3.5 text-zinc-400 inline" />
       : <CheckCheck className={`w-3.5 h-3.5 inline ${status === 'read' ? 'text-[#53bdeb]' : 'text-zinc-400'}`} />;
 
-  return (
+  const hub = (
     <>
-    {/* incoming-message banner (shown over the app while the hub is closed) */}
-    <AnimatePresence>
-      {toast && !open && (
-        <motion.button
-          initial={{ y: -80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -80, opacity: 0 }}
-          transition={{ type: 'spring', damping: 24, stiffness: 300 }}
-          onClick={() => { clearTimeout(toastTimer.current); const id = toast.chatId; setToast(null); sound.playTransition(); setOpen(true); openChat(id); }}
-          className="fixed top-12 inset-x-0 z-[96] mx-auto w-[92%] max-w-md text-left"
-        >
-          <span className="flex items-start gap-2.5 rounded-2xl bg-[#1f2c34]/95 border border-white/10 px-3.5 py-2.5 shadow-2xl backdrop-blur">
-            <span className="w-9 h-9 rounded-full bg-[#0b141a] flex items-center justify-center text-lg shrink-0">{toast.avatar}</span>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-1.5 text-[12px] font-black text-white truncate">
-                <MessageCircleIcon /> {toast.name} <span className="text-zinc-500 font-bold">• now</span>
-              </span>
-              <span className="block text-[12px] text-zinc-300 truncate">{toast.from}: {toast.text}</span>
-            </span>
-          </span>
-        </motion.button>
-      )}
-    </AnimatePresence>
-
-    <AnimatePresence>
-      {open && (
-        <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-          className="fixed inset-0 z-[95] mx-auto max-w-md flex flex-col bg-[#0b141a]">
 
           {view === 'list' ? (
             <>
               {/* inbox header */}
               <div className="px-4 pt-10 pb-3 bg-[#1f2c34] text-white">
                 <div className="flex items-center justify-between">
-                  <button onClick={close} className="flex items-center gap-1 text-[#00a884] font-black text-sm active:opacity-70">
-                    <ArrowLeft className="w-5 h-5" /> AgriPulse
-                  </button>
-                  <span className="text-lg font-black">WhatsApp</span>
+                  {side ? (
+                    <span className="text-lg font-black text-[#25D366]">WhatsApp</span>
+                  ) : (
+                    <button onClick={close} className="flex items-center gap-1 text-[#00a884] font-black text-sm active:opacity-70">
+                      <ArrowLeft className="w-5 h-5" /> AgriPulse
+                    </button>
+                  )}
+                  {!side && <span className="text-lg font-black">WhatsApp</span>}
                   <span className="flex items-center gap-4 text-zinc-300"><Camera className="w-5 h-5" /><MoreVertical className="w-5 h-5" /></span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 rounded-full bg-[#0b141a] px-3.5 py-2 text-zinc-400 text-sm">
@@ -347,13 +340,56 @@ export default function WhatsAppScreen() {
                   className="flex-1 min-h-[48px] rounded-full bg-[#00a884] text-black font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98]">
                   {chat.direct ? <><ExternalLink className="w-4 h-4" /> Open in real WhatsApp</> : <><Users className="w-4 h-4" /> Share group invite</>}
                 </a>
+                {!side && (
                 <button onClick={close}
                   className="min-h-[48px] px-5 rounded-full border-2 border-zinc-600 text-zinc-200 font-black text-sm active:scale-[0.98]">
                   App
                 </button>
+                )}
               </div>
             </>
           )}
+    </>
+  );
+
+  /* SIDE-BY-SIDE MODE — the hub lives permanently on the second phone. */
+  if (side && sideEl) {
+    return createPortal(
+      <div className="h-full w-full flex flex-col bg-[#0b141a] text-left">{hub}</div>,
+      sideEl
+    );
+  }
+
+  /* MOBILE / NARROW MODE — launcher + slide-in overlay + notification banner. */
+  return (
+    <>
+    <AnimatePresence>
+      {toast && !open && (
+        <motion.button
+          initial={{ y: -80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -80, opacity: 0 }}
+          transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+          onClick={() => { clearTimeout(toastTimer.current); const id = toast.chatId; setToast(null); sound.playTransition(); setOpen(true); openChat(id); }}
+          className="fixed top-12 inset-x-0 z-[96] mx-auto w-[92%] max-w-md text-left"
+        >
+          <span className="flex items-start gap-2.5 rounded-2xl bg-[#1f2c34]/95 border border-white/10 px-3.5 py-2.5 shadow-2xl backdrop-blur">
+            <span className="w-9 h-9 rounded-full bg-[#0b141a] flex items-center justify-center text-lg shrink-0">{toast.avatar}</span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5 text-[12px] font-black text-white truncate">
+                <MessageCircleIcon /> {toast.name} <span className="text-zinc-500 font-bold">• now</span>
+              </span>
+              <span className="block text-[12px] text-zinc-300 truncate">{toast.from}: {toast.text}</span>
+            </span>
+          </span>
+        </motion.button>
+      )}
+    </AnimatePresence>
+
+    <AnimatePresence>
+      {open && (
+        <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          className="fixed inset-0 z-[95] mx-auto max-w-md flex flex-col bg-[#0b141a]">
+          {hub}
         </motion.div>
       )}
     </AnimatePresence>
