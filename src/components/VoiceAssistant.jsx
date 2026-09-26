@@ -32,7 +32,72 @@ const WAIT_MSG = {
 };
 const WAIT_MS = 35000;
 
-export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNavigate }) {
+// ── voice language switching: "talk in tamil" / "தமிழில் பேசு" / "tamil bhasha" ──
+// Only languages the voice stack can actually speak (speechLangCode map).
+const LANG_ALIASES = [
+  ['hi', ['hindi', 'hindhi', 'हिंदी', 'हिन्दी']],
+  ['en', ['english', 'angrezi', 'अंग्रेज़ी', 'अंग्रेजी', 'inglish']],
+  ['ta', ['tamil', 'tamizh', 'तमिल', 'तमिळ', 'தமிழ்']],
+  ['te', ['telugu', 'तेलुगू', 'तेलुगु', 'తెలుగు']],
+  ['kn', ['kannada', 'kannda', 'कन्नड़', 'कन्नड', 'ಕನ್ನಡ']],
+  ['ml', ['malayalam', 'malyalam', 'മലയാളം', 'मलयालम']],
+  ['mr', ['marathi', 'marati', 'मराठी']],
+  ['pa', ['punjabi', 'panjabi', 'पंजाबी', 'ਪੰਜਾਬੀ']],
+  ['gu', ['gujarati', 'gujrati', 'गुजराती', 'ગુજરાતી']],
+  ['bn', ['bengali', 'bangla', 'bangali', 'बांग्ला', 'बंगाली', 'বাংলা']],
+  ['or', ['odia', 'oriya', 'ओड़िया', 'ଓଡ଼ିଆ']],
+  ['as', ['assamese', 'axomiya', 'असमिया', 'অসমীয়া']],
+  ['ur', ['urdu', 'उर्दू', 'اردو']],
+];
+const SWITCH_VERB = /(talk|speak|switch|change|reply|respond|bhasha|bolo|bolna|भाषा|बोलो|बोलिए|बात|మాట్లాడు|பேசு|ಮಾತನಾಡು|സംസാരി|പറയൂ|ਬੋਲੋ|ਗੱਲ|બોલો|વાત|বলুন|কথা|କୁହନ୍ତୁ|कওक)/i;
+const POLITE = /^(please|kripya|जी|ji|bolo|bhasha|me|in|ல்|மொழி|లో|భాష|ಲ್ಲಿ|ಭಾಷೆ|ഭാഷ|भाषा|বোলী)$/i;
+
+const isLatin = (s) => /[a-z]/i.test(s);
+
+function detectLangSwitch(text) {
+  const raw = String(text || '');
+  const t = ` ${raw.toLowerCase().trim()} `;
+  if (/nadu|ਨਾਡੂ|నాడు|नाडू/i.test(raw)) return null; // "tamil nadu mandi…" is a place, not a switch
+  for (const [code, names] of LANG_ALIASES) {
+    for (const n of names) {
+      // Latin names need word boundaries; Indic scripts agglutinate suffixes
+      // (à®¤à®®à®¿à®´à¯ + à®à®²à¯), so there we match the START of a word.
+      // Indic suffixes join at the stem: à®¤à®®à®¿à®´à¯ + à®à®²à¯ = à®¤à®®à®¿à®´à®¿à®²à¯,
+      // à´®à´²à´¯à´¾à´³à´ + à´¤àµà´¤à´¿àµ½ = à´®à´²à´¯à´¾à´³à´¤àµà´¤à´¿àµ½ â so also
+      // match the alias with its final joining mark removed.
+      const stem = n.replace(/[\u0902\u094D\u09CD\u0A02\u0A4D\u0ACD\u0B4D\u0BCD\u0C02\u0C4D\u0D02\u0D4D]/u, '');
+      const hit = isLatin(n)
+        ? (t.includes(` ${n} `) || t.includes(` ${n}?`) || t.includes(` ${n}.`))
+        : (t.includes(` ${n}`) || (stem !== n && t.includes(` ${stem}`)));
+      if (!hit) continue;
+      // explicit command form: verb + language name
+      if (SWITCH_VERB.test(text)) return code;
+      // or the utterance is essentially JUST the language name ("tamil?", "tamil bhasha")
+      const words = t.trim().split(/[\s?.]+/).filter(Boolean);
+      const rest = words.filter(w => w !== n && !POLITE.test(w));
+      if (words.length <= 3 && rest.length === 0) return code;
+    }
+  }
+  return null;
+}
+
+const SWITCH_OK = {
+  hi: 'ठीक है, अब मैं हिंदी में बात करूँगा।',
+  en: 'Okay, I will speak English now.',
+  ta: 'சரி, இப்போது தமிழில் பேசுவேன்.',
+  te: 'సరే, ఇప్పుడు తెలుగులో మాట్లాడుతాను.',
+  kn: 'ಸರಿ, ಈಗ ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ.',
+  ml: 'ശരി, ഇപ്പോൾ മലയാളത്തിൽ സംസാരിക്കും.',
+  mr: 'ठीक आहे, आता मी मराठीत बोलेन.',
+  pa: 'ਠੀਕ ਹੈ, ਹੁਣ ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰਾਂਗਾ।',
+  gu: 'ઠીક છે, હવે હું ગુજરાતીમાં વાત કરીશ.',
+  bn: 'ঠিক আছে, এখন আমি বাংলায় কথা বলব।',
+  or: 'ଠିକ୍ ଅଛି, ବର୍ତ୍ତମାନ ମୁଁ ଓଡ଼ିଆରେ କଥା ହେବି।',
+  as: 'ঠিক আছে, এতিয়া মই অসমীয়াত কথা পাতিম।',
+  ur: 'ٹھیک ہے، اب میں اردو میں بات کروں گا۔',
+};
+
+export default function VoiceAssistant({ isOpen, onClose, selectedLang, setSelectedLang, onNavigate }) {
   const t = T[selectedLang] || T['en'];
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -52,6 +117,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
   const autoListenRef = useRef(true);
   const openRef = useRef(isOpen);
   const manualStopRef = useRef(false);
+  const langRef = useRef(selectedLang); // spoken lang can change mid-conversation
   const lastExchangeRef = useRef(null); // {q, a} — one-turn memory for follow-ups
   const waitTimerRef = useRef(null); // 35s listening window after each reply
   const greetedRef = useRef(false);
@@ -79,6 +145,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
 
   useEffect(() => { openRef.current = isOpen; }, [isOpen]);
   useEffect(() => { autoListenRef.current = autoListen; }, [autoListen]);
+  useEffect(() => { langRef.current = selectedLang; }, [selectedLang]);
 
   // Stop everything when the modal closes — never leave a voice running.
   useEffect(() => {
@@ -97,7 +164,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
         greetedRef.current = true;
         const g = setTimeout(() => {
           if (!openRef.current) return;
-          say(GREETING[selectedLang] || GREETING.en);
+          say(GREETING[langRef.current] || GREETING.en);
         }, 350);
         return () => clearTimeout(g);
       }
@@ -125,7 +192,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
   const say = (text, { then } = {}) => {
     try { speechEngine.stopSpeaking(); } catch {}
     setIsSpeaking(true);
-    speechEngine.speak(text, speechLangCode(selectedLang), () => {
+    speechEngine.speak(text, speechLangCode(langRef.current), () => {
       setIsSpeaking(false);
       if (then) return then();
       if (autoListenRef.current && openRef.current && !manualStopRef.current) startListeningFlow();
@@ -158,7 +225,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
   // Answer → announce the 35s wait → listen for the next command.
   const reply = (answerText) => {
     if (autoListenRef.current) {
-      say(answerText, { then: () => say(WAIT_MSG[selectedLang] || WAIT_MSG.en, { then: () => startListeningFlow() }) });
+      say(answerText, { then: () => say(WAIT_MSG[langRef.current] || WAIT_MSG.en, { then: () => startListeningFlow() }) });
     } else {
       say(answerText);
     }
@@ -168,6 +235,19 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     sound.playClick();
     if (!userText) return;
     setTranscript(userText);
+
+    // 0. "talk in tamil" / "tamil bhasha" / "தமிழில் பேசு" → switch language NOW.
+    const switchTo = detectLangSwitch(userText);
+    if (switchTo && switchTo !== langRef.current) {
+      langRef.current = switchTo;                    // speak + listen in the new tongue immediately
+      try { setSelectedLang(switchTo); } catch (e) {} // app UI + ap_lang persistence
+      try { localStorage.setItem('ap_guide_lang_pref', switchTo); } catch (e) {} // guide stays in sync
+      const ok = SWITCH_OK[switchTo] || SWITCH_OK.en;
+      pushChat({ q: userText, a: ok, source: 'app' });
+      lastExchangeRef.current = { q: userText, a: ok };
+      reply(ok);
+      return;
+    }
 
     // 1. App commands → navigate + spoken confirmation (as before).
     const intent = classifyVoiceIntent(userText, selectedLang);
@@ -218,7 +298,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
       setTranscript('');
     }, WAIT_MS);
     speechEngine.startListening(
-      speechLangCode(selectedLang),
+      speechLangCode(langRef.current),
       (text, meta = {}) => {
         // Live interim text streams into the UI; we only ACT on final results.
         setTranscript(text);

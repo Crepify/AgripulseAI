@@ -405,6 +405,7 @@ export default function App() {
         isOpen={isVoiceOpen}
         onClose={() => setIsVoiceOpen(false)}
         selectedLang={selectedLang}
+        setSelectedLang={setSelectedLang}
         onNavigate={handleAutoNavigate}
       />
 

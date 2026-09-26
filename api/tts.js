@@ -8,7 +8,9 @@
 //
 // GET /api/tts?text=...&lang=ta  → audio/mpeg
 
-const ALLOWED = new Set(['hi', 'en', 'ta', 'te', 'kn', 'mr']);
+// All 17 app languages — Google TTS covers most; any it lacks returns 502
+// and the client gracefully falls back to device voices + phonetic text.
+const ALLOWED = new Set(['hi', 'en', 'ta', 'te', 'kn', 'mr', 'ml', 'pa', 'bn', 'gu', 'or', 'as', 'ur', 'ks', 'ne', 'sa', 'sd']);
 const MAX_CHARS = 600;
 
 // Google's endpoint accepts ~200 chars per request — split at sentence
