@@ -76,53 +76,22 @@ class SpeechEngine {
     return { voice: this.voices[0], isNative: false };
   }
 
-  // L2 — cloud TTS: natural Indian-language speech for devices with no local
-  // voice for the language. Free proxy endpoint (no key, nothing to install —
-  // the farmer must never have to install anything), cached in-memory by
-  // text+lang so repeated lines don't refetch. Falls back to the local voice
-  // on ANY failure (offline, slow, blocked) so the guide is never silent.
-  _cloudSpeak(text, lang, onEnd, fallback) {
-    let finished = false;
-    const done = () => { if (!finished && onEnd) { finished = true; onEnd(); } };
-    const fail = () => { if (!finished) { finished = true; fallback(); } };
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) { fail(); return; }
-    const key = lang + ':' + text;
-    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = setTimeout(() => { try { ctrl && ctrl.abort(); } catch {} }, 6000);
-    const play = (url) => {
-      try {
-        const audio = new Audio(url);
-        this._ttsAudio = audio;
-        audio.onended = done;
-        audio.onerror = fail;
-        const p = audio.play();
-        if (p && p.catch) p.catch(fail);
-        // Safety: if neither end nor error fires (weird browsers), don't hang the guide
-        setTimeout(() => { try { if (!finished && audio.paused && audio.currentTime === 0) fail(); } catch {} }, 15000);
-      } catch { fail(); }
-    };
-    const cached = this._ttsCache && this._ttsCache.get(key);
-    if (cached) { clearTimeout(timer); play(cached); return; }
-    fetch(`/api/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}`, ctrl ? { signal: ctrl.signal } : undefined)
-      .then((r) => { if (!r.ok) throw new Error('tts ' + r.status); return r.blob(); })
-      .then((blob) => {
-        clearTimeout(timer);
-        const url = URL.createObjectURL(blob);
-        if (!this._ttsCache) this._ttsCache = new Map();
-        if (this._ttsCache.size > 60) this._ttsCache.clear(); // keep memory bounded
-        this._ttsCache.set(key, url);
-        play(url);
-      })
-      .catch(() => { clearTimeout(timer); fail(); });
-  }
+  speak(textData, langCode = 'hi-IN', onEnd) {
+    if (!this.synth) return;
+    this.synth.cancel();
 
-  // L1/L3 — the local device synthesizer. With no native voice for the
-  // language, phonetic Romanized text sounds far better than raw Devanagari
-  // read by an English voice.
-  _localSpeak(nativeText, phoneticText, voiceInfo, langCode, onEnd) {
-    if (!this.synth) { if (onEnd) onEnd(); return; }
-    let textToSpeak = nativeText;
-    if (voiceInfo && !voiceInfo.isNative && phoneticText) textToSpeak = phoneticText;
+    // textData can be either a plain string or an object { devanagari: '...', phonetic: '...' }
+    let textToSpeak = typeof textData === 'string' ? textData : (textData.devanagari || textData.phonetic || textData.en);
+    const phoneticText = typeof textData === 'object' ? textData.phonetic : null;
+
+    const voiceInfo = this.getBestVoice(langCode);
+
+    // If native Devanagari/regional voice is NOT available on this device,
+    // use phonetic Romanized Hindi text so the synthesizer speaks fluent Hindi words instead of just numbers!
+    if (voiceInfo && !voiceInfo.isNative && phoneticText) {
+      textToSpeak = phoneticText;
+    }
+
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     if (voiceInfo && voiceInfo.voice) {
       utterance.voice = voiceInfo.voice;
@@ -130,54 +99,21 @@ class SpeechEngine {
     } else {
       utterance.lang = langCode;
     }
+
     utterance.rate = 0.92; // Slightly measured rate for clear rural comprehension
     utterance.pitch = 1.0;
+
     if (onEnd) {
       utterance.onend = onEnd;
       utterance.onerror = onEnd;
     }
+
     this.synth.speak(utterance);
-  }
-
-  speak(textData, langCode = 'hi-IN', onEnd) {
-    if (!this.synth) { if (onEnd) onEnd(); return; }
-    this.synth.cancel();
-    if (this._ttsAudio) { try { this._ttsAudio.pause(); } catch {} this._ttsAudio = null; }
-
-    // textData can be either a plain string or an object { devanagari: '...', phonetic: '...' }
-    const isStr = typeof textData === 'string';
-    const nativeText = isStr ? textData : (textData.devanagari || textData.phonetic || textData.en || '');
-    const phoneticText = !isStr && textData.phonetic ? textData.phonetic : null;
-
-    const voiceInfo = this.getBestVoice(langCode);
-    const baseLang = String(langCode || '').split('-')[0].toLowerCase();
-
-    // L1 — a real native voice for the language: best quality, works offline.
-    if (voiceInfo && voiceInfo.isNative) {
-      this._localSpeak(nativeText, phoneticText, voiceInfo, langCode, onEnd);
-      return;
-    }
-    // L2 — no native voice on this device (very common for ta/te/kn/mr):
-    // natural cloud speech instead of a wrong-accent robot. English always
-    // has a local voice, so it never needs the network.
-    if (baseLang && baseLang !== 'en' && nativeText) {
-      this._cloudSpeak(nativeText, baseLang, onEnd, () =>
-        this._localSpeak(nativeText, phoneticText, voiceInfo, langCode, onEnd));
-      return;
-    }
-    // L3 — local voice with phonetic text.
-    this._localSpeak(nativeText, phoneticText, voiceInfo, langCode, onEnd);
   }
 
   stopSpeaking() {
     if (this.synth) {
       this.synth.cancel();
-    }
-    // Cloud voice too — barge-in must silence BOTH layers or the guide
-    // keeps talking over the farmer.
-    if (this._ttsAudio) {
-      try { this._ttsAudio.pause(); } catch {}
-      this._ttsAudio = null;
     }
   }
 
@@ -229,18 +165,9 @@ class SpeechEngine {
             setTimeout(() => attemptStart(retriesLeft - 1), 350);
             return;
           }
-          // Giving up must NEVER throw: this runs inside a setTimeout, so a
-          // rethrow here is an UNCAUGHT window error — the app's stale-asset
-          // recovery would reload the page and wipe whatever the farmer was
-          // typing. Report it like any other mic failure instead.
-          this.isListening = false;
-          if (onError) onError(err);
+          throw err;
         }
       };
-      // Another component (Voice Fill, the guide's own revive timer) may
-      // still hold the shared recognizer open — a start() on top of it is
-      // the classic InvalidStateError. Clear the decks first.
-      try { this.recognition.abort(); } catch { /* wasn't running */ }
       attemptStart(2);
     } catch (err) {
       this.isListening = false;

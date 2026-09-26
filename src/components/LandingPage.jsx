@@ -10,19 +10,14 @@ import { createDemoSession } from '../utils/authService';
  */
 
 export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedLang }) {
-  // If the farmer was already inside the login flow, a page refresh (SW
-  // update, flaky network, OS memory purge) must NOT dump them back at
-  // "Get Started" with their number gone.
-  const [showAuth, setShowAuth] = useState(() => {
-    try { return sessionStorage.getItem('ap_in_login') === '1'; } catch (e) { return false; }
-  });
+  const [showAuth, setShowAuth] = useState(false);
   const hi = selectedLang === 'hi';
 
   if (showAuth) {
     return (
       <LoginPage
-        onSuccess={() => { try { sessionStorage.removeItem('ap_in_login'); } catch (e) {} onLoginSuccess(); }}
-        onCancel={() => { try { sessionStorage.removeItem('ap_in_login'); } catch (e) {} setShowAuth(false); }}
+        onSuccess={onLoginSuccess}
+        onCancel={() => setShowAuth(false)}
         selectedLang={selectedLang}
         setSelectedLang={setSelectedLang}
       />
@@ -30,10 +25,10 @@ export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedL
   }
 
   const features = [
-    { icon: Scan, title: hi ? 'रोग स्कैनर' : 'Disease Scanner', desc: hi ? 'फोटो लो — 52 रोगों की पहचान + दवा' : 'Photo → 52 diseases + exact dose', color: 'bg-emerald-100 text-emerald-700' },
-    { icon: Handshake, title: hi ? 'पट्टी ऑडिट' : 'Patti Auditor', desc: hi ? 'हर कटौती जांचो — चोरी के ₹ पकड़ो' : 'Audit every fee — catch stolen ₹', color: 'bg-amber-100 text-amber-700' },
-    { icon: TrendingUp, title: hi ? 'मुनाफ़ा सिम्युलेटर' : 'ROI Simulator', desc: hi ? 'भाड़ा-फीस काटकर असली मुनाफ़ा' : 'Net profit after transport + fees', color: 'bg-sky-100 text-sky-700' },
-    { icon: Mic, title: hi ? 'बोलकर ट्रक पूल' : 'Voice Truck Pool', desc: hi ? 'बोलो — ट्रक भरो, भाड़ा बांटो' : 'Speak → fill a truck, split freight', color: 'bg-violet-100 text-violet-700' },
+    { icon: Scan, title: hi ? 'रोग स्कैनर' : 'Disease Scanner', desc: hi ? 'एक फोटो से 52 रोगों की पहचान और सटीक दवा' : 'One photo identifies 52 diseases with exact dosage', color: 'bg-emerald-100 text-emerald-700' },
+    { icon: Handshake, title: hi ? 'पट्टी ऑडिटर' : 'Patti Auditor', desc: hi ? 'हर मंडी कटौती कानूनी सीमा से जांची जाती है' : 'Every mandi fee audited against legal limits', color: 'bg-amber-100 text-amber-700' },
+    { icon: TrendingUp, title: hi ? 'मुनाफ़ा सिम्युलेटर' : 'ROI Simulator', desc: hi ? 'भाड़ा, मजदूरी और फीस के बाद का शुद्ध मुनाफ़ा' : 'Net profit after transport, labor and fees', color: 'bg-sky-100 text-sky-700' },
+    { icon: Mic, title: hi ? 'वॉइस ट्रक पूलिंग' : 'Voice Truck Pooling', desc: hi ? 'बोलकर साझा ट्रक भरें और भाड़ा बांटें' : 'A shared truck filled by voice, freight split fairly', color: 'bg-violet-100 text-violet-700' },
   ];
 
   return (
@@ -100,7 +95,7 @@ export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedL
       {/* CTA */}
       <footer className="px-5 pb-10 pt-4">
         <motion.button initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-          onClick={() => { try { sessionStorage.setItem('ap_in_login', '1'); } catch (e) {} setShowAuth(true); }}
+          onClick={() => setShowAuth(true)}
           className="w-full min-h-[60px] rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white text-lg font-black flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-200 active:scale-[0.98] transition-transform"
         >
           {hi ? 'शुरू करें' : 'Get Started'} <ArrowRight className="w-5 h-5" strokeWidth={2.6} />

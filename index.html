@@ -43,13 +43,6 @@
         let refreshed = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           if (refreshed || !hadController || performance.now() > 20000) return;
-          // Never yank the page out from under the farmer: skip the
-          // auto-refresh if they're already inside the app (login included)
-          // or mid-typing — they get the new version on the next visit
-          // instead of losing the number they just entered.
-          try { if (sessionStorage.getItem('ap_phone_opened') === '1') return; } catch (e) {}
-          const ae = document.activeElement;
-          if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
           refreshed = true;
           window.location.reload();
         });
