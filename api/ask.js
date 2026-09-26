@@ -1,0 +1,286 @@
+// "Jarvis" knowledge endpoint — answers ANY question, keyless & free.
+//
+// The in-app assistant can only navigate to 9 fixed screens; for everything
+// else (weather words, general knowledge, "who is...", prices, math...) it
+// used to stay silent. This endpoint gives it real answers:
+//
+//   1. Pure math            → safe tokenizer + shunting-yard (no eval)
+//   2. Greetings / identity → friendly localized reply
+//   3. Wikipedia            → the farmer's OWN language edition first
+//                            (hi/ta/te/kn/mr/gu/bn/pa/ml/or/as/ur/en),
+//                            falling back to English Wikipedia
+//   4. DuckDuckGo Instant Answer → extra coverage (free, no key)
+//   5. Honest "I don't know yet" + Kisan Call Centre — NEVER silence
+//
+// GET /api/ask?q=...&lang=hi  → { answer, source, lang }
+
+const MAX_Q = 300;
+const UPSTREAM_TIMEOUT = 4500;
+
+// Module-level cache (best-effort, like the TTS proxy). Vercel reuses warm
+// lambdas, so repeat questions in a burst are free.
+const CACHE = new Map();
+const CACHE_MAX = 80;
+const CACHE_TTL = 10 * 60 * 1000;
+
+const WIKI_LANGS = new Set(['hi', 'en', 'ta', 'te', 'kn', 'mr', 'gu', 'bn', 'pa', 'ml', 'or', 'as', 'ur']);
+
+// ───────────────────────────── math (no eval, ever) ─────────────────────
+
+function tryMath(raw) {
+  // Strip courtesy/math words in a few languages, keep expression chars.
+  // Stopwords are dropped as WHOLE TOKENS only — a plain regex for "का" would
+  // also mangle words that merely contain those letters (कार → र).
+  const STOP = new Set(['what', 'is', 'whats', "what's", 'calculate', 'compute', 'solve',
+    'equals', 'equal', 'please', 'kya', 'hota', 'hoti', 'hote', 'hoga', 'hogi', 'hai',
+    'kitna', 'kitne', 'batao', 'btado', 'of', 'and', 'plus', 'minus', 'into', 'गुणा', 'जोड़',
+    'कितना', 'कितने', 'होता', 'होती', 'होते', 'होगा', 'होगी', 'जी', 'बराबर', 'और',
+    'का', 'की', 'के', 'में', 'से', 'पर']);
+  let q = String(raw || '')
+    .replace(/[=?]/g, ' ')
+    .replace(/×/g, '*')
+    .replace(/[xX÷]/g, (m) => (m === '÷' ? '/' : '*'))
+    .split(/\s+/)
+    .filter(w => w && !STOP.has(w.toLowerCase()))
+    .join(' ')
+    .trim();
+  if (!/^[\d\s+\-*/().^%]+$/.test(q)) return null;
+  if (!/\d/.test(q) || !/[+\-*/^%]/.test(q)) return null; // need digit AND operator
+  // Pure percent-of forms. Multiplication commutes, so both orders work:
+  //   "50 का 20%" → "50 20%"  → (20/100)*50
+  //   "18% of 500" → "18% 500" → (18/100)*500
+  const purePctAB = q.match(/^(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*%$/);
+  const purePctBA = q.match(/^(\d+(?:\.\d+)?)\s*%\s+(\d+(?:\.\d+)?)$/);
+  if (purePctAB) q = `(${purePctAB[2]}/100)*${purePctAB[1]}`;
+  else if (purePctBA) q = `(${purePctBA[1]}/100)*${purePctBA[2]}`;
+  else q = q.replace(/(\d+(?:\.\d+)?)\s*%/g, '($1/100)');
+  q = q.trim();
+
+  // tokenize
+  const tokens = q.match(/\d+(?:\.\d+)?|[+\-*/()^]/g);
+  if (!tokens) return null;
+  // reject sequences like "5 5" (two numbers with no operator)
+  let prev = null;
+  for (const tk of tokens) {
+    if (prev !== null && /[\d.]/.test(tk[0]) && /[\d.]/.test(String(prev)[0])) return null;
+    prev = tk;
+  }
+
+  const prec = { '+': 1, '-': 1, '*': 2, '/': 2, '^': 3 };
+  const out = [], ops = [];
+  for (const tk of tokens) {
+    if (/^\d/.test(tk)) out.push(parseFloat(tk));
+    else if (tk === '(') ops.push(tk);
+    else if (tk === ')') {
+      while (ops.length && ops[ops.length - 1] !== '(') out.push(ops.pop());
+      if (!ops.length) return null;
+      ops.pop();
+    } else {
+      while (ops.length && ops[ops.length - 1] !== '(' &&
+             (prec[ops[ops.length - 1]] > prec[tk] ||
+              (prec[ops[ops.length - 1]] === prec[tk] && tk !== '^'))) out.push(ops.pop());
+      ops.push(tk);
+    }
+  }
+  while (ops.length) {
+    const op = ops.pop();
+    if (op === '(') return null;
+    out.push(op);
+  }
+  const st = [];
+  for (const tk of out) {
+    if (typeof tk === 'number') st.push(tk);
+    else {
+      const b = st.pop(), a = st.pop();
+      if (a === undefined || b === undefined) return null;
+      if (tk === '+') st.push(a + b);
+      else if (tk === '-') st.push(a - b);
+      else if (tk === '*') st.push(a * b);
+      else if (tk === '/') { if (b === 0) return null; st.push(a / b); }
+      else if (tk === '^') st.push(Math.pow(a, b));
+    }
+  }
+  if (st.length !== 1 || !isFinite(st[0])) return null;
+  const v = st[0];
+  const rounded = Math.round(v * 1e6) / 1e6;
+  return String(rounded);
+}
+
+// ─────────────────────────── question cleanup ───────────────────────────
+
+const FILLERS = [
+  /^(please|kripya|कृपया)\s+/i,
+  /^(hey|ok|okay|accha|achha|अच्छा)\s+/i,
+  /^(do you know|kya aap jaante|क्या आप जानते)\s+/i,
+  /^(tell me about|tell me|batao|bataiye|batado|बताओ|बताइए|बता दो)\s*/i,
+  /^(what is|what are|what was|whats|what's|who is|who was|who are|where is|when is|when did|why is|define|explain|meaning of|how to|how do i|how does)\s+/i,
+  /^(kya hai|kaun hai|kaun tha|kahan hai|kab hua|kyun hai|kaise)\s+/i,
+  /(kya hai|kaun hai|kaun tha|kya hote hain|kya hota hai|hai kya|hai kaun)\s*[?.!]*$/i,
+  /(what is it|tell me|batao|बताओ|क्या है|कौन है|कौन थे|क्या हैं|क्या होता है|कहाँ है|कब हुआ|के बारे में बताओ|के बारे में|में बताओ|कैसे करें|कैसे करे|कैसे|kaise karein|kaise kare|kaise)\s*[?.!]*$/i,
+  /[?.!,;]+$/g,
+];
+
+function cleanForSearch(q) {
+  let s = String(q || '').trim();
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const f of FILLERS) {
+      const next = s.replace(f, '').trim();
+      if (next !== s && next) { s = next; changed = true; }
+    }
+  }
+  return s;
+}
+
+// ─────────────────────────────── fetchers ───────────────────────────────
+
+async function getJSON(url, timeout = UPSTREAM_TIMEOUT, retry = true) {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeout);
+  try {
+    const res = await fetch(url, {
+      signal: ac.signal,
+      headers: { 'User-Agent': 'AgriPulseAI-Assistant/1.0 (farmer voice assistant)' },
+    });
+    // One gentle retry on throttle/transient errors — shared egress IPs
+    // (Vercel functions) occasionally get 429s from Wikipedia.
+    if ((res.status === 429 || res.status >= 500) && retry) {
+      clearTimeout(t);
+      await new Promise(r => setTimeout(r, 350));
+      return getJSON(url, timeout, false);
+    }
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+  finally { clearTimeout(t); }
+}
+
+function firstSentences(text, maxChars = 420) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  if (t.length <= maxChars) return t;
+  const parts = t.split(/(?<=[।.!?])\s+/);
+  let out = '';
+  for (const p of parts) {
+    if ((out + ' ' + p).trim().length > maxChars && out) break;
+    out = out ? `${out} ${p}` : p;
+  }
+  // hard trim mid-sentence if a single sentence blew the budget
+  if (out.length > maxChars + 120) out = out.slice(0, maxChars + 120).replace(/\s+\S*$/, '') + '…';
+  return out;
+}
+
+async function wikipediaSearch(query, wikiLang) {
+  if (!query || !WIKI_LANGS.has(wikiLang)) return null;
+  const base = `https://${wikiLang}.wikipedia.org`;
+
+  // Search ladder: the full cleaned question first ("टमाटर की खेती कैसे करें"
+  // may have no article), then progressively shorter heads ("टमाटर की खेती",
+  // "टमाटर") so specific articles win over generic ones like "कृषि".
+  const words = query.split(/\s+/).filter(Boolean);
+  const attempts = [query];
+  if (words.length > 2) attempts.push(words.slice(0, 2).join(' '));
+  if (words.length > 1) attempts.push(words[0]);
+  const seen = new Set();
+
+  for (const attempt of attempts) {
+    if (!attempt || seen.has(attempt)) continue;
+    seen.add(attempt);
+    const search = await getJSON(
+      `${base}/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(attempt)}&format=json&srlimit=3`
+    );
+    const hits = (search?.query?.search || []).filter(h => !/may refer to|बहुविकल्पी|список/i.test(h.title + (h.snippet || '')));
+    for (const hit of hits.slice(0, 2)) {
+      const sum = await getJSON(`${base}/api/rest_v1/page/summary/${encodeURIComponent(hit.title.replace(/ /g, '_'))}`);
+      const extract = sum?.extract;
+      if (extract && sum?.type !== 'disambiguation' && extract.length > 40) {
+        return { text: firstSentences(extract), title: sum.title || hit.title, wikiLang };
+      }
+    }
+  }
+  return null;
+}
+
+async function duckduckgo(query) {
+  const j = await getJSON(
+    `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1&t=agripulse`
+  );
+  const text = j?.Answer || j?.AbstractText || j?.Definition || '';
+  if (text && text.length > 20 && !/^https?:\/\//i.test(text)) {
+    return { text: firstSentences(text, 380), source: 'duckduckgo' };
+  }
+  return null;
+}
+
+// ─────────────────────── greetings / identity / thanks ──────────────────
+
+const SMALL_TALK = [
+  { re: /^(hi|hello|hey|hola|namaste|namaskar|namaskaram|vanakkam|satsriakal|jai hind|jai kisan|नमस्ते|नमस्कार|हैलो|हेलो|जय हिंद|जय किसान)[\s!.?]*$/i,
+    hi: 'नमस्ते जी! मैं आपकी आवाज़ वाला सहायक हूँ। बोलिए, मैं आपकी क्या मदद कर सकता हूँ — खेती, भाव, दवा, या कोई भी सवाल?',
+    en: 'Hello! I am your voice assistant. Ask me anything — farming, prices, medicines, or any question at all.' },
+  { re: /^(who are you|what is your name|tum kaun ho|aap kaun ho|तुम कौन हो|आप कौन हो|तुम्हारा नाम|आपका नाम)[\s?.!]*$/i,
+    hi: 'मैं अग्रीपल्स एआई का आवाज़ सहायक हूँ — आपकी भाषा में जवाब देता हूँ। खेती के 9 काम तो करता हूँ ही, बाकी हर सवाल का जवाब विकिपीडिया से ढूँढ कर बोलता हूँ।',
+    en: 'I am the AgriPulse AI voice assistant — I speak your language. I run 9 farming tools for you, and for any other question I find and read out the answer from the web.' },
+  { re: /^(thanks|thank you|thankyou|dhanyavad|dhanyawad|shukriya|merci|धन्यवाद|शुक्रिया|आभार)[\s!.?]*$/i,
+    hi: 'जी, स्वागत है! कोई और सवाल हो तो बोलिए।',
+    en: 'You are most welcome! Ask me anything else anytime.' },
+];
+
+// ─────────────────────────────── handler ────────────────────────────────
+
+export default async function handler(req, res) {
+  const q = String(req?.query?.q || '').trim();
+  const lang = String(req?.query?.lang || 'hi').trim().toLowerCase();
+  const pref = (lang === 'en' || !WIKI_LANGS.has(lang)) ? 'en' : lang;
+
+  res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=6000');
+
+  if (!q) { res.status(400).json({ error: 'bad request — q required' }); return; }
+  if (q.length > MAX_Q) { res.status(400).json({ error: 'question too long' }); return; }
+
+  const key = `${pref}:${q.toLowerCase()}`;
+  const hit = CACHE.get(key);
+  if (hit && Date.now() - hit.t < CACHE_TTL) {
+    res.status(200).json({ ...hit.v, cached: true });
+    return;
+  }
+
+  const done = (answer, source, wikiTitle) => {
+    const v = { answer, source, lang: pref, ...(wikiTitle ? { wikiTitle } : {}) };
+    if (CACHE.size >= CACHE_MAX) CACHE.delete(CACHE.keys().next().value);
+    CACHE.set(key, { v, t: Date.now() });
+    res.status(200).json(v);
+  };
+
+  // 1. math ("25*48+12", "18% of 500", "50 का 20% कितना")
+  const math = tryMath(q);
+  if (math !== null) { done(math, 'math'); return; }
+
+  // 2. greetings / identity / thanks — instant, no network
+  for (const s of SMALL_TALK) {
+    if (s.re.test(q)) { done(s[pref] || s.en, 'assistant'); return; }
+  }
+
+  const subject = cleanForSearch(q);
+
+  // 3. Wikipedia in the farmer's own language, then English in parallel with
+  //    DuckDuckGo so the whole thing stays under the function timeout.
+  const native = await wikipediaSearch(subject, pref);
+  if (native) { done(native.text, `wikipedia-${native.wikiLang}`, native.title); return; }
+
+  const [english, ddg] = await Promise.all([
+    pref === 'en' ? null : wikipediaSearch(subject, 'en'),
+    duckduckgo(subject || q),
+  ]);
+  if (english) { done(english.text, `wikipedia-en`, english.title); return; }
+  if (ddg) { done(ddg.text, 'duckduckgo'); return; }
+
+  // 5. honest fallback — spoken in the farmer's language, never silence
+  done(
+    pref === 'en'
+      ? 'Sorry, I could not find a sure answer for that yet. For government scheme help, call the Kisan Call Centre free on 1800-180-1551.'
+      : 'माफ़ कीजिए, इस सवाल का पक्का जवाब अभी नहीं मिला। सरकारी योजनाओं के लिए किसान कॉल सेंटर पर मुफ़्त फोन कीजिए — 1800-180-1551।',
+    'none'
+  );
+}

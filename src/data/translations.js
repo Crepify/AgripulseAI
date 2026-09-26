@@ -132,6 +132,9 @@ export const T = {
       listening: 'Listening to your voice...',
       youAsked: 'You Asked:',
       autoNavigated: '⚡ Auto-Navigated to screen for you:',
+      thinking: 'Thinking…',
+      offline: 'No internet right now — please ask again once you are back online.',
+      typePlaceholder: 'Ask me anything…',
     },
     saathiHub: {
       console: 'KISAN SAATHI CONSOLE',
@@ -358,6 +361,9 @@ export const T = {
       listening: 'आपकी आवाज सुनी जा रही है...',
       youAsked: 'आपका सवाल:',
       autoNavigated: '⚡ आपके लिए यह स्क्रीन खोल दी गई है:',
+      thinking: 'सोच रहा हूँ…',
+      offline: 'अभी इंटरनेट नहीं है — नेट आने पर फिर पूछ लें।',
+      typePlaceholder: 'कुछ भी पूछिए…',
     },
     saathiHub: {
       console: 'किसान साथी कंसोल',
