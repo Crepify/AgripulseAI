@@ -231,7 +231,8 @@ async function duckduckgo(query) {
 
 // ─────────────── the Jarvis brain (keyless, free, no install) ───────────
 
-const JARVIS_TIMEOUT = 7000;
+const JARVIS_TIMEOUT = 7000;        // fresh questions — model answers in 1-5s
+const JARVIS_CTX_TIMEOUT = 9500;    // follow-ups reason over context → slower
 const LANG_NAME = {
   hi: 'Hindi (Devanagari script)', en: 'simple English', ta: 'Tamil', te: 'Telugu',
   kn: 'Kannada', mr: 'Marathi', gu: 'Gujarati', bn: 'Bengali', pa: 'Punjabi (Gurmukhi script)',
@@ -257,6 +258,8 @@ function cleanLlm(text) {
 }
 
 async function jarvisAnswer(question, pref, ctx) {
+  const hasCtx = !!ctx;
+  const budget = hasCtx ? JARVIS_CTX_TIMEOUT : JARVIS_TIMEOUT;
   const system = [
     'You are "Kisan Sahayak", the Jarvis-style voice assistant inside the AgriPulse AI app for Indian farmers.',
     `ALWAYS reply ONLY in ${LANG_NAME[pref] || 'simple English'}.`,
@@ -276,7 +279,7 @@ async function jarvisAnswer(question, pref, ctx) {
   } catch {}
 
   const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), JARVIS_TIMEOUT);
+  const t = setTimeout(() => ac.abort(), budget);
   try {
     const call = () => fetch('https://text.pollinations.ai/openai', {
       method: 'POST',
@@ -290,12 +293,18 @@ async function jarvisAnswer(question, pref, ctx) {
       }),
     });
     let res;
-    // Anonymous tier gets per-IP 429s (Vercel functions share egress IPs) —
-    // escalate the backoff within the same timeout budget.
-    for (let attempt = 0; attempt < 3; attempt++) {
+    if (hasCtx) {
+      // Follow-ups are slower (context reasoning) — one clean attempt with
+      // the full budget instead of burning it on retries.
       res = await call();
-      if (res.ok || (res.status !== 429 && res.status < 500)) break;
-      if (attempt < 2) await new Promise(r => setTimeout(r, attempt === 0 ? 500 : 1400));
+    } else {
+      // Anonymous tier gets per-IP 429s (Vercel functions share egress IPs) —
+      // escalate the backoff within the same timeout budget.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        res = await call();
+        if (res.ok || (res.status !== 429 && res.status < 500)) break;
+        if (attempt < 2) await new Promise(r => setTimeout(r, attempt === 0 ? 500 : 1400));
+      }
     }
     if (!res || !res.ok) return null;
     const data = await res.json();
@@ -374,7 +383,7 @@ export default async function handler(req, res) {
   const whoIs = /\b(who is|who was|who are|कौन है|कौन थे|कौन था|कौन हैं|वर्तमान|mukhyamantri|chief minister|prime minister|president of|agriculture minister)\b/i.test(q);
   let llm = null, native = null;
   if (whoIs && !hasCtx) {
-    native = await withDeadline(wikipediaSearch(subject, pref), 3000, null);
+    native = await withDeadline(wikipediaSearch(subject, pref), 4500, null);
     if (!native) llm = await jarvisAnswer(q, pref, req?.query?.ctx);
   } else {
     [llm, native] = await Promise.all([

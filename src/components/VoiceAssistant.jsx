@@ -126,7 +126,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     setThinking(true);
     askCtlRef.current?.abort();
     askCtlRef.current = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const killTimer = setTimeout(() => askCtlRef.current?.abort(), 12000);
+    const killTimer = setTimeout(() => askCtlRef.current?.abort(), 14000);
     try {
       const ctx = lastExchangeRef.current
         ? `&ctx=${encodeURIComponent(JSON.stringify(lastExchangeRef.current))}` : '';
