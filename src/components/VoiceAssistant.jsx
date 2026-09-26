@@ -162,7 +162,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm select-none" onClick={onClose}>
           <div onClick={(e) => e.stopPropagation()} className="modal-max-h max-w-md w-full p-5 sm:p-6 rounded-3xl bg-[#121514] border border-emerald-500/30 text-white relative flex flex-col items-center text-center shadow-[0_0_50px_rgba(16,185,129,0.2)] overflow-y-auto overscroll-contain">
-            <button onClick={onClose} aria-label="Close assistant" title="Close assistant" className="absolute top-4 right-4 p-2 rounded-xl bg-[#181c1a] text-zinc-400 hover:text-white"><X className="w-5 h-5" /></button>
+            <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-xl bg-[#181c1a] text-zinc-400 hover:text-white"><X className="w-5 h-5" /></button>
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-2xl mb-2 shadow-[0_0_20px_rgba(16,185,129,0.4)]">👨‍🌾</div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2"><Bot className="w-5 h-5 text-emerald-400" /> {t.assistant.title} — 22 Languages</h3>
             <p className="text-xs text-emerald-300 font-mono flex items-center gap-1.5 flex-wrap justify-center"><Globe className="w-3 h-3" /> {t.assistant.subtitle} + <span className="text-emerald-200">{selectedLang === 'hi' ? 'हर सवाल का जवाब — विकिपीडिया से' : 'any question answered — from the web'}</span></p>

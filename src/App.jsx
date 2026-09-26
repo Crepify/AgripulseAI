@@ -11,7 +11,7 @@ import TabPool from './components/TabPool';
 import TabAuction from './components/TabAuction';
 import TabROI from './components/TabROI';
 import TabMarket from './components/TabMarket';
-import WhatsAppScreen from './components/WhatsAppScreen';
+import WhatsAppScreen, { openWhatsAppHub } from './components/WhatsAppScreen';
 import VoiceAssistant from './components/VoiceAssistant';
 import HandsFreeVoiceBanner from './components/HandsFreeVoiceBanner';
 import BackgroundCanvas from './components/BackgroundCanvas';
@@ -27,7 +27,7 @@ import { voiceGuide } from './utils/voiceGuide';
 import { classifyVoiceIntent } from './utils/voiceNavigator';
 import { sound } from './utils/audio';
 import { T } from './data/translations';
-import { WifiOff, Mic } from 'lucide-react';
+import { WifiOff, Mic, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const LANG_MAP = {
@@ -55,6 +55,12 @@ export default function App() {
   const [selectedLang, setSelectedLang] = useState(() => detectBrowserLanguage());
   const [isOffline, setIsOffline] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [waUnread, setWaUnread] = useState(0);
+  // When the dedicated WhatsApp phone is on the desk (wide presentation
+  // mode), the in-app launcher disappears — WhatsApp lives on that device.
+  const [waSide, setWaSide] = useState(() => {
+    try { return window.innerWidth >= 1000 && window.innerWidth >= 520; } catch { return false; }
+  });
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [isSunlightMode, setIsSunlightMode] = useState(() => {
     try {
@@ -185,6 +191,18 @@ export default function App() {
     return () => window.removeEventListener('ap:navigate', onNav);
   }, []);
 
+  // WhatsApp Hub broadcasts its total unread count for the launcher badge
+  useEffect(() => {
+    const onUnread = (e) => setWaUnread(e.detail?.count || 0);
+    const onSide = (e) => setWaSide(Boolean(e.detail?.side));
+    window.addEventListener('ap:wa-unread', onUnread);
+    window.addEventListener('ap:wa-side', onSide);
+    return () => {
+      window.removeEventListener('ap:wa-unread', onUnread);
+      window.removeEventListener('ap:wa-side', onSide);
+    };
+  }, []);
+
   const handleLogout = () => {
     sound.playClick();
     clearSession();
@@ -222,7 +240,7 @@ export default function App() {
   }
 
   return (
-    <PhoneFrame onHome={goHomeScreen}>
+    <PhoneFrame onHome={goHomeScreen} companion>
     <div className={`min-h-dvh w-full transition-colors ${isSunlightMode ? 'bg-zinc-300' : 'bg-black'}`}>
     {/* FULL MOBILE MODE — the whole app lives in a centered phone frame */}
     <div id="ap-phone-frame" className={`relative mx-auto flex min-h-dvh w-full max-w-md flex-col font-sans shadow-2xl selection:bg-emerald-500 selection:text-black transition-colors ${
@@ -323,8 +341,23 @@ export default function App() {
         isSunlightMode={isSunlightMode}
       />
 
-      {/* Floating 1-Tap Voice Assistant — round icon on phones, labeled pill on larger screens */}
-      <div className="fixed bottom-[88px] inset-x-0 z-30 mx-auto max-w-md flex justify-end px-3 pointer-events-none [&>button]:pointer-events-auto">
+      {/* Floating launchers: WhatsApp Hub (left, hidden when the dedicated
+          WhatsApp phone is beside the app) + 1-Tap Voice Assistant (right) */}
+      <div className={`fixed bottom-[88px] inset-x-0 z-30 mx-auto max-w-md flex px-3 pointer-events-none [&>button]:pointer-events-auto ${waSide ? 'justify-end' : 'justify-between'}`}>
+        {!waSide && (
+        <button
+          onClick={() => { sound.playClick(); openWhatsAppHub(); }}
+          className="relative flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] text-black border-2 border-[#5ee394] shadow-[0_0_25px_rgba(37,211,102,0.55)] transition-transform hover:scale-105 active:scale-95"
+          aria-label="WhatsApp alerts — pools, frauds, deals"
+        >
+          <MessageCircle className="w-6 h-6 fill-black text-[#25D366]" strokeWidth={0} />
+          {waUnread > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-red-500 border-2 border-black text-white text-[10px] font-black flex items-center justify-center">
+              {waUnread}
+            </span>
+          )}
+        </button>
+        )}
         <button
           onClick={() => { sound.playClick(); setIsVoiceOpen(true); }}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-400 hover:bg-emerald-300 text-black border-2 border-emerald-300 shadow-[0_0_25px_rgba(52,211,153,0.6)] transition-transform hover:scale-105 active:scale-95 sm:h-auto sm:w-auto sm:gap-2 sm:px-5 sm:py-3"
