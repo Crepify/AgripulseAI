@@ -638,7 +638,11 @@ export class VoiceGuide {
     if (typeof native !== 'string') return String(native ?? '');
     if (vi && vi.isNative) return native; // CONFIRMED native voice → native script
     const phon = PHON[this.lang] && PHON[this.lang][key];
-    if (phon) return phon;                // no/unknown native voice → romanized
+    if (phon) {
+      // Both forms: cloud TTS reads native script (better pronunciation),
+      // local fallback reads romanized.
+      return { devanagari: native, phonetic: phon };
+    }
     if (this.lang !== 'en' && typeof S.en[key] === 'string') return S.en[key];
     return native;                         // english
   }
@@ -647,8 +651,8 @@ export class VoiceGuide {
     return this.say(this._renderLine(key), opts);
   }
 
-  askKey(key, timeoutMs = 16000) {
-    return this.ask(this._renderLine(key), timeoutMs);
+  askKey(key, timeoutMs = 16000, opts = null) {
+    return this.ask(this._renderLine(key), timeoutMs, opts);
   }
 
   // ── Patient step reminders ─────────────────────────────────────────────
@@ -842,7 +846,7 @@ export class VoiceGuide {
   }
 
   // Ask a yes/no question and wait for the answer (or timeout → 'timeout').
-  ask(text, timeoutMs = 16000) {
+  ask(text, timeoutMs = 16000, opts = null) {
     return this.say(text).then(() => new Promise((resolve) => {
       if (!this.active) { resolve(null); return; }
       // A previous question may still be pending (language switch re-ask,
@@ -856,6 +860,7 @@ export class VoiceGuide {
       }
       const timer = setTimeout(() => this._resolveAck('timeout'), timeoutMs);
       this._ackWaiter = {
+        invert: !!(opts && opts.invert),
         resolve: (v) => {
           clearTimeout(timer);
           this._ackWaiter = null;
@@ -934,20 +939,22 @@ export class VoiceGuide {
     const switchTo = matchLangSwitch(q, this.lang) || detectSpokenLanguage(q, this.lang);
     if (switchTo) {
       const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
+      const inv = this._ackWaiter ? !!this._ackWaiter.invert : false;
       if (this._ackWaiter) { this._ackWaiter.cancel(); this._ackWaiter = null; }
       if (!this._canSpeak(switchTo)) {
         // Asked for e.g. Tamil on a phone with no Tamil voice — say so
         // honestly and carry on in the current language. No fake switch
         // that silently becomes English.
         this.sayKey('langUnavailable');
-        if (outer) outer('yes'); // whatever was pending keeps moving
+        if (outer) outer(inv ? 'no' : 'yes'); // whatever was pending keeps moving
         return;
       }
       this.setLanguage(switchTo);
       this.sayKey('langSwitched').then(() => {
         if (outer) {
-          // re-ask the pending question in the new language, snappily
-          this.askKey('askResume', 6000).then((ans) => outer(ans === 'no' ? 'no' : 'yes'));
+          this.askKey('askResume', 6000).then((ans) => {
+            if (outer) outer(inv ? (ans === 'no' ? 'yes' : 'no') : (ans === 'no' ? 'no' : 'yes'));
+          });
         }
       });
       return;
@@ -960,7 +967,7 @@ export class VoiceGuide {
       // The tour WAITS on this gate — it must not race ahead into the next
       // service (and retire this question) before the farmer answers.
       this._confirmGate = new Promise((res) => { this._confirmGateResolve = res; });
-      this.askKey('tourStopAsk', 8000).then((ans) => {
+      this.askKey('tourStopAsk', 8000, { invert: true }).then((ans) => {
         if (this._confirmGateResolve) { this._confirmGateResolve(); this._confirmGateResolve = null; }
         this._confirmGate = null;
         if (ans === 'yes') {
@@ -982,9 +989,10 @@ export class VoiceGuide {
         // …then politely ask whether to continue. Hand the outer question's
         // waiter over explicitly — the inner ask() owns the ack slot meanwhile.
         const outer = this._ackWaiter ? this._ackWaiter.resolve : null;
+        const inv = this._ackWaiter ? !!this._ackWaiter.invert : false;
         if (this._ackWaiter) { this._ackWaiter.cancel(); this._ackWaiter = null; }
         this.askKey('askResume', 8000).then((ans) => {
-          if (outer) outer(ans === 'no' ? 'no' : 'yes');
+          if (outer) outer(inv ? (ans === 'no' ? 'yes' : 'no') : (ans === 'no' ? 'no' : 'yes'));
         });
         return;
       }
@@ -1019,12 +1027,13 @@ export class VoiceGuide {
       const L = this.script();
       const vi = this._voiceInfo();
       let name, desc;
+      const nS = (L.services && L.services[i]) || S.en.services[i];
+      const pS = (PHON[this.lang] && PHON[this.lang].services && PHON[this.lang].services[i]) || nS;
       if (vi && vi.isNative) {
-        [name, desc] = L.services[i];
-      } else if (PHON[this.lang] && PHON[this.lang].services && PHON[this.lang].services[i]) {
-        [name, desc] = PHON[this.lang].services[i];
+        [name, desc] = nS;
       } else {
-        [name, desc] = S.en.services[i];
+        name = { devanagari: nS[0], phonetic: pS[0] };
+        desc = { devanagari: nS[1], phonetic: pS[1] };
       }
       // The option's NAME first — clearly, unhurried — then a natural beat,
       // then its explanation. One run-on sentence was hard to follow.
@@ -1044,7 +1053,7 @@ export class VoiceGuide {
         // A single stray 'no' (noise, a bystander, a breath finalized by
         // the recognizer) must NEVER end the tour and silence the app —
         // confirm it. A real stop is two words: बस … हाँ.
-        const sure = await this.askKey('tourStopAsk', 8000);
+        const sure = await this.askKey('tourStopAsk', 8000, { invert: true });
         if (this._confirmGate) await this._confirmGate;
         if (!this._tourRunning) return;
         if (sure === 'yes') {
