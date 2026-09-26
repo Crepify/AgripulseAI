@@ -638,7 +638,12 @@ export class VoiceGuide {
     if (typeof native !== 'string') return String(native ?? '');
     if (vi && vi.isNative) return native; // CONFIRMED native voice → native script
     const phon = PHON[this.lang] && PHON[this.lang][key];
-    if (phon) return phon;                // no/unknown native voice → romanized
+    if (phon) {
+      // No local native voice: hand the engine BOTH forms. The cloud voice
+      // (api/tts) reads native-script Hindi/Tamil far better than romanized
+      // text, while the local-voice fallback still gets the romanized line.
+      return { devanagari: native, phonetic: phon };
+    }
     if (this.lang !== 'en' && typeof S.en[key] === 'string') return S.en[key];
     return native;                         // english
   }
@@ -1029,12 +1034,14 @@ export class VoiceGuide {
       const L = this.script();
       const vi = this._voiceInfo();
       let name, desc;
+      const n = (L.services && L.services[i]) || S.en.services[i];
+      const p = (PHON[this.lang] && PHON[this.lang].services && PHON[this.lang].services[i]) || n;
       if (vi && vi.isNative) {
-        [name, desc] = L.services[i];
-      } else if (PHON[this.lang] && PHON[this.lang].services && PHON[this.lang].services[i]) {
-        [name, desc] = PHON[this.lang].services[i];
+        [name, desc] = n;
       } else {
-        [name, desc] = S.en.services[i];
+        // both forms: cloud TTS reads the native script, local fallback reads romanized
+        name = { devanagari: n[0], phonetic: p[0] };
+        desc = { devanagari: n[1], phonetic: p[1] };
       }
       // The option's NAME first — clearly, unhurried — then a natural beat,
       // then its explanation. One run-on sentence was hard to follow.
