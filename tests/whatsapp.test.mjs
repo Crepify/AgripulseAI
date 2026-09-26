@@ -290,6 +290,149 @@ test('events addressed to a foreign phone_number_id are ignored', async () => {
   assert.equal(requests.filter((r) => r.body?.type).length, 0);
 });
 
+/* ── Vercel Node runtime adapter (default export) ────────────────────── */
+
+/**
+ * Vercel invokes `handler(req, res)` with Node http objects. Drive it through
+ * a real http server so the adapter is exercised exactly as the platform will.
+ */
+function serveVercelAdapter(handler) {
+  return new Promise((resolve) => {
+    const server = http.createServer((req, res) => handler(req, res));
+    server.listen(0, '127.0.0.1', () => resolve(server));
+  });
+}
+
+test('the Vercel default export exists and serves the handshake', async () => {
+  assert.equal(typeof webhook.default, 'function',
+    'Vercel\'s Node runtime needs a default export — without it the deployed function 500s');
+
+  const server = await serveVercelAdapter(webhook.default);
+  try {
+    const port = server.address().port;
+    const res = await fetch(
+      `http://127.0.0.1:${port}/api/whatsapp-webhook?hub.mode=subscribe&hub.verify_token=test-verify-token&hub.challenge=VERCEL123`
+    );
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'text/plain');
+    assert.equal(await res.text(), 'VERCEL123');
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
+test('the Vercel adapter ingests a POST and always ACKs 200', async () => {
+  const server = await serveVercelAdapter(webhook.default);
+  try {
+    const port = server.address().port;
+    reset();
+    const res = await fetch(`http://127.0.0.1:${port}/api/whatsapp-webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        object: 'whatsapp_business_account',
+        entry: [{
+          changes: [{
+            field: 'messages',
+            value: {
+              metadata: { phone_number_id: PHONE_ID },
+              contacts: [{ profile: { name: 'Vercel Farmer' } }],
+              messages: [{ from: '919800000009', id: 'wamid.VERCEL-1', type: 'text', text: { body: 'menu' } }],
+            },
+          }],
+        }],
+      }),
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { status: 'received' });
+    // the router really ran: it sent the welcome menu back through the client
+    assert.ok(requests.some((r) => r.body?.type === 'interactive'),
+      'expected the router to reply with the welcome menu');
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
+test('the Vercel adapter rejects an unsupported method with 405', async () => {
+  const server = await serveVercelAdapter(webhook.default);
+  try {
+    const port = server.address().port;
+    const res = await fetch(`http://127.0.0.1:${port}/api/whatsapp-webhook`, { method: 'DELETE' });
+    assert.equal(res.status, 405);
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+  }
+});
+
+/* ── webhook signature verification ─────────────────────────────────── */
+
+const inboundBody = (id) => JSON.stringify({
+  object: 'whatsapp_business_account',
+  entry: [{
+    changes: [{
+      field: 'messages',
+      value: {
+        metadata: { phone_number_id: PHONE_ID },
+        messages: [{ from: '919800000077', id, type: 'text', text: { body: 'menu' } }],
+      },
+    }],
+  }],
+});
+
+test('signature check is skipped when WHATSAPP_APP_SECRET is unset (back-compat)', async () => {
+  const { isSignatureVerificationEnabled, verifySignature } = await import('../server/whatsapp/verify.js');
+  const prev = process.env.WHATSAPP_APP_SECRET;
+  delete process.env.WHATSAPP_APP_SECRET;
+  try {
+    assert.equal(isSignatureVerificationEnabled(), false);
+    assert.equal(verifySignature('anything', undefined).ok, true);
+  } finally {
+    if (prev !== undefined) process.env.WHATSAPP_APP_SECRET = prev;
+  }
+});
+
+test('a forged webhook delivery is rejected with 401 once the app secret is set', async () => {
+  const { signBody } = await import('../server/whatsapp/verify.js');
+  process.env.WHATSAPP_APP_SECRET = 'test-app-secret-32-chars-long-ok';
+  const server = await serveVercelAdapter(webhook.default);
+  try {
+    const port = server.address().port;
+    const body = inboundBody('wamid.SIG-FORGED');
+    reset();
+
+    // 1. no signature at all
+    let res = await fetch(`http://127.0.0.1:${port}/api/whatsapp-webhook`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+    });
+    assert.equal(res.status, 401);
+
+    // 2. a wrong signature
+    res = await fetch(`http://127.0.0.1:${port}/api/whatsapp-webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': 'sha256=deadbeef' },
+      body,
+    });
+    assert.equal(res.status, 401);
+    assert.equal(requests.filter((r) => r.body?.type).length, 0, 'nothing may be sent for a forged event');
+
+    // 3. a correct signature — accepted and processed
+    res = await fetch(`http://127.0.0.1:${port}/api/whatsapp-webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': signBody(body) },
+      body,
+    });
+    assert.equal(res.status, 200);
+    assert.ok(requests.some((r) => r.body?.type === 'interactive'), 'a validly signed event must be processed');
+  } finally {
+    server.closeAllConnections?.();
+    server.close();
+    delete process.env.WHATSAPP_APP_SECRET;
+  }
+});
+
 /* ── env loader ─────────────────────────────────────────────────────── */
 
 test('parseDotEnv handles quotes, comments and export prefixes', async () => {

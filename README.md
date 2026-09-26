@@ -111,7 +111,13 @@ generic + savings) · `community` (join/leave 🚚 pool, 🚨 fraud, 🛒 deals,
 `GET /api/whatsapp-webhook?status=1` reports the wiring state (mode, masked ids,
 missing vars — never the token) and drives the **LIVE / Demo** badge in the
 app's WhatsApp hub, so a scripted demo can't be mistaken for a connected
-number. Full walkthrough: [`docs/WHATSAPP_INTEGRATION.md`](docs/WHATSAPP_INTEGRATION.md).
+number. Inbound deliveries are verified with `X-Hub-Signature-256` whenever
+`WHATSAPP_APP_SECRET` is set — the webhook URL is public, so a forged event
+must not be able to make the bot message an arbitrary number.
+
+👉 **To connect a real number: [`docs/WHATSAPP_GO_LIVE.md`](docs/WHATSAPP_GO_LIVE.md)**
+(~20 minutes with Meta's free test number).
+Architecture reference: [`docs/WHATSAPP_INTEGRATION.md`](docs/WHATSAPP_INTEGRATION.md).
 
 > 🔐 Credentials live in `.env` (gitignored) or the platform's env vars — real
 > environment variables always win. Tokens pasted into chat or committed to

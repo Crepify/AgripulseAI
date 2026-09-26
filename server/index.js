@@ -15,6 +15,7 @@ import http from 'node:http';
 import { config, validateConfig, describeConfig } from './whatsapp/config.js';
 import { handleInboundEvent } from './whatsapp/router.js';
 import { sendTextMessage } from './whatsapp/client.js';
+import { verifySignature, isSignatureVerificationEnabled } from './whatsapp/verify.js';
 import { COMMUNITY_NAME, CHANNELS, broadcastToChannel } from './whatsapp/community.js';
 
 const ADMIN_TOKEN = process.env.WHATSAPP_ADMIN_TOKEN || config.verifyToken;
@@ -114,11 +115,17 @@ const server = http.createServer(async (req, res) => {
     return res.end('Forbidden');
   }
 
-  /* POST — ACK 200 immediately, process fully async */
+  /* POST — verify Meta's signature, then ACK 200 immediately and process async */
   if (req.method === 'POST') {
     let body = '';
     req.on('data', (c) => { body += c; if (body.length > 2e6) req.destroy(); });
     req.on('end', () => {
+      // Reject a forged event before anything is processed or replied to.
+      const check = verifySignature(body, req.headers['x-hub-signature-256']);
+      if (!check.ok) {
+        console.warn(`[whatsapp] rejected delivery: ${check.reason}`);
+        return json(res, 401, { error: 'invalid signature' });
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end('{"status":"received"}'); // ← Meta ACK before any processing
 
@@ -147,4 +154,5 @@ server.listen(config.port, '0.0.0.0', () => {
   console.log(`✅ AgriPulse WhatsApp webhook listening on :${config.port}`);
   console.log(`   GET  /webhook   (verify token: ${config.verifyToken === 'agripulse-verify' ? 'DEFAULT — set WHATSAPP_VERIFY_TOKEN!' : 'custom ✓'})`);
   console.log(`   POST /webhook   mode: ${ok ? 'LIVE (Graph API v20.0)' : 'DRY-RUN'}`);
+  console.log(`   signature check: ${isSignatureVerificationEnabled() ? 'ON (WHATSAPP_APP_SECRET set) ✓' : 'OFF — set WHATSAPP_APP_SECRET before exposing this URL publicly'}`);
 });

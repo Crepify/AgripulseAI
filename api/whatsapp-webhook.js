@@ -18,6 +18,7 @@
 
 import { config, describeConfig } from '../server/whatsapp/config.js';
 import { handleInboundEvent } from '../server/whatsapp/router.js';
+import { verifySignature } from '../server/whatsapp/verify.js';
 
 /* ── GET: verification handshake + credential status ─────────────────── */
 
@@ -86,4 +87,63 @@ export async function POST(request) {
     console.error('[whatsapp-webhook]', err); // never surface as non-200
   }
   return ACK();
+}
+
+/* ── Vercel Node runtime adapter ────────────────────────────────────── */
+
+/**
+ * Vercel's Node.js runtime invokes the DEFAULT export as `handler(req, res)`
+ * (Node http objects). It does NOT dispatch named `GET`/`POST` exports that
+ * take a Web `Request` — that shape is what `vite.config.js`'s dev middleware
+ * uses, so both are kept: the named exports serve `npm run dev`, this bridge
+ * serves Vercel. Without it the deployed function 500s with no default export
+ * and Meta disables the webhook after repeated failures.
+ */
+export default async function handler(req, res) {
+  const route = { GET, POST }[req.method];
+  if (!route) {
+    res.statusCode = 405;
+    res.setHeader('Content-Type', 'text/plain');
+    return res.end('Method not allowed');
+  }
+
+  // Collect the body (Vercel gives a stream; req.body is absent for raw JSON
+  // when there's no body parser in front of us).
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks);
+
+  // Meta signs deliveries with HMAC-SHA256 over the raw body. Enforced only
+  // when WHATSAPP_APP_SECRET is configured; a bad signature is dropped with
+  // 401 so a forged event can never make the bot message an arbitrary number.
+  if (req.method === 'POST') {
+    const check = verifySignature(raw, req.headers['x-hub-signature-256']);
+    if (!check.ok) {
+      console.warn(`[whatsapp-webhook] rejected delivery: ${check.reason}`);
+      res.statusCode = 401;
+      res.setHeader('Content-Type', 'application/json');
+      return res.end('{"error":"invalid signature"}');
+    }
+  }
+
+  const host = req.headers.host || 'localhost';
+  const proto = req.headers['x-forwarded-proto'] || 'https';
+  const request = new Request(`${proto}://${host}${req.url}`, {
+    method: req.method,
+    headers: req.headers,
+    body: raw.length ? raw : undefined,
+    duplex: 'half',
+  });
+
+  let out;
+  try {
+    out = await route(request);
+  } catch (err) {
+    console.error('[whatsapp-webhook]', err);
+    out = ACK(); // still 200 — a non-200 makes Meta retry, then disable
+  }
+
+  res.statusCode = out.status;
+  out.headers.forEach((value, key) => res.setHeader(key, value));
+  res.end(Buffer.from(await out.arrayBuffer()));
 }

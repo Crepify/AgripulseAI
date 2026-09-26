@@ -35,6 +35,11 @@ Meta Cloud API ──POST──▶  webhook (200 ACK immediately, async processi
 | `scripts/mock-graph-server.mjs` | standalone mock Meta Graph API used by the test suite |
 | `tests/whatsapp.test.mjs` | `npm run whatsapp:test` — 15 tests over client limits, webhook, router, env, CLI |
 
+## 👉 Going live
+
+Step-by-step checklist — test number in ~20 minutes, then production:
+**[`docs/WHATSAPP_GO_LIVE.md`](WHATSAPP_GO_LIVE.md)**.
+
 ## Wiring credentials (`npm run whatsapp:setup`)
 
 An access token on its own is **not** enough to send: the Graph API also needs
