@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "whatsapp:server": "node server/index.js"
+    "whatsapp:server": "node server/index.js",
+    "whatsapp:setup": "node scripts/whatsapp-setup.js",
+    "whatsapp:test": "node --test \"tests/**/*.test.mjs\""
   },
   "dependencies": {
     "@litertjs/core": "^2.5.3",

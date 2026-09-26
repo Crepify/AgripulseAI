@@ -24,12 +24,73 @@ Meta Cloud API ──POST──▶  webhook (200 ACK immediately, async processi
 
 | File | Role |
 |---|---|
-| `server/whatsapp/config.js` | env validation, Graph endpoints |
+| `server/whatsapp/config.js` | env validation, Graph endpoints, `describeConfig()` status |
+| `server/whatsapp/env.js` | zero-dependency `.env` loader + `upsertEnvVar()` (real env vars always win) |
 | `server/whatsapp/client.js` | `sendTextMessage` / `sendInteractiveButtons` / `sendListMenu` / `sendMediaMessage` / `markAsRead` / `downloadMedia` — Meta limits enforced (≤3 buttons, 20-char titles, ≤10 list rows) |
 | `server/whatsapp/store.js` | user auto-provision by phone + session state machine (`IDLE`, `AWAITING_CROP_IMAGE`, `AWAITING_PATTI_PHOTO`, `AWAITING_POOL_DETAILS`, `AWAITING_DAWAI_NAME`) + wamid idempotency |
 | `server/whatsapp/router.js` | routes text / interactive / image / audio, runs the flows |
-| `api/whatsapp-webhook.js` | Vercel transport shim (GET verify + POST ingest) |
+| `api/whatsapp-webhook.js` | Vercel transport shim (GET verify + POST ingest + `?status=1`) |
 | `server/index.js` | zero-dependency standalone server (`npm run whatsapp:server`) |
+| `scripts/whatsapp-setup.js` | `npm run whatsapp:setup` — verifies the token, discovers the phone-number id, writes it to `.env` |
+| `scripts/mock-graph-server.mjs` | standalone mock Meta Graph API used by the test suite |
+| `tests/whatsapp.test.mjs` | `npm run whatsapp:test` — 15 tests over client limits, webhook, router, env, CLI |
+
+## Wiring credentials (`npm run whatsapp:setup`)
+
+An access token on its own is **not** enough to send: the Graph API also needs
+the *phone number id*, which is a separate opaque number (it is **not** the
+display phone number — confusing the two is the most common Cloud API error).
+The setup CLI reads it out of the Business graph and writes it back to `.env`:
+
+```bash
+# 1. put the token in .env
+echo 'WHATSAPP_API_TOKEN=EAA…' >> .env
+
+# 2. verify + discover + persist
+npm run whatsapp:setup
+
+# 3. prove the outbound path with a real message
+npm run whatsapp:setup -- --send 919812345678
+```
+
+What it does, in order:
+
+1. `GET /debug_token` — reports `is_valid`, granted scopes and expiry, and
+   warns when the token is the 24-hour API-Setup token rather than a
+   permanent System User token.
+2. Discovers phone numbers: `GET /me/accounts?fields=…,whatsapp_business_accounts{…}`
+   (system-user tokens) → `GET /me?fields=businesses` →
+   `{business}/owned_whatsapp_business_accounts` → `{waba}/phone_numbers`
+   (user tokens) → `GET /{phone_number_id}` (confirm an id already set).
+3. Writes `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_WABA_ID` and
+   `WHATSAPP_BUSINESS_PHONE` into `.env`, preserving comments.
+4. `--send <number>` fires a live test message through the real client.
+
+Flags: `--phone-number-id <id>` pin a specific number · `--json`
+machine-readable report · `--no-write` verify only.
+
+`.env` is read by `server/whatsapp/env.js` on import, so `npm run whatsapp:server`
+and the setup CLI pick it up with no dotenv dependency. Real environment
+variables always win over the file, so Vercel/Railway settings override it.
+
+> ⚠️ **Never commit `.env`** (it is gitignored). A token pasted into chat, a
+> ticket or a commit is compromised — rotate it in Meta Business Settings →
+> System Users and prefer a permanent System User token over the 24-hour
+> API-Setup token.
+
+### Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/whatsapp-webhook` | Meta verification handshake (echoes `hub.challenge`) |
+| GET | `/api/whatsapp-webhook?status=1` | credential status — mode, masked ids, missing vars (no secrets) |
+| POST | `/api/whatsapp-webhook` | inbound ingestion; always ACKs 200 |
+| GET | `/status`, `/healthz` | same status, standalone server |
+| POST | `/admin/send` | `{"to","text"}` — 1:1 send, `Authorization: Bearer $WHATSAPP_ADMIN_TOKEN` |
+| POST | `/admin/broadcast` | `{"channel","text"}` — community channel fan-out |
+
+The app's WhatsApp hub shows a **LIVE / Demo** badge driven by `?status=1`, so
+a demo deck can never be mistaken for a connected number.
 
 ## Setup (one-time, ~15 min)
 
@@ -40,8 +101,10 @@ Meta Cloud API ──POST──▶  webhook (200 ACK immediately, async processi
    generate token with `whatsapp_business_messaging` +
    `whatsapp_business_management` → this is `WHATSAPP_API_TOKEN`.
    (The API-Setup page token expires in 24 h — don't ship it.)
-3. **Env vars** — copy `.env.example`; set the three `WHATSAPP_*` vars in
-   Vercel project settings (or the server's environment).
+3. **Env vars** — copy `.env.example`, put the token in `.env`, then run
+   `npm run whatsapp:setup` to verify it and auto-fill
+   `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_WABA_ID` (details below). Mirror the
+   same vars into Vercel project settings (or the server's environment).
 4. **Webhook** — App → WhatsApp → Configuration →
    * Callback URL: `https://<your-deployment>/api/whatsapp-webhook`
    * Verify token: the exact value of `WHATSAPP_VERIFY_TOKEN`
@@ -56,6 +119,10 @@ Missing credentials switch the client to **dry-run**: outbound payloads are
 logged instead of sent, so the whole pipeline is testable offline.
 
 ```bash
+npm run whatsapp:test             # 15 tests: client limits, webhook, router,
+                                  # .env loader, credential-discovery CLI.
+                                  # Runs against scripts/mock-graph-server.mjs —
+                                  # no Meta app, no messages spent.
 npm run whatsapp:server           # listens on :8787 in dry-run
 
 # 1) verification handshake

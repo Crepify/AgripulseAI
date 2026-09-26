@@ -77,6 +77,48 @@ The whole app now runs in **full mobile style** — a phone-frame layout with bo
 
 ---
 
+## 🟢 NEW: WhatsApp Cloud API Integration (direct Meta, no BSP)
+
+A farmer never has to install AgriPulse. Messaging the business number opens a
+full service bot on the **Meta WhatsApp Cloud API** (Graph v20.0) — no Twilio,
+WATI or Interakt, and no per-message spend: every reply lands inside the
+farmer-initiated 24-hour service window, which Meta bills at zero.
+
+```
+farmer's WhatsApp ──▶ Meta Cloud API ──POST──▶ webhook (200 ACK, async work)
+                                               ├─ api/whatsapp-webhook.js  (Vercel)
+                                               └─ server/index.js          (VPS/Railway)
+                                                        │
+                                               server/whatsapp/router.js  ← state machine
+                                               ├─ client.js  Graph sends (Meta limits enforced)
+                                               ├─ store.js   phone→user, sessions, wamid dedupe
+                                               ├─ community.js  channel fan-out
+                                               └─ REUSES src/data/mandiRules.js,
+                                                  src/data/genericRegistry.js, api/_lib/upstream.js
+```
+
+| Command | What it does |
+|---|---|
+| `npm run whatsapp:setup` | Verifies the token via `debug_token` (scopes + expiry), **auto-discovers the phone-number id** from the Business graph and writes it into `.env`. `--send 91…` fires a live test message. |
+| `npm run whatsapp:server` | Standalone zero-dependency webhook server (`:8787`) — dry-run mode when credentials are absent |
+| `npm run whatsapp:test` | 15 tests over the real modules against `scripts/mock-graph-server.mjs` — no Meta app, no messages spent |
+
+Bot flows: `mandi` (live Agmarknet price) · `patti` (illegal-deduction audit,
+reusing the app's own `auditPatti()`) · `scan` (crop photo → disease report) ·
+`pool` (truck share, fans out to the Truck Pool channel) · `dawai` (brand →
+generic + savings) · `community` (join/leave 🚚 pool, 🚨 fraud, 🛒 deals, 🥬 mandi).
+
+`GET /api/whatsapp-webhook?status=1` reports the wiring state (mode, masked ids,
+missing vars — never the token) and drives the **LIVE / Demo** badge in the
+app's WhatsApp hub, so a scripted demo can't be mistaken for a connected
+number. Full walkthrough: [`docs/WHATSAPP_INTEGRATION.md`](docs/WHATSAPP_INTEGRATION.md).
+
+> 🔐 Credentials live in `.env` (gitignored) or the platform's env vars — real
+> environment variables always win. Tokens pasted into chat or committed to
+> Git should be rotated in Meta Business Settings → System Users.
+
+---
+
 ## ✨ Key Features & Innovations
 
 ### 1. 🌿 Hybrid Cloud + On-Device Leaf Scanner

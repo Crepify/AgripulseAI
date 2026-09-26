@@ -203,6 +203,21 @@ export default function WhatsAppScreen() {
     scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' });
   }, [chats, typingChat, view]);
 
+  /* Real Cloud API wiring status.
+     GET /api/whatsapp-webhook?status=1 reports LIVE only when the server has
+     WHATSAPP_API_TOKEN + WHATSAPP_PHONE_NUMBER_ID, so this badge tells the
+     difference between a scripted demo and a genuinely connected number.
+     Any failure (static preview, offline PWA) falls back to DEMO. */
+  const [link, setLink] = useState({ live: false, checked: false });
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/whatsapp-webhook?status=1')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => { if (!cancelled) setLink({ live: Boolean(s?.live), checked: true }); })
+      .catch(() => { if (!cancelled) setLink({ live: false, checked: true }); });
+    return () => { cancelled = true; };
+  }, []);
+
   const openChat = (id) => {
     sound.playClick();
     setView(id);
@@ -258,6 +273,19 @@ export default function WhatsAppScreen() {
                     <span className="block text-[12px] text-zinc-400 truncate">Community · 4 groups · 450+ kisan</span>
                   </span>
                   <span className="text-[10px] font-black text-[#00a884] bg-[#00a884]/10 rounded-full px-2 py-1 shrink-0">JOINED</span>
+                </div>
+
+                {/* live Cloud API wiring status (see /api/whatsapp-webhook?status=1) */}
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-white/10 bg-white/[0.02]">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${link.live ? 'bg-[#25D366]' : 'bg-zinc-500'}`} />
+                  <span className="text-[11px] font-bold text-zinc-300 truncate">
+                    {link.live
+                      ? 'WhatsApp Cloud API connected — replies arrive on the farmer’s real WhatsApp'
+                      : 'Demo mode — scripted alerts (server has no WhatsApp credentials yet)'}
+                  </span>
+                  {link.checked && !link.live && (
+                    <span className="ml-auto text-[10px] font-black text-zinc-500 shrink-0">npm run whatsapp:setup</span>
+                  )}
                 </div>
                 {sorted.map((c) => {
                   const last = c.messages[c.messages.length - 1];

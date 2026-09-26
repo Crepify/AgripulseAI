@@ -16,13 +16,23 @@
  * deployment) — this file is only the serverless transport shim.
  */
 
-import { config } from '../server/whatsapp/config.js';
+import { config, describeConfig } from '../server/whatsapp/config.js';
 import { handleInboundEvent } from '../server/whatsapp/router.js';
 
-/* ── GET: verification handshake ────────────────────────────────────── */
+/* ── GET: verification handshake + credential status ─────────────────── */
 
 export async function GET(request) {
   const url = new URL(request.url);
+
+  // `?status=1` — config/credential report for the app's WhatsApp hub.
+  // Returns no secrets: only masked ids, mode and the missing-var list.
+  if (url.searchParams.has('status')) {
+    return new Response(JSON.stringify(describeConfig()), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const mode = url.searchParams.get('hub.mode');
   const token = url.searchParams.get('hub.verify_token');
   const challenge = url.searchParams.get('hub.challenge');
