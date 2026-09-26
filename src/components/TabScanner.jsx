@@ -437,7 +437,7 @@ export default function TabScanner({ selectedLang, isSunlightMode, isLowLiteracy
                 {isCustom && (
                   <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
                     <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500 text-black text-[10px] font-black border border-emerald-300 shadow-md"><ImageIcon className="w-3 h-3" /> {customImageName || 'Your photo'}</span>
-                    <button onClick={clearCustomImage} aria-label="Remove photo" title="Remove photo" className="p-1.5 rounded-full bg-zinc-900/80 hover:bg-red-500 text-white border border-zinc-700"><X className="w-3.5 h-3.5" /></button>
+                    <button onClick={clearCustomImage} className="p-1.5 rounded-full bg-zinc-900/80 hover:bg-red-500 text-white border border-zinc-700"><X className="w-3.5 h-3.5" /></button>
                   </div>
                 )}
                 {isCustom && hasScanResult && <div className="absolute top-3 right-3 z-20 px-2 py-1 rounded-full bg-black/70 text-emerald-300 text-[9px] font-black border border-emerald-500/30 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Verified upload</div>}
