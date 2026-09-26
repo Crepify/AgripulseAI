@@ -64,8 +64,8 @@ export default function TabExposer({ isSunlightMode }) {
     <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">PRICE EXPOSER • असली दाम</div>
-        <div className="text-lg font-black">Branded chemical = up to 90% overpriced</div>
-        <p className={`text-xs font-bold mt-1 ${sub}`}>Photo the bottle or speak the brand — we reveal the identical generic and its true wholesale price.</p>
+        <div className="text-lg font-black">The True Price of Every Pesticide</div>
+        <p className={`text-xs font-bold mt-1 ${sub}`}>Photograph the bottle or speak the brand — instantly see the identical generic, its real wholesale price, and the nearby shops that stock it.</p>
       </div>
 
       {/* input row */}

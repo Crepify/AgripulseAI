@@ -52,8 +52,8 @@ export default function TabROI({ isSunlightMode }) {
     <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">ROI SIMULATOR • मुनाफ़ा कैलकुलेटर</div>
-        <div className="text-lg font-black">Know your profit BEFORE the truck leaves</div>
-        <p className={`text-xs font-bold mt-1 ${sub}`}>Live mandi price minus transport, labor and APMC fees — the real number in your pocket.</p>
+        <div className="text-lg font-black">Your Net Profit, Calculated Before Departure</div>
+        <p className={`text-xs font-bold mt-1 ${sub}`}>Live mandi prices minus transport, labor and APMC fees — the real number that reaches your pocket.</p>
       </div>
 
       {/* inputs */}

@@ -83,8 +83,8 @@ export default function TabPatti({ isSunlightMode }) {
     <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">PATTI AUDITOR • पर्ची जांच</div>
-        <div className="text-lg font-black">Catch illegal fees on your payment slip</div>
-        <p className={`text-xs font-bold mt-1 ${sub}`}>Photo the patti → OCR reads every deduction → we compare against the legal APMC fee limits of your state → you get the exact ₹ stolen.</p>
+        <div className="text-lg font-black">Every Deduction, Verified Against the Law</div>
+        <p className={`text-xs font-bold mt-1 ${sub}`}>Photograph your payment slip and every fee is read, checked against your state's legal APMC limits, and the exact overcharge is revealed in rupees.</p>
         <div className="mt-3">
           <label className={`text-[10px] font-mono font-black ${sub}`}>YOUR MANDI STATE</label>
           <select value={state} onChange={(e) => { setState(e.target.value); setAudit(null); setParsed(null); }}

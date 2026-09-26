@@ -82,13 +82,13 @@ export default function TabAuction({ isSunlightMode }) {
     <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">REVERSE AUCTION • उल्टी बोली</div>
-        <div className="text-lg font-black">Make dealers fight for YOUR order</div>
-        <p className={`text-xs font-bold mt-1 ${sub}`}>Your order pools with neighbours for 24h → 5 dealers get one WhatsApp blast → lowest bid wins the whole lot.</p>
+        <div className="text-lg font-black">Dealers Compete, Your Price Drops</div>
+        <p className={`text-xs font-bold mt-1 ${sub}`}>Your order pools with neighbours for 24 hours, five local dealers receive one WhatsApp broadcast, and the lowest bid wins the entire lot.</p>
       </div>
 
       {/* order form */}
       <div className={`p-4 rounded-2xl border ${card}`}>
-        <label className={`text-[10px] font-mono font-black ${sub}`}>WHAT DO YOU NEED?</label>
+        <label className={`text-[10px] font-mono font-black ${sub}`}>PRODUCT REQUIRED</label>
         <select value={product.id} onChange={(e) => setProduct(PRODUCTS.find((p) => p.id === e.target.value))}
           className={`mt-1 w-full min-h-[56px] px-3 rounded-xl border-2 text-sm font-black outline-none ${isSunlightMode ? 'bg-zinc-50 border-zinc-300' : 'bg-zinc-900 border-zinc-700 text-white'}`}>
           {PRODUCTS.map((p) => <option key={p.id} value={p.id}>{p.name} — MRP {inr(p.mrp)}/{p.unit}</option>)}

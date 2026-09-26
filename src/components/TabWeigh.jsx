@@ -74,8 +74,8 @@ export default function TabWeigh({ isSunlightMode }) {
     <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">WEIGHING FRAUD TRACKER • तौल चोरी पकड़ो</div>
-        <div className="text-lg font-black">1–2 kg stolen per bag ≈ ₹2,200 per trip</div>
-        <p className={`text-xs font-bold mt-1 ${sub}`}>Photograph the scale BEFORE the deal. The record is locked with time + GPS + a SHA-256 fingerprint — the middleman knows an uneditable witness exists.</p>
+        <div className="text-lg font-black">Tamper-Proof Weighing, Every Single Trip</div>
+        <p className={`text-xs font-bold mt-1 ${sub}`}>Photograph the scale before the deal. The reading is sealed with time, GPS and a SHA-256 fingerprint — an unalterable record that keeps every kilogram honest.</p>
       </div>
 
       {/* STEP 1 — scale evidence */}

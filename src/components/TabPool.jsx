@@ -87,8 +87,8 @@ export default function TabPool({ isSunlightMode }) {
     <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">TRUCK POOLING • साझा ट्रक</div>
-        <div className="text-lg font-black">Small load? Don't pay for an empty truck</div>
-        <p className={`text-xs font-bold mt-1 ${sub}`}>Speak your load — we pool farmers within 5 km heading to the same mandi in 48h and split one truck's freight by weight.</p>
+        <div className="text-lg font-black">One Shared Truck, a Fraction of the Freight</div>
+        <p className={`text-xs font-bold mt-1 ${sub}`}>Speak your load and farmers within 5 km heading to the same mandi fill one truck together — the freight is split fairly by weight.</p>
       </div>
 
       {/* my load */}

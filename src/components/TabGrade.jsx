@@ -60,8 +60,8 @@ export default function TabGrade({ isSunlightMode }) {
     <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">PROOF OF GRADE • गुणवत्ता प्रमाण</div>
-        <div className="text-lg font-black">Kill the fake 20% "quality cut"</div>
-        <p className={`text-xs font-bold mt-1 ${sub}`}>Scan the crop before the truck leaves. The certificate is locked with time + GPS — visual history the buyer cannot argue with.</p>
+        <div className="text-lg font-black">Certified Quality, Straight from the Farm Gate</div>
+        <p className={`text-xs font-bold mt-1 ${sub}`}>Scan your crop before the truck leaves. A time and GPS locked grading certificate travels with it — verified proof of quality that stands firm at the mandi.</p>
         <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
           {CROPS.map((c) => (
             <button key={c} onClick={() => { sound.playClick(); setCrop(c); setCert(null); }}
