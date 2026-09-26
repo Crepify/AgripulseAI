@@ -14,6 +14,9 @@
 import http from 'node:http';
 import { config, validateConfig } from './whatsapp/config.js';
 import { handleInboundEvent } from './whatsapp/router.js';
+import { COMMUNITY_NAME, CHANNELS, broadcastToChannel } from './whatsapp/community.js';
+
+const ADMIN_TOKEN = process.env.WHATSAPP_ADMIN_TOKEN || config.verifyToken;
 
 const WEBHOOK_PATHS = new Set(['/webhook', '/api/whatsapp-webhook', '/api/whatsapp/webhook']);
 
@@ -29,6 +32,34 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/healthz') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, live: ok, missing }));
+  }
+
+  /* POST /admin/broadcast — post to an AgriPulse Community channel.
+     curl -X POST :8787/admin/broadcast -H "Authorization: Bearer $TOKEN" \
+          -d '{"channel":"mandi","text":"Aaj tamatar ₹2,400/q — 6% upar 📈"}' */
+  if (req.method === 'POST' && url.pathname === '/admin/broadcast') {
+    if ((req.headers.authorization || '') !== `Bearer ${ADMIN_TOKEN}`) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      return res.end('{"error":"unauthorized"}');
+    }
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const { channel, text } = JSON.parse(body || '{}');
+        if (!text || !CHANNELS.some((c) => c.id === channel)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'need { channel, text }', channels: CHANNELS.map((c) => c.id) }));
+        }
+        const result = await broadcastToChannel(channel, text);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ community: COMMUNITY_NAME, channel, ...result }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
   }
 
   if (!WEBHOOK_PATHS.has(url.pathname)) {

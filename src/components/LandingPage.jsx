@@ -10,16 +10,14 @@ import { createDemoSession } from '../utils/authService';
  */
 
 export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedLang }) {
-  const [showAuth, setShowAuth] = useState(() => {
-    try { return sessionStorage.getItem('ap_in_login') === '1'; } catch (e) { return false; }
-  });
+  const [showAuth, setShowAuth] = useState(false);
   const hi = selectedLang === 'hi';
 
   if (showAuth) {
     return (
       <LoginPage
-        onSuccess={() => { try { sessionStorage.removeItem('ap_in_login'); } catch (e) {} onLoginSuccess(); }}
-        onCancel={() => { try { sessionStorage.removeItem('ap_in_login'); } catch (e) {} setShowAuth(false); }}
+        onSuccess={onLoginSuccess}
+        onCancel={() => setShowAuth(false)}
         selectedLang={selectedLang}
         setSelectedLang={setSelectedLang}
       />
@@ -97,7 +95,7 @@ export default function LandingPage({ onLoginSuccess, selectedLang, setSelectedL
       {/* CTA */}
       <footer className="px-5 pb-10 pt-4">
         <motion.button initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-          onClick={() => { try { sessionStorage.setItem('ap_in_login', '1'); } catch (e) {} setShowAuth(true)}}
+          onClick={() => setShowAuth(true)}
           className="w-full min-h-[60px] rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white text-lg font-black flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-200 active:scale-[0.98] transition-transform"
         >
           {hi ? 'शुरू करें' : 'Get Started'} <ArrowRight className="w-5 h-5" strokeWidth={2.6} />
