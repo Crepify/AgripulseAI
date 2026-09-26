@@ -276,14 +276,15 @@ async function jarvisAnswer(question, pref, ctx) {
         private: true,
       }),
     });
-    let res = await call();
-    // Anonymous tier gets transient 429s — one gentle retry inside the same
-    // timeout budget.
-    if (res.status === 429 || res.status >= 500) {
-      await new Promise(r => setTimeout(r, 400));
+    let res;
+    // Anonymous tier gets per-IP 429s (Vercel functions share egress IPs) —
+    // escalate the backoff within the same timeout budget.
+    for (let attempt = 0; attempt < 3; attempt++) {
       res = await call();
+      if (res.ok || (res.status !== 429 && res.status < 500)) break;
+      if (attempt < 2) await new Promise(r => setTimeout(r, attempt === 0 ? 400 : 1100));
     }
-    if (!res.ok) return null;
+    if (!res || !res.ok) return null;
     const data = await res.json();
     const text = cleanLlm(data?.choices?.[0]?.message?.content);
     if (!text || text.length < 2) return null;
@@ -354,11 +355,20 @@ export default async function handler(req, res) {
   // 3. The Jarvis brain — a keyless conversational model — racing Wikipedia
   //    in the farmer's own language. Prefer the model's conversational
   //    answer (handles ANY question + follow-up context); Wikipedia is the
-  //    reliable fallback when the model is slow or down.
-  const [llm, native] = await Promise.all([
-    jarvisAnswer(q, pref, req?.query?.ctx),
-    hasCtx ? null : withDeadline(wikipediaSearch(subject, pref), 6000, null),
-  ]);
+  //    reliable fallback when the model is slow or down. EXCEPTION: "who is
+  //    / कौन है" questions ask about CURRENT officeholders — Wikipedia is
+  //    both faster and fresher there, so it goes first.
+  const whoIs = /\b(who is|who was|who are|कौन है|कौन थे|कौन था|कौन हैं|वर्तमान|mukhyamantri|chief minister|prime minister|president of|agriculture minister)\b/i.test(q);
+  let llm = null, native = null;
+  if (whoIs && !hasCtx) {
+    native = await withDeadline(wikipediaSearch(subject, pref), 3000, null);
+    if (!native) llm = await jarvisAnswer(q, pref, req?.query?.ctx);
+  } else {
+    [llm, native] = await Promise.all([
+      jarvisAnswer(q, pref, req?.query?.ctx),
+      hasCtx ? null : withDeadline(wikipediaSearch(subject, pref), 6000, null),
+    ]);
+  }
   if (llm) { done(llm.text, 'jarvis', llm.model); return; }
   if (native) { done(native.text, `wikipedia-${native.wikiLang}`, native.title); return; }
   if (hasCtx) {
