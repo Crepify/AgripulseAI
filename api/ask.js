@@ -193,7 +193,20 @@ async function wikipediaSearch(query, wikiLang) {
     const search = await getJSON(
       `${base}/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(attempt)}&format=json&srlimit=3`
     );
-    const hits = (search?.query?.search || []).filter(h => !/may refer to|बहुविकल्पी|список/i.test(h.title + (h.snippet || '')));
+    let hits = (search?.query?.search || []).filter(h => !/may refer to|बहुविकल्पी|список/i.test(h.title + (h.snippet || '')));
+    // Rank by word overlap with the query — "भारत के कृषि मंत्री" should hit
+    // the ministry article, not a random "list of firsts" page that merely
+    // contains "भारत".
+    const qWords = new Set(attempt.toLowerCase().split(/\s+/).filter(w => w.length > 1));
+    hits = hits
+      .map(h => {
+        const tWords = h.title.toLowerCase().split(/\s+/);
+        let score = 0;
+        for (const w of tWords) if (qWords.has(w)) score += 1;
+        return { h, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.h);
     for (const hit of hits.slice(0, 2)) {
       const sum = await getJSON(`${base}/api/rest_v1/page/summary/${encodeURIComponent(hit.title.replace(/ /g, '_'))}`);
       const extract = sum?.extract;
@@ -282,7 +295,7 @@ async function jarvisAnswer(question, pref, ctx) {
     for (let attempt = 0; attempt < 3; attempt++) {
       res = await call();
       if (res.ok || (res.status !== 429 && res.status < 500)) break;
-      if (attempt < 2) await new Promise(r => setTimeout(r, attempt === 0 ? 400 : 1100));
+      if (attempt < 2) await new Promise(r => setTimeout(r, attempt === 0 ? 500 : 1400));
     }
     if (!res || !res.ok) return null;
     const data = await res.json();
