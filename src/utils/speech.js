@@ -31,9 +31,9 @@ class SpeechEngine {
         this.recognition = new SpeechRecognition();
         this.recognition.continuous = false;
         this.recognition.interimResults = true;
-        // Ask the recognizer for alternate hypotheses — intent matching can
-        // then rescue a mis-heard primary transcript.
-        this.recognition.maxAlternatives = 3;
+      // Ask the recognizer for alternate hypotheses — intent matching can
+      // then rescue a mis-heard primary transcript.
+      this.recognition.maxAlternatives = 3;
       }
     }
   }
@@ -79,22 +79,50 @@ class SpeechEngine {
     return { voice: this.voices[0], isNative: false };
   }
 
-  speak(textData, langCode = 'hi-IN', onEnd) {
-    if (!this.synth) return;
-    this.synth.cancel();
+  // L2 — cloud TTS: natural Indian-language speech for devices with no local
+  // voice for the language. Free proxy endpoint (no key, nothing to install —
+  // the farmer must never have to install anything), cached in-memory by
+  // text+lang so repeated lines don't refetch. Falls back to the local voice
+  // on ANY failure (offline, slow, blocked) so the guide is never silent.
+  _cloudSpeak(text, lang, onEnd, fallback) {
+    let finished = false;
+    const done = () => { if (!finished && onEnd) { finished = true; onEnd(); } };
+    const fail = () => { if (!finished) { finished = true; fallback(); } };
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) { fail(); return; }
+    const key = lang + ':' + text;
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = setTimeout(() => { try { ctrl && ctrl.abort(); } catch {} }, 6000);
+    const play = (url) => {
+      try {
+        const audio = new Audio(url);
+        this._ttsAudio = audio;
+        audio.onended = done;
+        audio.onerror = fail;
+        const p = audio.play();
+        if (p && p.catch) p.catch(fail);
+        setTimeout(() => { try { if (!finished && audio.paused && audio.currentTime === 0) fail(); } catch {} }, 15000);
+      } catch { fail(); }
+    };
+    const cached = this._ttsCache && this._ttsCache.get(key);
+    if (cached) { clearTimeout(timer); play(cached); return; }
+    fetch(`/api/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(lang)}`, ctrl ? { signal: ctrl.signal } : undefined)
+      .then((r) => { if (!r.ok) throw new Error('tts ' + r.status); return r.blob(); })
+      .then((blob) => {
+        clearTimeout(timer);
+        const url = URL.createObjectURL(blob);
+        if (!this._ttsCache) this._ttsCache = new Map();
+        if (this._ttsCache.size > 60) this._ttsCache.clear();
+        this._ttsCache.set(key, url);
+        play(url);
+      })
+      .catch(() => { clearTimeout(timer); fail(); });
+  }
 
-    // textData can be either a plain string or an object { devanagari: '...', phonetic: '...' }
-    let textToSpeak = typeof textData === 'string' ? textData : (textData.devanagari || textData.phonetic || textData.en);
-    const phoneticText = typeof textData === 'object' ? textData.phonetic : null;
-
-    const voiceInfo = this.getBestVoice(langCode);
-
-    // If native Devanagari/regional voice is NOT available on this device,
-    // use phonetic Romanized Hindi text so the synthesizer speaks fluent Hindi words instead of just numbers!
-    if (voiceInfo && !voiceInfo.isNative && phoneticText) {
-      textToSpeak = phoneticText;
-    }
-
+  // L1/L3 — the local device synthesizer (phonetic text when no native voice).
+  _localSpeak(nativeText, phoneticText, voiceInfo, langCode, onEnd) {
+    if (!this.synth) { if (onEnd) onEnd(); return; }
+    let textToSpeak = nativeText;
+    if (voiceInfo && !voiceInfo.isNative && phoneticText) textToSpeak = phoneticText;
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     if (voiceInfo && voiceInfo.voice) {
       utterance.voice = voiceInfo.voice;
@@ -102,22 +130,47 @@ class SpeechEngine {
     } else {
       utterance.lang = langCode;
     }
-
-    utterance.rate = 0.92; // Slightly measured rate for clear rural comprehension
+    utterance.rate = 0.92;
     utterance.pitch = 1.0;
-
-    if (onEnd) {
-      utterance.onend = onEnd;
-      utterance.onerror = onEnd;
-    }
-
+    if (onEnd) { utterance.onend = onEnd; utterance.onerror = onEnd; }
     this.synth.speak(utterance);
   }
+
+  speak(textData, langCode = 'hi-IN', onEnd) {
+    if (!this.synth) { if (onEnd) onEnd(); return; }
+    this.synth.cancel();
+    if (this._ttsAudio) { try { this._ttsAudio.pause(); } catch {} this._ttsAudio = null; }
+
+    const isStr = typeof textData === 'string';
+    const nativeText = isStr ? textData : (textData.devanagari || textData.phonetic || textData.en || '');
+    const phoneticText = !isStr && textData.phonetic ? textData.phonetic : null;
+
+    const voiceInfo = this.getBestVoice(langCode);
+    const baseLang = String(langCode || '').split('-')[0].toLowerCase();
+
+    // L1 — a real native voice: best quality, works offline.
+    if (voiceInfo && voiceInfo.isNative) {
+      this._localSpeak(nativeText, phoneticText, voiceInfo, langCode, onEnd);
+      return;
+    }
+    // L2 — no native voice on this device (common for ta/te/kn/mr): natural
+    // cloud speech instead of a wrong-accent robot. English always has a
+    // local voice, so it never needs the network.
+    if (baseLang && baseLang !== 'en' && nativeText) {
+      this._cloudSpeak(nativeText, baseLang, onEnd, () =>
+        this._localSpeak(nativeText, phoneticText, voiceInfo, langCode, onEnd));
+      return;
+    }
+    // L3 — local voice with phonetic text.
+    this._localSpeak(nativeText, phoneticText, voiceInfo, langCode, onEnd);
+  }
+
 
   stopSpeaking() {
     if (this.synth) {
       this.synth.cancel();
     }
+    if (this._ttsAudio) { try { this._ttsAudio.pause(); } catch {} this._ttsAudio = null; }
   }
 
   startListening(langCode = 'hi-IN', onResult, onEnd, onError) {
@@ -135,20 +188,15 @@ class SpeechEngine {
       this.recognition.onresult = (event) => {
         let final = '';
         let interim = '';
-        const alternatives = [];
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           const r = event.results[i];
-          if (r.isFinal) {
-            final += r[0].transcript;
-            for (let a = 1; a < r.length; a++) alternatives.push(r[a].transcript);
-          } else {
-            interim += r[0].transcript;
-          }
+          if (r.isFinal) final += r[0].transcript;
+          else interim += r[0].transcript;
         }
         // FINAL results are the ones to act on — interim fragments from
         // noise/echo used to phantom-trigger the guide (stray 'no' that
         // killed the tour). Interim text still flows for live UI display.
-        if (onResult) onResult(final || interim, { final: !!final, alternatives });
+        if (onResult) onResult(final || interim, { final: !!final });
       };
 
       this.recognition.onend = () => {
@@ -196,7 +244,7 @@ class SpeechEngine {
 
 export const speechEngine = new SpeechEngine();
 
-/** App language code → BCP-47 recognizer locale (Indian variants). */
+// Map short lang keys to BCP-47 codes for speechSynthesis/recognition.
 export function speechLangCode(lang = 'hi') {
   const map = {
     hi: 'hi-IN', en: 'en-IN', ta: 'ta-IN', te: 'te-IN', kn: 'kn-IN',
