@@ -1,37 +1,58 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, X, Sparkles, ArrowRight, Navigation, Bot, Globe, Send } from 'lucide-react';
+import { Mic, MicOff, X, Sparkles, ArrowRight, Navigation, Bot, Globe, Send, Infinity as InfinityIcon } from 'lucide-react';
 import { speechEngine, speechLangCode } from '../utils/speech';
 import { classifyVoiceIntent } from '../utils/voiceNavigator';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
 
 const SOURCE_LABEL = {
-  'wikipedia-hi': 'Wikipedia हिन्दी', 'wikipedia-en': 'Wikipedia', 'wikipedia-ta': 'Wikipedia தமிழ்',
-  'wikipedia-te': 'Wikipedia తెలుగు', 'wikipedia-kn': 'Wikipedia ಕನ್ನಡ', 'wikipedia-mr': 'Wikipedia मराठी',
-  'wikipedia-gu': 'Wikipedia ગુજરાતી', 'wikipedia-bn': 'Wikipedia বাংলা', 'wikipedia-pa': 'Wikipedia ਪੰਜਾਬੀ',
-  'wikipedia-ml': 'Wikipedia മലയാളം', 'wikipedia-or': 'Wikipedia ଓଡ଼ିଆ', 'wikipedia-as': 'Wikipedia অসমীয়া',
-  'wikipedia-ur': 'Wikipedia اردو', 'duckduckgo': 'DuckDuckGo', 'math': '🧮', 'assistant': 'AgriPulse',
-  'app': 'AgriPulse', 'offline': '', 'none': '',
+  'jarvis': '⚡ Jarvis AI', 'wikipedia-hi': 'Wikipedia हिन्दी', 'wikipedia-en': 'Wikipedia',
+  'wikipedia-ta': 'Wikipedia தமிழ்', 'wikipedia-te': 'Wikipedia తెలుగు', 'wikipedia-kn': 'Wikipedia ಕನ್ನಡ',
+  'wikipedia-mr': 'Wikipedia मराठी', 'wikipedia-gu': 'Wikipedia ગુજરાતી', 'wikipedia-bn': 'Wikipedia বাংলা',
+  'wikipedia-pa': 'Wikipedia ਪੰਜਾਬੀ', 'wikipedia-ml': 'Wikipedia മലയാളം', 'wikipedia-or': 'Wikipedia ଓଡ଼ିଆ',
+  'wikipedia-as': 'Wikipedia অসমীয়া', 'wikipedia-ur': 'Wikipedia اردو', 'duckduckgo': 'DuckDuckGo',
+  'math': '🧮', 'assistant': 'AgriPulse', 'app': 'AgriPulse', 'offline': '', 'none': '',
+};
+
+// Saying these to the assistant closes it (the modal — NOT the mic session,
+// which self-heals; and never from a stray single word mid-guide).
+const STOP_WORDS = /^(band karo|band kar|band kro|बंद करो|बंद कर|stop speaking|stop listening|stop|close|chup karo|chup|ruko|rukja|रुको|रुक जाओ|alvida|अलविदा)[\s!.?]*$/i;
+
+const GREETING = {
+  hi: 'नमस्ते जी! मैं आपका आवाज़ सहायक हूँ — बोलिए, सुन रहा हूँ।',
+  en: 'Hello! I am your voice assistant — go ahead, I am listening.',
 };
 
 export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNavigate }) {
   const t = T[selectedLang] || T['en'];
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [thinking, setThinking] = useState(false);
   const [chat, setChat] = useState([]); // {q, a, source, nav}
   const [typed, setTyped] = useState('');
+  const [autoListen, setAutoListen] = useState(true);
+
   // Latest heard text lives in a ref — the old version read the `transcript`
   // STATE inside onEnd, which was a stale closure and always acted on ''.
   const heardRef = useRef({ text: '', acted: false });
   const askCtlRef = useRef(null);
   const chatEndRef = useRef(null);
+  // Conversation loop state in refs — the speak→listen chain runs through
+  // async callbacks where state would be stale.
+  const autoListenRef = useRef(true);
+  const openRef = useRef(isOpen);
+  const manualStopRef = useRef(false);
+  const lastExchangeRef = useRef(null); // {q, a} — one-turn memory for follow-ups
+  const greetedRef = useRef(false);
 
   const loc = {
     thinking: t.assistant.thinking || 'Thinking…',
+    speaking: t.assistant.speaking || 'Speaking…',
     offline: t.assistant.offline || 'No internet right now — please ask again once you are back online.',
     placeholder: t.assistant.typePlaceholder || 'Ask me anything…',
+    autoListen: t.assistant.autoListen || 'Auto-listen',
   };
 
   const commandSamples = [
@@ -45,30 +66,71 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     { text: 'बिना बिचौलिए बेचो', topic: 'market' },
     { text: 'मंडी भाव बताओ', topic: 'mandi' },
   ];
-  const webSamples = ['भारत के राष्ट्रपति कौन है', '50 का 20% कितना', 'what is organic farming'];
+  const webSamples = ['टमाटर की पत्तियाँ पीली क्यों हो जाती हैं', 'भारत के राष्ट्रपति कौन है', '50 का 20% कितना'];
+
+  useEffect(() => { openRef.current = isOpen; }, [isOpen]);
+  useEffect(() => { autoListenRef.current = autoListen; }, [autoListen]);
 
   // Stop everything when the modal closes — never leave a voice running.
   useEffect(() => {
     if (!isOpen) {
+      manualStopRef.current = true;
       try { speechEngine.stopSpeaking(); speechEngine.stopListening(); } catch {}
       askCtlRef.current?.abort();
       setIsListening(false);
+      setIsSpeaking(false);
       setThinking(false);
+    } else {
+      manualStopRef.current = false;
+      // Jarvis greets you, then starts listening — once per open.
+      if (!greetedRef.current) {
+        greetedRef.current = true;
+        const g = setTimeout(() => {
+          if (!openRef.current) return;
+          say(GREETING[selectedLang] || GREETING.en);
+        }, 350);
+        return () => clearTimeout(g);
+      }
     }
-  }, [isOpen]);
+    return undefined;
+  }, [isOpen, selectedLang]);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ block: 'nearest' }); }, [chat, thinking]);
 
+  // Reset the once-per-open greeting flag after the modal fully closes.
+  useEffect(() => {
+    if (!isOpen) {
+      const r = setTimeout(() => { greetedRef.current = false; }, 500);
+      return () => clearTimeout(r);
+    }
+    return undefined;
+  }, [isOpen]);
+
   const pushChat = (entry) => setChat(prev => [...prev.slice(-5), entry]);
 
-  // Ask the web (api/ask.js: Wikipedia in the farmer's language + DDG + math).
+  // Speak + optional chain: when the voice finishes, the conversation loop
+  // continues automatically (Jarvis-style) unless the user stopped it.
+  const say = (text, { then } = {}) => {
+    try { speechEngine.stopSpeaking(); } catch {}
+    setIsSpeaking(true);
+    speechEngine.speak(text, speechLangCode(selectedLang), () => {
+      setIsSpeaking(false);
+      if (then) return then();
+      if (autoListenRef.current && openRef.current && !manualStopRef.current) startListeningFlow();
+    });
+  };
+
+  // Ask the web (api/ask.js: Jarvis AI → Wikipedia in the farmer's language
+  // → DuckDuckGo → math; remembers the last exchange for follow-ups).
   async function askWeb(userText) {
     setThinking(true);
     askCtlRef.current?.abort();
     askCtlRef.current = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const killTimer = setTimeout(() => askCtlRef.current?.abort(), 9000);
+    const killTimer = setTimeout(() => askCtlRef.current?.abort(), 12000);
     try {
-      const res = await fetch(`/api/ask?q=${encodeURIComponent(userText)}&lang=${encodeURIComponent(selectedLang)}`,
+      const ctx = lastExchangeRef.current
+        ? `&ctx=${encodeURIComponent(JSON.stringify(lastExchangeRef.current))}` : '';
+      const res = await fetch(`/api/ask?q=${encodeURIComponent(userText)}&lang=${encodeURIComponent(selectedLang)}${ctx}`,
         askCtlRef.current ? { signal: askCtlRef.current.signal } : {});
       const data = await res.json();
       if (data && data.answer) return { a: data.answer, source: data.source || 'none' };
@@ -92,8 +154,9 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
       const speechText = intent.speechResponse[selectedLang] || intent.speechResponse['hi'] || intent.speechResponse['en'];
       const targetLabel = intent.tabLabel[selectedLang] || intent.tabLabel['hi'] || intent.tabLabel['en'];
       pushChat({ q: userText, a: speechText, source: 'app', nav: targetLabel });
+      lastExchangeRef.current = { q: userText, a: String(speechText).slice(0, 400) };
       onNavigate(intent.targetTab);
-      speechEngine.speak(speechText, speechLangCode(selectedLang));
+      say(speechText);
       return;
     }
 
@@ -102,16 +165,25 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     //    every language even on phones with no voices installed.
     const { a, source } = await askWeb(userText);
     pushChat({ q: userText, a, source });
-    speechEngine.speak(a, speechLangCode(selectedLang));
+    lastExchangeRef.current = { q: userText, a: String(a).slice(0, 400) };
+    say(a);
   };
 
-  const handleMic = () => {
-    sound.playClick();
-    if (isListening) {
-      speechEngine.stopListening();
-      setIsListening(false);
+  const onFinalHeard = (text) => {
+    const heard = String(text || '').trim();
+    setIsListening(false);
+    if (!heard) return; // silence → the loop rests until the next tap
+    if (STOP_WORDS.test(heard)) {
+      try { speechEngine.stopSpeaking(); } catch {}
+      sound.playClick();
+      onClose();
       return;
     }
+    handleAsk(heard);
+  };
+
+  const startListeningFlow = () => {
+    if (!openRef.current || manualStopRef.current) return;
     try { speechEngine.stopSpeaking(); } catch {} // don't listen to our own voice
     heardRef.current = { text: '', acted: false };
     setTranscript('');
@@ -124,29 +196,48 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
         heardRef.current.text = text;
         if (meta.final && text.trim() && !heardRef.current.acted) {
           heardRef.current.acted = true;
-          setIsListening(false);
           speechEngine.stopListening();
-          handleAsk(text.trim());
+          onFinalHeard(text);
         }
       },
       () => {
         // Recognizer ended (silence/timeout) — act on whatever was heard.
-        setIsListening(false);
         const heard = heardRef.current.text.trim();
         if (heard && !heardRef.current.acted) {
           heardRef.current.acted = true;
-          handleAsk(heard);
+          onFinalHeard(heard);
+        } else {
+          setIsListening(false);
         }
       },
       () => {
-        setIsListening(false);
         const heard = heardRef.current.text.trim();
         if (heard && !heardRef.current.acted) {
           heardRef.current.acted = true;
-          handleAsk(heard);
+          onFinalHeard(heard);
+        } else {
+          setIsListening(false);
         }
       }
     );
+  };
+
+  const handleMic = () => {
+    sound.playClick();
+    if (isListening) {
+      manualStopRef.current = true;
+      speechEngine.stopListening();
+      setIsListening(false);
+      return;
+    }
+    if (isSpeaking) {
+      manualStopRef.current = true;
+      try { speechEngine.stopSpeaking(); } catch {}
+      setIsSpeaking(false);
+      return;
+    }
+    manualStopRef.current = false;
+    startListeningFlow();
   };
 
   const submitTyped = (e) => {
@@ -157,6 +248,8 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     handleAsk(q);
   };
 
+  const statusLine = isSpeaking ? loc.speaking : isListening ? t.assistant.listening : thinking ? loc.thinking : t.assistant.tapToSpeak;
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -165,11 +258,15 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
             <button onClick={onClose} aria-label="Close assistant" title="Close assistant" className="absolute top-4 right-4 p-2 rounded-xl bg-[#181c1a] text-zinc-400 hover:text-white"><X className="w-5 h-5" /></button>
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-2xl mb-2 shadow-[0_0_20px_rgba(16,185,129,0.4)]">👨‍🌾</div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2"><Bot className="w-5 h-5 text-emerald-400" /> {t.assistant.title} — 22 Languages</h3>
-            <p className="text-xs text-emerald-300 font-mono flex items-center gap-1.5 flex-wrap justify-center"><Globe className="w-3 h-3" /> {t.assistant.subtitle} + <span className="text-emerald-200">{selectedLang === 'hi' ? 'हर सवाल का जवाब — विकिपीडिया से' : 'any question answered — from the web'}</span></p>
+            <p className="text-xs text-emerald-300 font-mono flex items-center gap-1.5 flex-wrap justify-center"><Globe className="w-3 h-3" /> {t.assistant.subtitle} + <span className="text-emerald-200">{selectedLang === 'hi' ? 'हर सवाल का जवाब — AI से' : 'any question answered — by AI'}</span></p>
 
-            <div className="my-5 flex flex-col items-center">
-              <button onClick={handleMic} aria-label={isListening ? 'Stop listening' : 'Start listening'} className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${isListening ? 'bg-red-500 text-white animate-pulse shadow-[0_0_30px_rgba(239,68,68,0.8)] scale-105' : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:scale-105'}`}><span className="sr-only">Mic</span>{isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8 fill-black" />}</button>
-              <span className="text-xs font-mono text-zinc-400 mt-2.5">{isListening ? t.assistant.listening : t.assistant.tapToSpeak} — {selectedLang.toUpperCase()}</span>
+            <div className="my-5 flex flex-col items-center gap-2">
+              <button onClick={handleMic} aria-label={isListening ? 'Stop listening' : 'Start listening'} className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${isListening ? 'bg-red-500 text-white animate-pulse shadow-[0_0_30px_rgba(239,68,68,0.8)] scale-105' : isSpeaking ? 'bg-emerald-400 text-black animate-pulse shadow-[0_0_30px_rgba(16,185,129,0.8)]' : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:scale-105'}`}><span className="sr-only">Mic</span>{isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8 fill-black" />}</button>
+              <span className="text-xs font-mono text-zinc-400">{statusLine} — {selectedLang.toUpperCase()}</span>
+              <button onClick={() => { sound.playClick(); setAutoListen(v => !v); }} aria-pressed={autoListen} title={loc.autoListen}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono border transition-colors ${autoListen ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-[#181c1a] border-[#232925] text-zinc-500'}`}>
+                <InfinityIcon className="w-3 h-3" />{loc.autoListen}: {autoListen ? 'ON' : 'OFF'}
+              </button>
             </div>
 
             {(transcript || isListening) && !thinking && (
@@ -210,7 +307,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
             </form>
 
             <div className="w-full text-left space-y-1.5">
-              <div className="text-[10px] font-black text-zinc-500 flex items-center gap-1"><Globe className="w-3 h-3" /> {selectedLang === 'hi' ? 'कुछ भी पूछें (वेब से जवाब):' : 'Ask anything (answered from the web):'}</div>
+              <div className="text-[10px] font-black text-zinc-500 flex items-center gap-1"><Globe className="w-3 h-3" /> {selectedLang === 'hi' ? 'कुछ भी पूछें (AI से जवाब):' : 'Ask anything (answered by AI):'}</div>
               {webSamples.map((wq, i) => (
                 <button key={`w${i}`} onClick={() => handleAsk(wq)} className="w-full p-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-xs text-emerald-200 text-left flex items-center justify-between"><span className="truncate">{wq}</span><Globe className="w-3.5 h-3.5 text-emerald-400 shrink-0 ml-1" /></button>
               ))}
@@ -219,7 +316,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
                 <button key={i} onClick={() => handleAsk(sq.text)} className="w-full p-2.5 rounded-xl bg-[#181c1a] hover:bg-[#222825] border border-[#232925] text-xs text-zinc-300 text-left flex items-center justify-between"><span className="truncate">{sq.text}</span><ArrowRight className="w-3.5 h-3.5 text-emerald-400 shrink-0 ml-1" /></button>
               ))}
             </div>
-            <div className="mt-3 text-[10px] text-zinc-500">Voice → Action + spoken reply in {selectedLang.toUpperCase()}. General questions answered from Wikipedia/DuckDuckGo — free, no data charged. Kisan Call Centre: 1800-180-1551</div>
+            <div className="mt-3 text-[10px] text-zinc-500">Just talk — it listens, answers, and listens again. Say "{selectedLang === 'hi' ? 'बंद करो' : 'stop'}" to close. Kisan Call Centre: 1800-180-1551</div>
           </div>
         </div>
       )}

@@ -135,6 +135,8 @@ export const T = {
       thinking: 'Thinking…',
       offline: 'No internet right now — please ask again once you are back online.',
       typePlaceholder: 'Ask me anything…',
+      speaking: 'Speaking…',
+      autoListen: 'Auto-listen',
     },
     saathiHub: {
       console: 'KISAN SAATHI CONSOLE',
@@ -364,6 +366,8 @@ export const T = {
       thinking: 'सोच रहा हूँ…',
       offline: 'अभी इंटरनेट नहीं है — नेट आने पर फिर पूछ लें।',
       typePlaceholder: 'कुछ भी पूछिए…',
+      speaking: 'बोल रहा हूँ…',
+      autoListen: 'लगातार सुनना',
     },
     saathiHub: {
       console: 'किसान साथी कंसोल',

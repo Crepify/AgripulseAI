@@ -6,13 +6,16 @@
 //
 //   1. Pure math            → safe tokenizer + shunting-yard (no eval)
 //   2. Greetings / identity → friendly localized reply
-//   3. Wikipedia            → the farmer's OWN language edition first
+//   3. Jarvis AI            → keyless conversational model (Pollinations),
+//                            remembers the last exchange for follow-ups,
+//                            always answers in the farmer's language
+//   4. Wikipedia            → the farmer's OWN language edition first
 //                            (hi/ta/te/kn/mr/gu/bn/pa/ml/or/as/ur/en),
 //                            falling back to English Wikipedia
-//   4. DuckDuckGo Instant Answer → extra coverage (free, no key)
-//   5. Honest "I don't know yet" + Kisan Call Centre — NEVER silence
+//   5. DuckDuckGo Instant Answer → extra coverage (free, no key)
+//   6. Honest "I don't know yet" + Kisan Call Centre — NEVER silence
 //
-// GET /api/ask?q=...&lang=hi  → { answer, source, lang }
+// GET /api/ask?q=...&lang=hi[&ctx={"q":..,"a":..}]  → { answer, source, lang }
 
 const MAX_Q = 300;
 const UPSTREAM_TIMEOUT = 4500;
@@ -213,6 +216,82 @@ async function duckduckgo(query) {
   return null;
 }
 
+// ─────────────── the Jarvis brain (keyless, free, no install) ───────────
+
+const JARVIS_TIMEOUT = 7000;
+const LANG_NAME = {
+  hi: 'Hindi (Devanagari script)', en: 'simple English', ta: 'Tamil', te: 'Telugu',
+  kn: 'Kannada', mr: 'Marathi', gu: 'Gujarati', bn: 'Bengali', pa: 'Punjabi (Gurmukhi script)',
+  ml: 'Malayalam', or: 'Odia', as: 'Assamese', ur: 'Urdu',
+};
+
+function withDeadline(promise, ms, value = null) {
+  let timer;
+  const timeout = new Promise((r) => { timer = setTimeout(() => r(value), ms); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// Spoken-channel cleanup: the reply is READ ALOUD, so markdown/links/lists
+// would sound like garbage.
+function cleanLlm(text) {
+  return String(text || '')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replace(/[*_`#>|]+/g, '')
+    .replace(/^\s*[-•–\d.]+\s*/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 600);
+}
+
+async function jarvisAnswer(question, pref, ctx) {
+  const system = [
+    'You are "Kisan Sahayak", the Jarvis-style voice assistant inside the AgriPulse AI app for Indian farmers.',
+    `ALWAYS reply ONLY in ${LANG_NAME[pref] || 'simple English'}.`,
+    'Your reply is SPOKEN aloud by a text-to-speech voice, so use plain flowing sentences — no markdown, no lists, no emoji, no URLs.',
+    'Keep it short: 1-3 sentences for simple questions, at most 5 for complex ones. Use simple words a farmer uses every day.',
+    'Be accurate. If you are not sure, say so briefly instead of inventing facts.',
+    'For pesticide or medicine dosages, remind to follow the product label. For medical or veterinary problems, advise seeing a doctor or vet.',
+  ].join(' ');
+
+  const messages = [{ role: 'system', content: system }];
+  try {
+    const c = typeof ctx === 'string' ? JSON.parse(ctx) : (ctx || null);
+    if (c && c.q && c.a) {
+      messages.push({ role: 'user', content: String(c.q).slice(0, 300) });
+      messages.push({ role: 'assistant', content: String(c.a).slice(0, 400) });
+    }
+  } catch {}
+
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), JARVIS_TIMEOUT);
+  try {
+    const call = () => fetch('https://text.pollinations.ai/openai', {
+      method: 'POST',
+      signal: ac.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'openai',
+        messages: [...messages, { role: 'user', content: String(question).slice(0, 300) }],
+        referrer: 'agripulse.ai',
+        private: true,
+      }),
+    });
+    let res = await call();
+    // Anonymous tier gets transient 429s — one gentle retry inside the same
+    // timeout budget.
+    if (res.status === 429 || res.status >= 500) {
+      await new Promise(r => setTimeout(r, 400));
+      res = await call();
+    }
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = cleanLlm(data?.choices?.[0]?.message?.content);
+    if (!text || text.length < 2) return null;
+    return { text, model: data?.model || 'pollinations-openai' };
+  } catch { return null; }
+  finally { clearTimeout(t); }
+}
+
 // ─────────────────────── greetings / identity / thanks ──────────────────
 
 const SMALL_TALK = [
@@ -264,14 +343,39 @@ export default async function handler(req, res) {
 
   const subject = cleanForSearch(q);
 
-  // 3. Wikipedia in the farmer's own language, then English in parallel with
-  //    DuckDuckGo so the whole thing stays under the function timeout.
-  const native = await wikipediaSearch(subject, pref);
+  // A follow-up ("और उसका इलाज?") carries no standalone meaning — without
+  // the conversational model it must NOT become a raw Wikipedia search.
+  let hasCtx = false;
+  try {
+    const c = typeof req?.query?.ctx === 'string' ? JSON.parse(req.query.ctx) : (req?.query?.ctx || null);
+    hasCtx = !!(c && c.q && c.a);
+  } catch {}
+
+  // 3. The Jarvis brain — a keyless conversational model — racing Wikipedia
+  //    in the farmer's own language. Prefer the model's conversational
+  //    answer (handles ANY question + follow-up context); Wikipedia is the
+  //    reliable fallback when the model is slow or down.
+  const [llm, native] = await Promise.all([
+    jarvisAnswer(q, pref, req?.query?.ctx),
+    hasCtx ? null : withDeadline(wikipediaSearch(subject, pref), 6000, null),
+  ]);
+  if (llm) { done(llm.text, 'jarvis', llm.model); return; }
   if (native) { done(native.text, `wikipedia-${native.wikiLang}`, native.title); return; }
+  if (hasCtx) {
+    // The AI layer is the only thing that can resolve "उसका/its/that" —
+    // be honest instead of searching for random words.
+    done(
+      pref === 'en'
+        ? 'Sorry — my connection to the thinking service just failed. Please ask the full question once more.'
+        : 'माफ़ कीजिए — सोचने वाली सेवा से अभी जुड़ नहीं पाया। पूरा सवाल एक बार फिर पूछ दीजिए।',
+      'none'
+    );
+    return;
+  }
 
   const [english, ddg] = await Promise.all([
-    pref === 'en' ? null : wikipediaSearch(subject, 'en'),
-    duckduckgo(subject || q),
+    pref === 'en' ? null : withDeadline(wikipediaSearch(subject, 'en'), 2500, null),
+    withDeadline(duckduckgo(subject || q), 2500, null),
   ]);
   if (english) { done(english.text, `wikipedia-en`, english.title); return; }
   if (ddg) { done(ddg.text, 'duckduckgo'); return; }
