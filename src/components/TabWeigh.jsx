@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Scale, Camera, Lock, AlertTriangle, CircleCheck, ReceiptText, MessageCircle } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { stampEvidence, inr, saveToList } from '../utils/evidence';
+import { sendWhatsApp } from './WhatsAppScreen';
 
 /*
  * WEIGHING FRAUD TRACKER
@@ -62,7 +63,7 @@ export default function TabWeigh({ isSunlightMode }) {
     e.target.value = '';
   };
 
-  const waText = verdict ? encodeURIComponent(
+  const waText = verdict ? (
     `WEIGHING FRAUD RECORD (AgriPulse AI)\nScale photo (locked ${scaleStamp?.time}, SHA ${scaleStamp?.hashShort}): ${scaleKg} kg\nSlip shows: ${slipKg} kg\nMISSING: ${verdict.missingKg} kg = ${inr(verdict.missingMoney)} at ₹${pricePerKg}/kg\nGPS: ${scaleStamp?.loc ? `${scaleStamp.loc.lat}, ${scaleStamp.loc.lng}` : 'recorded'}\nPay the difference — the timestamped photo record cannot be edited.`) : '';
 
   const num = (v, set) => (
@@ -135,10 +136,17 @@ export default function TabWeigh({ isSunlightMode }) {
           ) : (
             <div className="flex items-center gap-2 text-emerald-500 font-black text-sm"><CircleCheck className="w-5 h-5" /> Weights match (gap {verdict.gapPct}% &lt; 5%) — fair deal.</div>
           )}
-          <a href={`https://wa.me/?text=${waText}`} target="_blank" rel="noreferrer" onClick={() => sound.playClick()}
+          <button onClick={() => { sound.playClick(); sendWhatsApp({
+              name: 'Mandi Trader', avatar: '🧑‍💼', phone: '9876500072', message: waText,
+              replies: verdict.fraud ? [
+                { text: 'Kanta thoda kharab hoga bhai…', delay: 1800 },
+                { text: `Photo record hai to theek hai — ${inr(verdict.missingMoney)} abhi UPI kar raha hun. 🙏`, delay: 2400 },
+              ] : [
+                { text: 'Haan ji, tol bilkul sahi hai. Agli baar bhi seedha le aana. 👍', delay: 1800 },
+              ] }); }}
             className={`mt-3 w-full min-h-[56px] rounded-2xl font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98] ${verdict.fraud ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}`}>
             <MessageCircle className="w-5 h-5" /> {verdict.fraud ? 'Send proof & demand the missing money' : 'Share the fair-deal record'}
-          </a>
+          </button>
         </div>
       )}
     </div>

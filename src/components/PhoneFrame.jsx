@@ -31,7 +31,7 @@ export function StatusBar() {
       <span className="flex items-center gap-1.5 drop-shadow">
         <Signal className="w-3.5 h-3.5" strokeWidth={2.6} />
         <Wifi className="w-3.5 h-3.5" strokeWidth={2.6} />
-        <BatteryFull className="w-4.5 h-4.5 w-[18px]" strokeWidth={2.2} />
+        <BatteryFull className="h-[18px] w-[18px]" strokeWidth={2.2} />
       </span>
     </div>
   );
@@ -57,7 +57,12 @@ export default function PhoneFrame({ children, onHome }) {
         AGRIPULSE AI • FARMER COMMERCE OS
       </div>
 
-      <div className="relative" style={{ height: 'min(94dvh, 880px)', aspectRatio: '9 / 19' }}>
+      {/*
+        Sized off the STABLE viewport (vh), not dvh — the dynamic viewport
+        grows/shrinks with the URL bar & on-screen keyboard, which re-derived
+        a wider/narrower phone through the aspect ratio on every change.
+      */}
+      <div className="relative" style={{ height: 'min(94vh, 880px)', aspectRatio: '9 / 19', maxWidth: '96vw' }}>
         {/* side hardware buttons */}
         <div className="absolute -left-[3px] top-[18%] h-14 w-[4px] rounded-l-md bg-zinc-800" />
         <div className="absolute -left-[3px] top-[28%] h-20 w-[4px] rounded-l-md bg-zinc-800" />

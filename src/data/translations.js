@@ -15,6 +15,7 @@ export const T = {
     savedLocally: 'Saved Locally',
     footerText: 'AgriPulse AI • Built for Farmers • Zero Network Overhead',
     tabs: {
+      market: 'Direct Market',
       patti: 'Patti Audit',
       weigh: 'Weigh Check',
       grade: 'Proof of Grade',
@@ -240,6 +241,7 @@ export const T = {
     savedLocally: 'फोन में सुरक्षित',
     footerText: 'एग्रीपल्स एआई • भारतीय किसानों के लिए समर्पित • 100% मुफ्त व ऑफलाइन',
     tabs: {
+      market: 'सीधा बाज़ार',
       patti: 'पट्टी ऑडिट',
       weigh: 'तौल जांच',
       grade: 'गुणवत्ता प्रमाण',

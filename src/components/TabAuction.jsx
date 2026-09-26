@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Gavel, Users, Timer, Trophy, MapPin, MessageCircle, Loader2 } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { inr } from '../utils/evidence';
+import { sendWhatsApp } from './WhatsAppScreen';
 
 /*
  * REVERSE FERTILIZER AUCTION
@@ -75,7 +76,7 @@ export default function TabAuction({ isSunlightMode }) {
   const savePerUnit = winner ? product.mrp - winner.price : 0;
   const mySaving = savePerUnit * myQty;
 
-  const waOrder = winner ? encodeURIComponent(
+  const waOrder = winner ? (
     `REVERSE AUCTION RESULT (AgriPulse AI)\n${product.name} — pooled order ${totalQty} ${product.unit}\nWinning bid: ${winner.name} @ ${inr(winner.price)}/${product.unit} (MRP ${inr(product.mrp)})\nMy share: ${myQty} ${product.unit} = ${inr(winner.price * myQty)} (saved ${inr(mySaving)})\nConfirming pickup.`) : '';
 
   return (
@@ -155,10 +156,15 @@ export default function TabAuction({ isSunlightMode }) {
             Your {myQty} {product.unit} = {inr(winner.price * myQty)} — you save {inr(mySaving)} vs MRP
           </div>
           <div className="grid grid-cols-2 gap-2 mt-3">
-            <a href={`https://wa.me/?text=${waOrder}`} target="_blank" rel="noreferrer" onClick={() => sound.playClick()}
+            <button onClick={() => { sound.playClick(); sendWhatsApp({
+                name: winner.name, avatar: '🏪', phone: '9876500075', message: waOrder,
+                replies: [
+                  { text: 'Order pakka! 🎉 Pura lot hamara.', delay: 1800 },
+                  { text: `${totalQty} ${product.unit} kal subah 8 baje tak ready rahega. Village pickup point par de denge.`, delay: 2400 },
+                ] }); }}
               className="min-h-[56px] rounded-2xl bg-emerald-600 text-white font-black text-xs flex items-center justify-center gap-1.5 active:scale-[0.98]">
               <MessageCircle className="w-4 h-4" /> Confirm on WhatsApp
-            </a>
+            </button>
             <a href={`https://www.google.com/maps/search/${encodeURIComponent(winner.name)}`} target="_blank" rel="noreferrer" onClick={() => sound.playClick()}
               className={`min-h-[56px] rounded-2xl border-2 font-black text-xs flex items-center justify-center gap-1.5 active:scale-[0.98] ${isSunlightMode ? 'border-zinc-300 text-zinc-800' : 'border-zinc-700 text-zinc-200'}`}>
               <MapPin className="w-4 h-4" /> Directions ({winner.dist})

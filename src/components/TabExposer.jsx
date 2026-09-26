@@ -1,8 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { Camera, Mic, Search, MessageCircle, Store, FlaskConical, TrendingDown } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { speechEngine, speechLangCode } from '../utils/speech';
 import { lookupBrand, lookupFromPhoto, SAMPLE_SHOPS, GENERIC_REGISTRY } from '../data/genericRegistry';
 import { inr } from '../utils/evidence';
+import { sendWhatsApp } from './WhatsAppScreen';
 
 /*
  * PESTICIDE PRICE EXPOSER
@@ -11,7 +13,7 @@ import { inr } from '../utils/evidence';
  * local shops that stock it. Negotiation ammo in one text message.
  */
 
-export default function TabExposer({ isSunlightMode }) {
+export default function TabExposer({ isSunlightMode, selectedLang = 'hi' }) {
   const card = isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-[#121514] border-[#1f2421] text-white';
   const sub = isSunlightMode ? 'text-zinc-600' : 'text-zinc-400';
   const fileRef = useRef(null);
@@ -36,28 +38,34 @@ export default function TabExposer({ isSunlightMode }) {
     e.target.value = '';
   };
 
-  // Local speech input for the brand name — separate from the global
-  // Kisan Sahayak assistant, which stays untouched.
+  // Local speech input for the brand name — shares the app-wide engine
+  // (interim text streams into the box; alternates rescue mis-hearings).
   const onSpeak = () => {
     sound.playClick();
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert('Speech recognition not supported on this browser'); return; }
-    const rec = new SR();
-    rec.lang = 'hi-IN'; rec.interimResults = false;
+    if (listening) { speechEngine.stopListening(); setListening(false); return; }
     setListening(true);
-    rec.onresult = (ev) => {
-      const text = ev.results[0][0].transcript;
-      setQuery(text); setListening(false);
-      show(lookupBrand(text) || lookupFromPhoto(text));
-    };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
-    try { rec.start(); } catch { setListening(false); }
+    let acted = false;
+    speechEngine.startListening(
+      speechLangCode(selectedLang),
+      (text, meta = {}) => {
+        setQuery(text);
+        if (meta.final && text.trim() && !acted) {
+          acted = true;
+          setListening(false);
+          // Try the primary transcript, then each recognizer alternative.
+          const candidates = [text, ...(meta.alternatives || [])];
+          const hit = candidates.map((c) => lookupBrand(c)).find(Boolean);
+          show(hit || lookupFromPhoto(text));
+        }
+      },
+      () => setListening(false),
+      () => setListening(false)
+    );
   };
 
   const savings = result ? result.brandedPrice - result.genericPrice : 0;
   const savingsPct = result ? Math.round((savings / result.brandedPrice) * 100) : 0;
-  const waText = result ? encodeURIComponent(
+  const waText = result ? (
     `GENERIC PRICE CHECK (AgriPulse AI)\nActive ingredient: ${result.activeIngredient}\nGeneric: ${result.genericName} — TRUE wholesale ${inr(result.genericPrice)} / ${result.unit}\nBranded price being charged: ${inr(result.brandedPrice)} (${savingsPct}% more!)\nStocked at: ${SAMPLE_SHOPS.map((s) => `${s.name} (${s.dist})`).join(', ')}\nGive me the generic or match the price.`) : '';
 
   return (
@@ -121,10 +129,15 @@ export default function TabExposer({ isSunlightMode }) {
             ))}
           </div>
 
-          <a href={`https://wa.me/?text=${waText}`} target="_blank" rel="noreferrer" onClick={() => sound.playClick()}
+          <button onClick={() => { sound.playClick(); sendWhatsApp({
+              name: 'Agro Dealer', avatar: '🏪', phone: '9876500074', message: waText,
+              replies: [
+                { text: `${result.genericName} stock mein hai ji.`, delay: 1800 },
+                { text: `Theek hai, ${inr(result.genericPrice)} wale generic par de deta hun — branded ka kya faida. 🙂`, delay: 2400 },
+              ] }); }}
             className="w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98]">
-            <MessageCircle className="w-5 h-5" /> Text me this — negotiate at the counter
-          </a>
+            <MessageCircle className="w-5 h-5" /> Send to the dealer — negotiate on record
+          </button>
         </>
       )}
     </div>

@@ -278,7 +278,7 @@ export default function Header({
                       row.on ? 'bg-emerald-400 border-emerald-300' : isSunlightMode ? 'bg-zinc-100 border-zinc-300' : 'bg-zinc-800 border-zinc-700'
                     }`}
                   >
-                    <RowIcon className={`w-4.5 h-4.5 ${row.on ? row.iconOn : row.iconOff}`} />
+                    <RowIcon className={`w-[18px] h-[18px] ${row.on ? row.iconOn : row.iconOff}`} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className={`block text-xs font-black ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>{row.label}</span>
@@ -291,7 +291,7 @@ export default function Header({
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 h-4.5 w-4.5 rounded-full shadow transition-all ${
+                      className={`absolute top-0.5 h-[18px] w-[18px] rounded-full shadow transition-all ${
                         row.on ? 'left-[calc(100%-1.25rem)] bg-black' : `left-0.5 ${isSunlightMode ? 'bg-white' : 'bg-zinc-300'}`
                       }`}
                     />
@@ -309,7 +309,7 @@ export default function Header({
               }`}
             >
               <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-amber-400 border-amber-300`}>
-                <Download className="w-4.5 h-4.5 text-black" />
+                <Download className="w-[18px] h-[18px] text-black" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className={`block text-xs font-black ${isSunlightMode ? 'text-zinc-900' : 'text-white'}`}>

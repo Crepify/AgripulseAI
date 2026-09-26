@@ -226,12 +226,8 @@ function loadGsiScript() {
 export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', setSelectedLang }) {
   const l = L[selectedLang] || L.en;
 
-  const __savedLogin = (() => { try { return JSON.parse(sessionStorage.getItem('ap_login_pos') || 'null'); } catch (e) { return null; } })();
-  const [step, setStep] = useState(() => {
-    const s = __savedLogin && __savedLogin.step;
-    return (s === 'register' || s === 'aadhaar_login') ? s : 'phone';
-  }); // phone | register | aadhaar_login | aadhaar_otp | otp | success
-  const [phone, setPhone] = useState(() => (__savedLogin && __savedLogin.phone) || '');
+  const [step, setStep] = useState('phone'); // phone | register | aadhaar_login | aadhaar_otp | otp | success
+  const [phone, setPhone] = useState('');
   const [showMore, setShowMore] = useState(false); // advanced sign-in options
   const [showHelp, setShowHelp] = useState(false);     // pictured help sheet
   const [guideActive, setGuideActive] = useState(false);
@@ -391,13 +387,6 @@ export default function LoginPage({ onSuccess, onCancel, selectedLang = 'hi', se
     const unsubscribe = voiceGuide.subscribe(() => setGuideActive(voiceGuide.active));
     return unsubscribe;
   }, []);
-
-  useEffect(() => {
-    try {
-      if (step === 'success') sessionStorage.removeItem('ap_login_pos');
-      else sessionStorage.setItem('ap_login_pos', JSON.stringify({ step, phone: phone || '' }));
-    } catch (e) {}
-  }, [step, phone]);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Scan, Scale, ReceiptText, TrendingUp, LayoutGrid, X } from 'lucide-react';
+import { Scan, Scale, ReceiptText, TrendingUp, LayoutGrid, X, BadgeCheck, FlaskConical, Truck, Gavel, Store } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
 
@@ -11,10 +11,11 @@ import { T } from '../data/translations';
  */
 
 const MORE_TABS = [
-  { id: 'grade', label: 'Proof of Grade', emoji: '📜' },
-  { id: 'exposer', label: 'Price Exposer', emoji: '💊' },
-  { id: 'pool', label: 'Truck Pooling', emoji: '🚚' },
-  { id: 'auction', label: 'Reverse Auction', emoji: '🔨' },
+  { id: 'grade', label: 'Proof of Grade', icon: BadgeCheck },
+  { id: 'exposer', label: 'Price Exposer', icon: FlaskConical },
+  { id: 'pool', label: 'Truck Pooling', icon: Truck },
+  { id: 'auction', label: 'Reverse Auction', icon: Gavel },
+  { id: 'market', label: 'Direct Market', icon: Store },
 ];
 
 export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSunlightMode }) {
@@ -69,13 +70,14 @@ export default function BottomNav({ activeTab, setActiveTab, selectedLang, isSun
               <div className="grid grid-cols-3 gap-2">
                 {MORE_TABS.map((m) => {
                   const active = activeTab === m.id;
+                  const MIcon = m.icon;
                   return (
                     <button key={m.id} onClick={() => go(m.id)}
-                      className={`min-h-[84px] rounded-2xl border-2 flex flex-col items-center justify-center gap-1 active:scale-95 transition-transform ${
+                      className={`min-h-[84px] rounded-2xl border-2 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-transform ${
                         active ? 'bg-emerald-500 text-black border-emerald-400'
                           : isSunlightMode ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-zinc-900 border-zinc-800 text-zinc-100'
                       }`}>
-                      <span className="text-3xl leading-none">{m.emoji}</span>
+                      <MIcon className={`w-7 h-7 ${active ? 'text-black' : 'text-emerald-500'}`} strokeWidth={2.2} />
                       <span className="text-[11px] font-black text-center leading-tight px-1">{t.tabs?.[m.id] || m.label}</span>
                     </button>
                   );
