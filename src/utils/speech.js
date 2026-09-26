@@ -165,9 +165,18 @@ class SpeechEngine {
             setTimeout(() => attemptStart(retriesLeft - 1), 350);
             return;
           }
-          throw err;
+          // Giving up must NEVER throw: this runs inside a setTimeout, so a
+          // rethrow here is an UNCAUGHT window error — the app's stale-asset
+          // recovery would reload the page and wipe whatever the farmer was
+          // typing. Report it like any other mic failure instead.
+          this.isListening = false;
+          if (onError) onError(err);
         }
       };
+      // Another component (Voice Fill, the guide's own revive timer) may
+      // still hold the shared recognizer open — a start() on top of it is
+      // the classic InvalidStateError. Clear the decks first.
+      try { this.recognition.abort(); } catch { /* wasn't running */ }
       attemptStart(2);
     } catch (err) {
       this.isListening = false;
