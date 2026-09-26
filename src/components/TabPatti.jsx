@@ -80,7 +80,7 @@ export default function TabPatti({ isSunlightMode }) {
     `\nLegal cash due: ${audit.dueDateText} (${audit.rules.paymentDueDays} days, ${audit.rules.state} APMC)\nPay the legal balance or this goes to the Mandi Secretary.`) : '';
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">PATTI AUDITOR • पर्ची जांच</div>
         <div className="text-lg font-black">Catch illegal fees on your payment slip</div>

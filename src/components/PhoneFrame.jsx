@@ -73,7 +73,7 @@ export default function PhoneFrame({ children, onHome }) {
               <span className="h-2.5 w-2.5 rounded-full bg-zinc-800 ring-1 ring-zinc-700" />
             </div>
             {/* app viewport */}
-            <div className="h-full w-full overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain">
+            <div className="ap-screen-scroll h-full w-full overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain">
               {children}
             </div>
             {/* home indicator — tap to go back to the phone home screen */}

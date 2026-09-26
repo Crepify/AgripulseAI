@@ -31,6 +31,23 @@ html {
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
+  /*
+    Tabs have different heights (Scanner fits the screen, Weigh/Patti scroll).
+    Without a reserved gutter the scrollbar pops in/out on every tab switch
+    and the whole centered layout shifts/resizes. Reserve the space once.
+  */
+  scrollbar-gutter: stable;
+}
+
+/*
+  Mobile browsers auto-zoom the page when focusing an input whose font-size
+  is below 16px — that "UI grows" effect when tapping the Weigh/ROI number
+  fields. Keep form controls at ≥16px on real phones so the zoom never fires.
+*/
+@media (max-width: 519px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
 
 body {

@@ -84,7 +84,7 @@ export default function TabPool({ isSunlightMode }) {
     `AGRIPULSE POOL DISPATCH\n${market} run — ${pooledKg} kg total (${1 + joined.length} farmers)\nPickups: You (${myKg}kg), ${joined.map((f) => `${f.name} ${f.kg}kg`).join(', ')}\nFreight ${inr(BASE_FREIGHT)} split by weight. Confirm 6 AM tomorrow.`);
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">TRUCK POOLING • साझा ट्रक</div>
         <div className="text-lg font-black">Small load? Don't pay for an empty truck</div>

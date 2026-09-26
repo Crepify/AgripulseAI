@@ -61,7 +61,7 @@ export default function TabExposer({ isSunlightMode }) {
     `GENERIC PRICE CHECK (AgriPulse AI)\nActive ingredient: ${result.activeIngredient}\nGeneric: ${result.genericName} — TRUE wholesale ${inr(result.genericPrice)} / ${result.unit}\nBranded price being charged: ${inr(result.brandedPrice)} (${savingsPct}% more!)\nStocked at: ${SAMPLE_SHOPS.map((s) => `${s.name} (${s.dist})`).join(', ')}\nGive me the generic or match the price.`) : '';
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">PRICE EXPOSER • असली दाम</div>
         <div className="text-lg font-black">Branded chemical = up to 90% overpriced</div>

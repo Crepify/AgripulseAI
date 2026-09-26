@@ -71,7 +71,7 @@ export default function TabWeigh({ isSunlightMode }) {
   );
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">WEIGHING FRAUD TRACKER • तौल चोरी पकड़ो</div>
         <div className="text-lg font-black">1–2 kg stolen per bag ≈ ₹2,200 per trip</div>

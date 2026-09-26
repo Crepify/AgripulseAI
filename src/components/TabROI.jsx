@@ -49,7 +49,7 @@ export default function TabROI({ isSunlightMode }) {
   const profitable = net > 0;
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">ROI SIMULATOR • मुनाफ़ा कैलकुलेटर</div>
         <div className="text-lg font-black">Know your profit BEFORE the truck leaves</div>

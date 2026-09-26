@@ -79,7 +79,7 @@ export default function TabAuction({ isSunlightMode }) {
     `REVERSE AUCTION RESULT (AgriPulse AI)\n${product.name} — pooled order ${totalQty} ${product.unit}\nWinning bid: ${winner.name} @ ${inr(winner.price)}/${product.unit} (MRP ${inr(product.mrp)})\nMy share: ${myQty} ${product.unit} = ${inr(winner.price * myQty)} (saved ${inr(mySaving)})\nConfirming pickup.`) : '';
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">REVERSE AUCTION • उल्टी बोली</div>
         <div className="text-lg font-black">Make dealers fight for YOUR order</div>

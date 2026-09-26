@@ -120,6 +120,15 @@ export default function App() {
     try { localStorage.setItem('ap_low_literacy', String(isLowLiteracy)); } catch {}
   }, [isLowLiteracy]);
 
+  // Every tab opens from the top — switching mid-scroll used to land the new
+  // tab halfway down, making the layout look like it "changed size".
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      document.querySelector('.ap-screen-scroll')?.scrollTo({ top: 0, behavior: 'instant' });
+    } catch {}
+  }, [activeTab]);
+
   // ── Voice guide: run the service tour once the farmer logs in ──────────
   useEffect(() => {
     // subscribe (not a single callback slot) so the login page's subscription

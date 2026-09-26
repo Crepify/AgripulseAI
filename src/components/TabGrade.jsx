@@ -57,7 +57,7 @@ export default function TabGrade({ isSunlightMode }) {
     `PROOF OF GRADE ${cert.id} (AgriPulse AI)\nCrop: ${cert.crop} — GRADE ${cert.grade}\nSurface defects: ${cert.defects}% • Color ${cert.color}/100 • Size ${cert.size}/100 • Moisture ${cert.moisture}%\nScanned at farm gate: ${cert.stamp.time}${cert.stamp.loc ? ` • GPS ${cert.stamp.loc.lat}, ${cert.stamp.loc.lng}` : ''}\nSHA-256: ${cert.stamp.hashShort}…\nAny "quality cut" beyond this certificate is fraud.`) : '';
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="w-full space-y-4">
       <div className={`p-4 rounded-2xl border ${card}`}>
         <div className="text-[10px] font-mono font-black tracking-widest text-emerald-500">PROOF OF GRADE • गुणवत्ता प्रमाण</div>
         <div className="text-lg font-black">Kill the fake 20% "quality cut"</div>
