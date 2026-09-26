@@ -1,108 +1,79 @@
 /**
- * Vercel Function  GET|POST /api/whatsapp-webhook
+ * FILE 3 — Webhook Verification & Ingestion Router (Vercel adapter)
+ * ─────────────────────────────────────────────────────────────────────────
+ *   GET  /api/whatsapp-webhook   Meta verification handshake
+ *   POST /api/whatsapp-webhook   inbound message ingestion
  *
- * FARMER WHATSAPP CONVERSATIONAL PASSBOOK — webhook endpoint.
+ * Meta handshake: echoes hub.challenge as plain text iff
+ * hub.mode === 'subscribe' && hub.verify_token matches WHATSAPP_VERIFY_TOKEN.
  *
- * GET  — Meta Cloud API verification handshake (hub.challenge echo).
- * POST — Incoming WhatsApp voice note → STT (Whisper / Sarvam AI for Indian
- *        languages) → structured deal JSON → interactive template reply.
+ * POST contract: ALWAYS answer 200 fast. Meta retries (and eventually
+ * disables) webhooks that are slow or non-200 — so parsing/processing
+ * errors are swallowed after logging, and per-message work is bounded by a
+ * hard time cap so the ACK can never hang on a slow upstream.
  *
- * Set WHATSAPP_VERIFY_TOKEN / WHATSAPP_ACCESS_TOKEN / SARVAM_API_KEY in
- * Vercel env vars for live mode; without them the route runs a fully
- * deterministic mock so the demo flow works end-to-end.
+ * The same core router also powers server/index.js (standalone node:http
+ * deployment) — this file is only the serverless transport shim.
  */
 
-const json = (data, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
+import { config } from '../server/whatsapp/config.js';
+import { handleInboundEvent } from '../server/whatsapp/router.js';
 
-// Meta webhook verification handshake
+/* ── GET: verification handshake ────────────────────────────────────── */
+
 export async function GET(request) {
   const url = new URL(request.url);
   const mode = url.searchParams.get('hub.mode');
   const token = url.searchParams.get('hub.verify_token');
   const challenge = url.searchParams.get('hub.challenge');
-  const expected = process.env.WHATSAPP_VERIFY_TOKEN || 'agripulse-verify';
-  if (mode === 'subscribe' && token === expected) {
-    return new Response(challenge || '', { status: 200 });
+
+  if (mode === 'subscribe' && token === config.verifyToken) {
+    // Meta requires the raw challenge string back, 200, text/plain.
+    return new Response(challenge ?? '', {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain' },
+    });
   }
-  return json({ error: 'Webhook verification failed' }, 403);
+  return new Response('Forbidden', { status: 403 });
 }
 
-/**
- * Mock STT: converts a Hindi/Marathi voice note into the structured deal
- * intent. In production this calls OpenAI Whisper or Sarvam AI (better for
- * Indic languages), then an LLM extraction pass.
- */
-function mockTranscribeVoiceNote(/* mediaId */) {
-  return {
-    transcript: 'मेरे पास पाँच क्विंटल टमाटर है, खेड़ गाँव से। कल बेचना है।',
-    structured: { crop: 'Tomato', quantityQuintals: 5, village: 'Khed' },
-    sttProvider: 'sarvam-ai (mock)',
-    confidence: 0.94,
-  };
-}
+/* ── POST: inbound ingestion ────────────────────────────────────────── */
 
-/** Build the interactive template reply (net-in-hand ONLY — never gross). */
-function buildInteractiveReply(to, deal) {
-  const FARMER_NET = 235; // ₹/quintal net-in-hand (see saathiEconomics)
-  const net = deal.quantityQuintals * FARMER_NET;
-  return {
-    messaging_product: 'whatsapp',
-    to,
-    type: 'interactive',
-    interactive: {
-      type: 'button',
-      body: {
-        text:
-          `🌾 ${deal.crop} • ${deal.quantityQuintals} क्विंटल • ${deal.village}\n` +
-          `आपको मिलेंगे: *₹${net.toLocaleString('en-IN')} सीधे बैंक में* (₹${FARMER_NET}/क्विंटल NET)\n` +
-          `मंडी से ~₹${(deal.quantityQuintals * 30).toLocaleString('en-IN')} ज़्यादा। कोई कटौती नहीं।`,
-      },
-      action: {
-        buttons: [
-          { type: 'reply', reply: { id: 'confirm_deal', title: '✅ हाँ, बेचना है' } },
-          { type: 'reply', reply: { id: 'open_passbook', title: '📗 पासबुक देखें' } },
-          { type: 'reply', reply: { id: 'talk_saathi', title: '🧑‍🌾 साथी से बात' } },
-        ],
-      },
-    },
-  };
-}
+const ACK = () =>
+  new Response(JSON.stringify({ status: 'received' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 
 export async function POST(request) {
-  let body;
-  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
+  let payload = null;
+  try {
+    payload = await request.json();
+  } catch {
+    return ACK(); // malformed body — still 200 so Meta never retries forever
+  }
 
   try {
-    const entry = body?.entry?.[0]?.changes?.[0]?.value;
-    const message = entry?.messages?.[0];
-    if (!message) return json({ status: 'ignored', reason: 'no message in payload' });
-
-    const from = message.from || 'unknown';
-
-    // Voice note → STT → structured deal
-    if (message.type === 'audio' || message.type === 'voice' || body?.mockVoice) {
-      const stt = mockTranscribeVoiceNote(message.audio?.id);
-      const reply = buildInteractiveReply(from, stt.structured);
-
-      // Live mode: POST `reply` to graph.facebook.com/v19.0/{phoneId}/messages
-      // with WHATSAPP_ACCESS_TOKEN. Mocked here for the demo.
-      return json({
-        status: 'processed',
-        stt,
-        outboundTemplate: reply,
-        passbookLink: `/passbook/${Date.now().toString(36)}`,
-      });
+    if (payload?.object === 'whatsapp_business_account') {
+      // Route every change in every entry. Sender phone lives at
+      // entry[].changes[].value.messages[].from — extracted in the router.
+      const jobs = [];
+      for (const entry of payload.entry || []) {
+        for (const change of entry.changes || []) {
+          if (change.field === 'messages') jobs.push(handleInboundEvent(change.value));
+        }
+      }
+      // Serverless caveat: work started after the response returns can be
+      // frozen by the platform, so we await — but bounded by a hard cap so
+      // the ACK is always fast. Replies that miss the cap complete on the
+      // next warm invocation via the idempotency guard in store.js.
+      await Promise.race([
+        Promise.allSettled(jobs),
+        new Promise((r) => setTimeout(r, 8000)),
+      ]);
     }
-
-    // Button replies route back into the deal state machine
-    if (message.type === 'interactive') {
-      const id = message.interactive?.button_reply?.id;
-      return json({ status: 'button', action: id || 'unknown' });
-    }
-
-    return json({ status: 'ignored', type: message.type });
   } catch (err) {
-    return json({ error: err.message || 'Webhook processing failed' }, 500);
+    console.error('[whatsapp-webhook]', err); // never surface as non-200
   }
+  return ACK();
 }
