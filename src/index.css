@@ -50,6 +50,23 @@ html {
   }
 }
 
+/*
+  Hard clamp against horizontal growth: long unbroken strings (SHA-256
+  fingerprints, WhatsApp payload text) and oversized media can silently
+  widen the phone. Nothing is allowed to push the frame sideways.
+*/
+#ap-phone-frame {
+  overflow-x: clip;
+}
+#ap-phone-frame img,
+#ap-phone-frame video,
+#ap-phone-frame canvas {
+  max-width: 100%;
+}
+#ap-phone-frame .font-mono {
+  overflow-wrap: anywhere;
+}
+
 body {
   margin: 0;
   padding: 0;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Mic, X } from 'lucide-react';
-import { speechEngine } from '../utils/speech';
+import { speechEngine, speechLangCode } from '../utils/speech';
 import { classifyVoiceIntent } from '../utils/voiceNavigator';
 import { sound } from '../utils/audio';
 
@@ -24,12 +24,15 @@ export default function HandsFreeVoiceBanner({ isHandsFree, onToggle, selectedLa
 
   const startHandsFreeLoop = () => {
     setIsListening(true);
-    const langCode = selectedLang === 'hi' ? 'hi-IN' : selectedLang === 'ta' ? 'ta-IN' : selectedLang === 'te' ? 'te-IN' : selectedLang === 'kn' ? 'kn-IN' : 'en-IN';
+    const langCode = speechLangCode(selectedLang);
 
     speechEngine.startListening(
       langCode,
-      (transcript) => {
+      (transcript, meta = {}) => {
         setLastHeard(transcript);
+        // Only navigate on FINAL results — interim noise fragments used to
+        // fire phantom tab switches mid-sentence.
+        if (!meta.final || !transcript.trim()) return;
         const intent = classifyVoiceIntent(transcript, selectedLang);
         if (intent && intent.targetTab) {
           sound.playSuccess();

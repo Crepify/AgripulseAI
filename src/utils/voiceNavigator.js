@@ -27,7 +27,7 @@ export function classifyVoiceIntent(query) {
   }
 
   // 2) Weighing Fraud Tracker — scale / weight / kata / tola
-  if (has('weigh', 'weight', 'वजन', 'तौल', 'scale', 'कांटा', 'kanta', 'तराजू', 'wajan', 'tol')) {
+  if (has('weigh', 'weight', 'वजन', 'तौल', 'scale', 'कांट', 'kanta', 'kante', 'तराजू', 'wajan', 'tol')) {
     return {
       targetTab: 'weigh',
       tabLabel: { hi: 'तौल जांच', en: 'Weighing Check', ta: 'எடை சரிபார்ப்பு', te: 'తూకం తనిఖీ', kn: 'ತೂಕ ಪರಿಶೀಲನೆ', mr: 'वजन तपासणी', pa: 'ਤੋਲ ਜਾਂਚ', bn: 'ওজন যাচাই', gu: 'તોલ તપાસ' },
@@ -117,6 +117,25 @@ export function classifyVoiceIntent(query) {
         pa: 'ਉਲਟੀ ਬੋਲੀ ਖੋਲ੍ਹੀ ਗਈ। ਖਾਦ ਦਾ ਆਰਡਰ ਪਾਓ।',
         bn: 'বিপরীত নিলাম খোলা হয়েছে। সারের অর্ডার দিন।',
         gu: 'ઊંધી હરાજી ખોલવામાં આવી છે. ખાતરનો ઓર્ડર મૂકો.',
+      },
+    };
+  }
+
+  // 9) Direct Market — sell straight to urban buyers, no middlemen
+  if (has('direct', 'सीधा', 'सीधे', 'बिचौलि', 'bichauli', 'middleman', 'customer', 'ग्राहक', 'society', 'सोसाइटी', 'शहर में बेच', 'sell direct', 'marketplace', 'doorstep')) {
+    return {
+      targetTab: 'market',
+      tabLabel: { hi: 'सीधा बाज़ार', en: 'Direct Market', ta: 'நேரடி சந்தை', te: 'ప్రత్యక్ష మార్కెట్', kn: 'ನೇರ ಮಾರುಕಟ್ಟೆ', mr: 'थेट बाजार', pa: 'ਸਿੱਧਾ ਬਾਜ਼ਾਰ', bn: 'সরাসরি বাজার', gu: 'સીધું બજાર' },
+      speechResponse: {
+        hi: 'सीधा बाज़ार खोल दिया गया है। अपनी फसल का दाम खुद तय करें — शहर की सोसाइटी और दुकानें बिना बिचौलिए के सीधे आपसे खरीदेंगी।',
+        en: 'Opening Direct Market. Set your own fair price — urban societies, restaurants and shops buy straight from you with no middleman.',
+        ta: 'நேரடி சந்தை திறக்கப்பட்டது. உங்கள் விலையை நீங்களே நிர்ணயியுங்கள்.',
+        te: 'ప్రత్యక్ష మార్కెట్ తెరవబడింది. మీ ధర మీరే నిర్ణయించండి.',
+        kn: 'ನೇರ ಮಾರುಕಟ್ಟೆ ತೆರೆಯಲಾಗಿದೆ. ನಿಮ್ಮ ಬೆಲೆ ನೀವೇ ನಿಗದಿಪಡಿಸಿ.',
+        mr: 'थेट बाजार उघडला आहे. तुमची किंमत तुम्हीच ठरवा.',
+        pa: 'ਸਿੱਧਾ ਬਾਜ਼ਾਰ ਖੋਲ੍ਹਿਆ ਗਿਆ। ਆਪਣੀ ਕੀਮਤ ਆਪ ਤੈਅ ਕਰੋ।',
+        bn: 'সরাসরি বাজার খোলা হয়েছে। নিজের দাম নিজে ঠিক করুন।',
+        gu: 'સીધું બજાર ખોલવામાં આવ્યું છે. તમારી કિંમત તમે નક્કી કરો.',
       },
     };
   }

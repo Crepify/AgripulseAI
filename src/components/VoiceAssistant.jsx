@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, X, Sparkles, ArrowRight, Navigation, Bot } from 'lucide-react';
-import { speechEngine } from '../utils/speech';
+import { speechEngine, speechLangCode } from '../utils/speech';
 import { classifyVoiceIntent } from '../utils/voiceNavigator';
 import { sound } from '../utils/audio';
 import { T } from '../data/translations';
@@ -12,6 +12,9 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
   const [transcript, setTranscript] = useState('');
   const [aiResponse, setAiResponse] = useState(null);
   const [navigatedTab, setNavigatedTab] = useState(null);
+  // Latest heard text lives in a ref — the old version read the `transcript`
+  // STATE inside onEnd, which was a stale closure and always acted on ''.
+  const heardRef = useRef({ text: '', acted: false });
 
   const sampleQuestions = [
     { text: 'टमाटर में रोग है', topic: 'scan' },
@@ -21,6 +24,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     { text: 'दवा का असली दाम', topic: 'exposer' },
     { text: 'ट्रक साझा करो', topic: 'pool' },
     { text: 'खाद की बोली लगाओ', topic: 'auction' },
+    { text: 'बिना बिचौलिए बेचो', topic: 'market' },
     { text: 'मंडी भाव बताओ', topic: 'mandi' },
   ];
 
@@ -45,24 +49,44 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     if (isListening) {
       speechEngine.stopListening();
       setIsListening(false);
-    } else {
-      setIsListening(true);
-      const langMap = { hi: 'hi-IN', en: 'en-IN', ta: 'ta-IN', te: 'te-IN', kn: 'kn-IN', mr: 'mr-IN', gu: 'gu-IN', bn: 'bn-IN', pa: 'pa-IN' };
-      const speechLangCode = langMap[selectedLang] || 'hi-IN';
-      speechEngine.startListening(
-        speechLangCode,
-        (text) => setTranscript(text),
-        () => {
-          setIsListening(false);
-          const finalText = transcript || 'मंडी भाव बताओ';
-          handleAsk(finalText);
-        },
-        () => {
-          setIsListening(false);
-          handleAsk(transcript || 'मंडी भाव बताओ');
-        }
-      );
+      return;
     }
+    heardRef.current = { text: '', acted: false };
+    setTranscript('');
+    setAiResponse(null);
+    setNavigatedTab(null);
+    setIsListening(true);
+    speechEngine.startListening(
+      speechLangCode(selectedLang),
+      (text, meta = {}) => {
+        // Live interim text streams into the UI; we only ACT on final results.
+        setTranscript(text);
+        heardRef.current.text = text;
+        if (meta.final && text.trim() && !heardRef.current.acted) {
+          heardRef.current.acted = true;
+          setIsListening(false);
+          speechEngine.stopListening();
+          handleAsk(text.trim());
+        }
+      },
+      () => {
+        // Recognizer ended (silence/timeout) — act on whatever was heard.
+        setIsListening(false);
+        const heard = heardRef.current.text.trim();
+        if (heard && !heardRef.current.acted) {
+          heardRef.current.acted = true;
+          handleAsk(heard);
+        }
+      },
+      () => {
+        setIsListening(false);
+        const heard = heardRef.current.text.trim();
+        if (heard && !heardRef.current.acted) {
+          heardRef.current.acted = true;
+          handleAsk(heard);
+        }
+      }
+    );
   };
 
   return (
@@ -73,7 +97,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
             <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-xl bg-[#181c1a] text-zinc-400 hover:text-white"><X className="w-5 h-5" /></button>
             <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-2xl mb-2 shadow-[0_0_20px_rgba(16,185,129,0.4)]">👨‍🌾</div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2"><Bot className="w-5 h-5 text-emerald-400" /> {t.assistant.title} — 22 Languages</h3>
-            <p className="text-xs text-emerald-300 font-mono">{t.assistant.subtitle} + Marketplace, Community, Jobs, Fuel, CSC</p>
+            <p className="text-xs text-emerald-300 font-mono">{t.assistant.subtitle} + Patti Audit, Weighing, Grade, Pooling, Auction</p>
 
             <div className="my-5 flex flex-col items-center">
               <button onClick={handleMic} className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${isListening ? 'bg-red-500 text-white animate-pulse shadow-[0_0_30px_rgba(239,68,68,0.8)] scale-105' : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_25px_rgba(16,185,129,0.5)] hover:scale-105'}`}><span className="sr-only">Mic</span>{isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8 fill-black" />}</button>
@@ -95,7 +119,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
                 <button key={i} onClick={() => handleAsk(sq.text)} className="w-full p-2.5 rounded-xl bg-[#181c1a] hover:bg-[#222825] border border-[#232925] text-xs text-zinc-300 text-left flex items-center justify-between"><span className="truncate">{sq.text}</span><ArrowRight className="w-3.5 h-3.5 text-emerald-400 shrink-0 ml-1" /></button>
               ))}
             </div>
-            <div className="mt-3 text-[10px] text-zinc-500">Voice → Intent → Auto-navigate + TTS in {selectedLang}. Works offline for 12 tabs. CSC: 1800 3000 3468</div>
+            <div className="mt-3 text-[10px] text-zinc-500">Voice → Intent → Auto-navigate + spoken reply in {selectedLang.toUpperCase()}. Kisan Call Centre: 1800-180-1551</div>
           </div>
         </div>
       )}

@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Truck, Users, MapPin, MessageCircle, Loader2, CircleCheck } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { speechEngine, speechLangCode } from '../utils/speech';
 import { inr } from '../utils/evidence';
+import { sendWhatsApp } from './WhatsAppScreen';
 
 /*
  * VOICE-ACTIVATED TRUCK POOLING
@@ -22,7 +24,7 @@ const NEARBY = [
   { name: 'Anil (Rajgurunagar)', kg: 250, dist: '4.9 km' },
 ];
 
-export default function TabPool({ isSunlightMode }) {
+export default function TabPool({ isSunlightMode, selectedLang = 'hi' }) {
   const card = isSunlightMode ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-[#121514] border-[#1f2421] text-white';
   const sub = isSunlightMode ? 'text-zinc-600' : 'text-zinc-400';
   const [myKg, setMyKg] = useState(300);
@@ -32,25 +34,41 @@ export default function TabPool({ isSunlightMode }) {
   const [phase, setPhase] = useState('idle'); // idle | searching | pooling | full
   const [joined, setJoined] = useState([]);
 
-  // Local speech input — the global voice assistant is untouched.
+  // Hindi/regional number words the recognizer often returns instead of digits.
+  const WORD_KG = { 'सौ': 100, 'डेढ़ सौ': 150, 'दो सौ': 200, 'ढाई सौ': 250, 'तीन सौ': 300, 'चार सौ': 400, 'पांच सौ': 500, 'छह सौ': 600, 'hundred': 100, 'two hundred': 200, 'three hundred': 300, 'four hundred': 400, 'five hundred': 500 };
+
+  const parseLoad = (text) => {
+    const digits = text.match(/(\d{2,4})/);
+    if (digits) return Math.min(900, Number(digits[1]));
+    const t = text.toLowerCase();
+    const hit = Object.keys(WORD_KG).sort((a, b) => b.length - a.length).find((w) => t.includes(w));
+    return hit ? WORD_KG[hit] : null;
+  };
+
+  // Local speech input — shares the app-wide engine; only final results act.
   const onSpeak = () => {
     sound.playClick();
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { startSearch(); return; }
-    const rec = new SR();
-    rec.lang = 'hi-IN'; rec.interimResults = false;
+    if (listening) { speechEngine.stopListening(); setListening(false); return; }
     setListening(true);
-    rec.onresult = (ev) => {
-      const text = ev.results[0][0].transcript;
-      setHeard(text);
-      const kgMatch = text.match(/(\d{2,4})/);
-      if (kgMatch) setMyKg(Math.min(900, Number(kgMatch[1])));
-      setListening(false);
-      startSearch();
-    };
-    rec.onerror = () => { setListening(false); startSearch(); };
-    rec.onend = () => setListening(false);
-    try { rec.start(); } catch { setListening(false); startSearch(); }
+    let acted = false;
+    speechEngine.startListening(
+      speechLangCode(selectedLang),
+      (text, meta = {}) => {
+        setHeard(text);
+        if (meta.final && text.trim() && !acted) {
+          acted = true;
+          setListening(false);
+          const kg = [text, ...(meta.alternatives || [])].map(parseLoad).find((v) => v != null);
+          if (kg) setMyKg(kg);
+          if (/pune|पुणे/i.test(text)) setMarket('Pune Mandi');
+          else if (/nashik|नासिक/i.test(text)) setMarket('Nashik Mandi');
+          else if (/mumbai|vashi|मुंबई|वाशी/i.test(text)) setMarket('Mumbai Vashi');
+          startSearch();
+        }
+      },
+      () => setListening(false),
+      () => setListening(false)
+    );
   };
 
   const startSearch = () => {
@@ -80,8 +98,8 @@ export default function TabPool({ isSunlightMode }) {
   const saving = SOLO_FREIGHT - myShare;
   const savingPct = Math.round((saving / SOLO_FREIGHT) * 100);
 
-  const smsDriver = encodeURIComponent(
-    `AGRIPULSE POOL DISPATCH\n${market} run — ${pooledKg} kg total (${1 + joined.length} farmers)\nPickups: You (${myKg}kg), ${joined.map((f) => `${f.name} ${f.kg}kg`).join(', ')}\nFreight ${inr(BASE_FREIGHT)} split by weight. Confirm 6 AM tomorrow.`);
+  const driverMsg =
+    `AGRIPULSE POOL DISPATCH\n${market} run — ${pooledKg} kg total (${1 + joined.length} farmers)\nPickups: You (${myKg}kg), ${joined.map((f) => `${f.name} ${f.kg}kg`).join(', ')}\nFreight ${inr(BASE_FREIGHT)} split by weight. Confirm 6 AM tomorrow.`;
 
   return (
     <div className="w-full space-y-4">
@@ -165,10 +183,15 @@ export default function TabPool({ isSunlightMode }) {
           <div className="mt-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-center text-emerald-600 font-black text-sm">
             You save {inr(saving)} ({savingPct}%) — freight {inr(BASE_FREIGHT)} split across {pooledKg} kg
           </div>
-          <a href={`sms:9876500055?body=${smsDriver}`} onClick={() => sound.playClick()}
+          <button onClick={() => { sound.playClick(); sendWhatsApp({
+              name: 'Ramu — Tata Ace Driver', avatar: '🚚', phone: '9876500055', message: driverMsg,
+              replies: [
+                { text: 'Ho jayega bhai! 6 baje pehla pickup aapke gate se. 🚜', delay: 1800 },
+                { text: 'Sab farmers ko location bhej dena. Mandi 9 baje tak pahunch jayenge.', delay: 2400 },
+              ] }); }}
             className="mt-3 w-full min-h-[56px] rounded-2xl bg-slate-900 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98]">
-            <MessageCircle className="w-5 h-5" /> SMS the driver — book 6 AM pickup
-          </a>
+            <MessageCircle className="w-5 h-5" /> WhatsApp the driver — book 6 AM pickup
+          </button>
         </div>
       )}
     </div>

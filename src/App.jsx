@@ -10,6 +10,8 @@ import TabExposer from './components/TabExposer';
 import TabPool from './components/TabPool';
 import TabAuction from './components/TabAuction';
 import TabROI from './components/TabROI';
+import TabMarket from './components/TabMarket';
+import WhatsAppScreen from './components/WhatsAppScreen';
 import VoiceAssistant from './components/VoiceAssistant';
 import HandsFreeVoiceBanner from './components/HandsFreeVoiceBanner';
 import BackgroundCanvas from './components/BackgroundCanvas';
@@ -308,6 +310,7 @@ export default function App() {
         {activeTab === 'pool' && <TabPool selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'auction' && <TabAuction selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         {activeTab === 'profit' && <TabROI selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
+        {activeTab === 'market' && <TabMarket selectedLang={selectedLang} isSunlightMode={isSunlightMode} />}
         </motion.div>
         </AnimatePresence>
       </main>
@@ -341,6 +344,9 @@ export default function App() {
           AgriPulse AI • NexHack 2026
         </div>
       </footer>
+
+      {/* In-app WhatsApp integration screen — features dispatch 'ap:whatsapp' */}
+      <WhatsAppScreen />
 
       {/* Kisan Sahayak Voice Modal */}
       <VoiceAssistant

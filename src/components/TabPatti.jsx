@@ -4,6 +4,7 @@ import { ScanLine, FileText, AlertTriangle, BellRing, Loader2, MessageCircle, Ci
 import { sound } from '../utils/audio';
 import { auditPatti, getMandiRules, STATE_MANDI_RULES } from '../data/mandiRules';
 import { stampEvidence, inr, saveToList } from '../utils/evidence';
+import { sendWhatsApp } from './WhatsAppScreen';
 
 /*
  * AUTOMATED PATTI AUDITOR
@@ -74,7 +75,7 @@ export default function TabPatti({ isSunlightMode }) {
     setReminderSet(true); sound.playSuccess();
   };
 
-  const whatsappText = audit && parsed ? encodeURIComponent(
+  const whatsappText = audit && parsed ? (
     `PATTI AUDIT (AgriPulse AI)\nTrader: ${parsed.trader}\nGross: ${inr(audit.gross)} (${parsed.weightKg}kg × ₹${parsed.pricePerKg}/kg)\nILLEGAL OVERCHARGE: ${inr(audit.totalStolen)}\n` +
     audit.items.filter((i) => i.verdict === 'ILLEGAL').map((i) => `• ${i.label}: charged ${inr(i.charged)}, legal max ${inr(i.legalMax)} → stolen ${inr(i.stolen)}`).join('\n') +
     `\nLegal cash due: ${audit.dueDateText} (${audit.rules.paymentDueDays} days, ${audit.rules.state} APMC)\nPay the legal balance or this goes to the Mandi Secretary.`) : '';
@@ -155,10 +156,15 @@ export default function TabPatti({ isSunlightMode }) {
                 <BellRing className="w-4 h-4" /> {reminderSet ? 'Reminder set ✓' : 'Remind me'}
               </button>
             </div>
-            <a href={`https://wa.me/?text=${whatsappText}`} target="_blank" rel="noreferrer" onClick={() => sound.playClick()}
+            <button onClick={() => { sound.playClick(); sendWhatsApp({
+                name: parsed?.trader || 'Trader (Arhtiya)', avatar: '🧑‍💼', phone: '9876500071', message: whatsappText,
+                replies: [
+                  { text: 'Bhai hisaab dobara check karta hun… 🙏', delay: 1800 },
+                  { text: `Theek hai, ${inr(audit.totalStolen)} ka difference kal aapke account mein bhej dunga. Mandi Secretary ko mat bhejo.`, delay: 2400 },
+                ] }); }}
               className="mt-3 w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98]">
-              <MessageCircle className="w-5 h-5" /> Send audit to trader / village group
-            </a>
+              <MessageCircle className="w-5 h-5" /> Send audit to trader on WhatsApp
+            </button>
           </div>
         </>
       )}

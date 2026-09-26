@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Camera, BadgeCheck, Lock, ScanLine, Share2, FileCheck2 } from 'lucide-react';
 import { sound } from '../utils/audio';
 import { stampEvidence, saveToList, loadList } from '../utils/evidence';
+import { sendWhatsApp } from './WhatsAppScreen';
 
 /*
  * FARM-GATE PROOF OF GRADE
@@ -53,7 +54,7 @@ export default function TabGrade({ isSunlightMode }) {
     e.target.value = '';
   };
 
-  const waText = cert ? encodeURIComponent(
+  const waText = cert ? (
     `PROOF OF GRADE ${cert.id} (AgriPulse AI)\nCrop: ${cert.crop} — GRADE ${cert.grade}\nSurface defects: ${cert.defects}% • Color ${cert.color}/100 • Size ${cert.size}/100 • Moisture ${cert.moisture}%\nScanned at farm gate: ${cert.stamp.time}${cert.stamp.loc ? ` • GPS ${cert.stamp.loc.lat}, ${cert.stamp.loc.lng}` : ''}\nSHA-256: ${cert.stamp.hashShort}…\nAny "quality cut" beyond this certificate is fraud.`) : '';
 
   return (
@@ -113,10 +114,15 @@ export default function TabGrade({ isSunlightMode }) {
                 ⏱ {cert.stamp.time}{cert.stamp.loc && <> • 📍 {cert.stamp.loc.lat}, {cert.stamp.loc.lng}</>}<br />SHA-256 {cert.stamp.hashShort}… — edits break the fingerprint
               </div>
             </div>
-            <a href={`https://wa.me/?text=${waText}`} target="_blank" rel="noreferrer" onClick={() => sound.playClick()}
+            <button onClick={() => { sound.playClick(); sendWhatsApp({
+                name: 'Mandi Buyer', avatar: '🏬', phone: '9876500073', message: waText,
+                replies: [
+                  { text: `Certificate ${cert.id} mil gaya. Grade ${cert.grade} confirmed. ✅`, delay: 1800 },
+                  { text: 'Quality cut nahi lagega — full rate par hisaab hoga.', delay: 2200 },
+                ] }); }}
               className="mt-3 w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white font-black text-sm flex items-center justify-center gap-2 active:scale-[0.98]">
-              <Share2 className="w-5 h-5" /> Carry certificate to the mandi
-            </a>
+              <Share2 className="w-5 h-5" /> Send certificate to the buyer
+            </button>
           </div>
         </div>
       )}
