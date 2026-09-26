@@ -35,8 +35,12 @@ class RootErrorBoundary extends React.Component {
 if (typeof window !== 'undefined') {
   window.addEventListener('error', (e) => {
     const msg = e?.message || '';
-    const src = e?.filename || '';
-    if (src.includes('/assets/') || msg.includes('Failed to fetch') || msg.includes('Loading chunk') || msg.includes('Importing a module') || msg.includes('Unexpected token')) {
+    // ONLY genuine stale-asset failures after a deploy — never plain runtime
+    // errors (filename says nothing) and never 'Failed to fetch' (normal for
+    // offline-mode API calls): one uncaught error must not reload the page
+    // mid-login and wipe what the farmer was typing.
+    const src = '';
+    if (msg.includes('Loading chunk') || msg.includes('Importing a module') || msg.includes('Unexpected token')) {
       console.warn('[AgriPulse] asset load failed, clearing SW cache', src, msg);
       try {
         if ('serviceWorker' in navigator) {
