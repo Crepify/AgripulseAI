@@ -250,6 +250,15 @@ export default function WhatsAppScreen() {
 
               {/* chat list */}
               <div className="flex-1 overflow-y-auto no-scrollbar">
+                {/* AgriPulse Community header (WhatsApp Communities style) */}
+                <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-white/[0.03]">
+                  <span className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-700 flex items-center justify-center text-2xl shrink-0">🌾</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-black text-white truncate">AgriPulse</span>
+                    <span className="block text-[12px] text-zinc-400 truncate">Community · 4 groups · 450+ kisan</span>
+                  </span>
+                  <span className="text-[10px] font-black text-[#00a884] bg-[#00a884]/10 rounded-full px-2 py-1 shrink-0">JOINED</span>
+                </div>
                 {sorted.map((c) => {
                   const last = c.messages[c.messages.length - 1];
                   return (

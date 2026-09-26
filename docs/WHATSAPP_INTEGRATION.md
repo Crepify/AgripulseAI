@@ -88,6 +88,31 @@ ngrok / cloudflared) and point the Meta webhook at it.
 | voice note | media resolved via Graph; STT slot (Sarvam) documented in router |
 | anything else | contextual fallback help |
 
+## AgriPulse Community
+
+Meta's Cloud API has no group/Community API, so the **AgriPulse Community**
+is modeled server-side (`server/whatsapp/community.js`): members join named
+channels and every community event fans out as individual messages —
+behaves like a community group from the farmer's side.
+
+| Channel | id | Fed by |
+|---|---|---|
+| 🚚 Truck Pool | `pool` | every new pool request fans out to members |
+| 🚨 Fraud Alerts | `fraud` | every illegal patti audit fans out (anonymized) |
+| 🛒 Direct Deals | `deals` | admin broadcasts |
+| 🥬 Mandi Bhav | `mandi` | admin broadcasts (e.g. daily price cron) |
+
+- New farmers are **auto-joined** to `fraud` + `mandi` on first "hi".
+- Commands: `community` (menu), `join pool`, `leave fraud`, …
+- Broadcasts deliver **only to members with an open 24-h service window**
+  (skipped members are counted) → the community stays on the free tier.
+- Admin posts (standalone server):
+  ```bash
+  curl -X POST localhost:8787/admin/broadcast \
+    -H "Authorization: Bearer $WHATSAPP_ADMIN_TOKEN" \
+    -d '{"channel":"mandi","text":"Aaj tamatar *₹2,400/q* — 6% upar 📈"}'
+  ```
+
 ## Production notes
 
 - **Always-200 webhook**: non-200/slow responses make Meta retry and

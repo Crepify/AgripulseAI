@@ -23,7 +23,12 @@ import {
   sendTextMessage, sendInteractiveButtons, sendListMenu,
   markAsRead, getMediaUrl,
 } from './client.js';
-import { resolveUser, getSession, setSession, clearSession, alreadyProcessed } from './store.js';
+import {
+  resolveUser, getSession, setSession, clearSession, alreadyProcessed,
+  touchUser, subscribe, unsubscribe, getSubscriptions,
+} from './store.js';
+import { COMMUNITY_NAME, CHANNELS, getChannel, broadcastToChannel } from './community.js';
+import { config } from './config.js';
 import { auditPatti } from '../../src/data/mandiRules.js';
 import { lookupBrand, GENERIC_REGISTRY } from '../../src/data/genericRegistry.js';
 import { cedaPrices, hasCedaKey } from '../../api/_lib/upstream.js';
@@ -35,6 +40,14 @@ const APP_URL = process.env.PUBLIC_APP_URL || 'https://agripulse.ai';
 export async function handleInboundEvent(value) {
   // Delivery/read receipts arrive on the same webhook — ignore quietly.
   if (!value?.messages?.length) return;
+
+  // Multi-number safety: if our phone-number id is configured, only accept
+  // events addressed to it (value.metadata.phone_number_id from Meta).
+  const targetId = value.metadata?.phone_number_id;
+  if (config.phoneNumberId && targetId && targetId !== config.phoneNumberId) {
+    console.warn(`[whatsapp] event for foreign phone_number_id ${targetId} — ignored`);
+    return;
+  }
 
   const profileName = value.contacts?.[0]?.profile?.name || '';
 
@@ -56,6 +69,7 @@ async function safeSend(to, text) {
 async function routeMessage(message, profileName) {
   const from = message.from; // entry[0].changes[0].value.messages[0].from
   const user = await resolveUser(from, profileName);
+  await touchUser(from); // renews the 24h service window → broadcast-eligible
   const session = await getSession(from);
 
   markAsRead(message.id).catch(() => {}); // fire-and-forget blue tick
@@ -88,6 +102,16 @@ async function handleText(from, user, session, raw) {
     await clearSession(from);
     return sendWelcome(from, user);
   }
+  if (/(community|samuday|समुदाय|^join$|^group$|समूह)/.test(text)) return sendCommunityMenu(from);
+  {
+    // "join pool" / "leave fraud" — direct channel commands
+    const m = text.match(/^(join|leave|chodo|छोड़ो)\s+(\w+)/);
+    if (m && getChannel(m[2])) {
+      return m[1] === 'join'
+        ? joinChannel(from, m[2])
+        : leaveChannel(from, m[2]);
+    }
+  }
   if (/(help|madad|मदद|sahayata)/.test(text)) return sendHelp(from);
   if (/(mandi|bhav|मंडी|भाव|rate|price)/.test(text)) return startMandiFlow(from);
   if (/(patti|पट्टी|parchi|slip|audit|katauti|कटौती)/.test(text)) return startPattiFlow(from);
@@ -108,7 +132,7 @@ async function handleText(from, user, session, raw) {
       // IDLE fallback: try dawai lookup on the raw text before giving up.
       if (lookupBrand(text)) return finishDawaiFlow(from, raw);
       return safeSend(from,
-        `Samajh nahi aaya 🤔\n\nYeh try karein:\n• *mandi* — aaj ke bhav\n• *patti* — parchi audit\n• *scan* — fasal ki photo se rog\n• *pool* — truck share\n• *dawai* — sasti generic dawai\n\nYa *menu* bhejein.`);
+        `Samajh nahi aaya 🤔\n\nYeh try karein:\n• *mandi* — aaj ke bhav\n• *patti* — parchi audit\n• *scan* — fasal ki photo se rog\n• *pool* — truck share\n• *dawai* — sasti generic dawai\n• *community* — ${COMMUNITY_NAME} channels\n\nYa *menu* bhejein.`);
   }
 }
 
@@ -119,6 +143,9 @@ async function handleAction(from, user, id, title) {
     case id === 'MENU_MANDI': return startMandiFlow(from);
     case id === 'MENU_PATTI': return startPattiFlow(from);
     case id === 'MENU_MORE': return sendServicesList(from);
+    case id === 'MENU_COMMUNITY': return sendCommunityMenu(from);
+    case id.startsWith('COMM_JOIN_'): return joinChannel(from, id.slice(10));
+    case id.startsWith('COMM_LEAVE_'): return leaveChannel(from, id.slice(11));
     case id === 'SVC_SCAN': return startScanFlow(from);
     case id === 'SVC_POOL': return startPoolFlow(from);
     case id === 'SVC_DAWAI': return startDawaiFlow(from);
@@ -140,14 +167,59 @@ async function handleAction(from, user, id, title) {
 /* ── flows ──────────────────────────────────────────────────────────── */
 
 async function sendWelcome(from, user) {
-  const hello = user.isNew
-    ? `🙏 *Namaste ${user.name}!*\n\nAgriPulse mein aapka swagat hai — aapka WhatsApp hi ab aapka kheti ka saathi hai. Koi app download karne ki zaroorat nahi!`
-    : `🙏 *Namaste ${user.name}!* Wapas swagat hai.`;
+  let hello;
+  if (user.isNew) {
+    // New farmers are welcomed INTO the community: auto-joined to the two
+    // protective channels (fraud + mandi); pool/deals stay opt-in.
+    await subscribe(from, 'fraud');
+    await subscribe(from, 'mandi');
+    hello = `🙏 *Namaste ${user.name}!*\n\n*${COMMUNITY_NAME} Community* mein aapka swagat hai — aapka WhatsApp hi ab aapka kheti ka saathi hai. Koi app download karne ki zaroorat nahi!\n\n✅ Aap jud gaye: 🚨 Fraud Alerts & 🥬 Mandi Bhav\n_(Aur channels: *community* bhejein)_`;
+  } else {
+    hello = `🙏 *Namaste ${user.name}!* Wapas swagat hai.`;
+  }
   return sendInteractiveButtons(from, `${hello}\n\nKya karna chahenge?`, [
     { id: 'MENU_MANDI', title: '🥬 Mandi Bhav' },     // ≤20 chars — Meta limit
     { id: 'MENU_PATTI', title: '🧾 Patti Audit' },
     { id: 'MENU_MORE', title: '📋 Aur Sevaayein' },
   ]);
+}
+
+/* ── AgriPulse Community (channel membership + fan-out) ─────────────── */
+
+async function sendCommunityMenu(from) {
+  const mine = getSubscriptions(from);
+  return sendListMenu(from,
+    `🌾 *${COMMUNITY_NAME} Community*\n\nHazaaron kisan, ek saath. Channel chunein — jud jaayein ya chhodein:\n\n` +
+    CHANNELS.map((c) => `${c.emoji} *${c.title}* ${mine.includes(c.id) ? '✅ (jude hue)' : ''}`).join('\n'),
+    'Channels', [
+      {
+        title: 'Judne ke liye',
+        rows: CHANNELS.filter((c) => !mine.includes(c.id)).map((c) => ({
+          id: `COMM_JOIN_${c.id}`, title: `${c.emoji} ${c.title}`, description: c.description,
+        })),
+      },
+      {
+        title: 'Chhodne ke liye',
+        rows: CHANNELS.filter((c) => mine.includes(c.id)).map((c) => ({
+          id: `COMM_LEAVE_${c.id}`, title: `❌ ${c.title} chhodein`, description: 'Alerts band ho jayenge',
+        })),
+      },
+    ].filter((s) => s.rows.length));
+}
+
+async function joinChannel(from, channelId) {
+  const ch = getChannel(channelId);
+  if (!ch) return safeSend(from, 'Yeh channel nahi mila. *community* bhejein.');
+  await subscribe(from, channelId);
+  return safeSend(from,
+    `✅ Aap *${COMMUNITY_NAME} Community · ${ch.emoji} ${ch.title}* se jud gaye!\n\n${ch.description}.\n\n_Chhodna ho to *leave ${ch.id}* bhejein._`);
+}
+
+async function leaveChannel(from, channelId) {
+  const ch = getChannel(channelId);
+  if (!ch) return safeSend(from, 'Yeh channel nahi mila. *community* bhejein.');
+  await unsubscribe(from, channelId);
+  return safeSend(from, `👋 *${ch.title}* channel se hata diya. Wapas judne ke liye *join ${ch.id}* bhejein.`);
 }
 
 async function sendServicesList(from) {
@@ -166,6 +238,7 @@ async function sendServicesList(from) {
         { id: 'SVC_DAWAI', title: '💊 Sasti Dawai', description: 'Brand ki jagah generic — aadha daam' },
         { id: 'SVC_POOL', title: '🚚 Truck Pool', description: 'Bhada baant kar 40% tak bachayein' },
         { id: 'SVC_MARKET', title: '🛒 Seedha Bazaar', description: 'Bina bichauliye seedha buyer ko bechein' },
+        { id: 'MENU_COMMUNITY', title: '🌾 Community', description: `${COMMUNITY_NAME} channels — judein ya chhodein` },
         { id: 'SVC_HELP', title: '☎️ Madad', description: 'Helpline aur guide' },
       ],
     },
@@ -237,6 +310,13 @@ async function runPattiAudit(from, mediaId) {
   };
   const audit = auditPatti(parsed, 'Maharashtra');
   const bad = audit.items.filter((i) => i.verdict === 'ILLEGAL');
+  // COMMUNITY FAN-OUT: an illegal patti warns the whole Fraud Alerts
+  // channel (anonymized) so the next farmer isn't the next victim.
+  if (bad.length) {
+    broadcastToChannel('fraud',
+      `⚠️ *FRAUD PAKDA GAYA* — ek kisan ki patti mein *₹${Math.round(audit.totalStolen)}* ki gair-kanooni katauti mili (${bad.map((i) => i.hi).join(', ')}).\n\nApni patti zaroor jaanchein — *patti* bhej kar photo dein.`,
+      { exclude: from }).catch(() => {});
+  }
   const lines = audit.items.map((i) =>
     `${i.verdict === 'ILLEGAL' ? '🔴' : '🟢'} ${i.label}: ₹${Math.round(i.charged)} _(max ₹${Math.round(i.legalMax)})_`
   ).join('\n');
@@ -281,6 +361,11 @@ async function finishPoolFlow(from, raw) {
   const dest = (m[2] || 'Pune Mandi').trim();
   const share = Math.max(250, Math.round(1800 * (kg / 1500)));
   await clearSession(from);
+  // COMMUNITY FAN-OUT: every Truck Pool member hears about the new load —
+  // this is what fills trucks. Poster excluded; async, never blocks the reply.
+  broadcastToChannel('pool',
+    `🚚 *Naya load!* ${kg} kg, *${dest}* jaana hai.\n\nTruck mein jagah chahiye? *pool* bhej kar apna load jodein — jitne zyada kisan, utna sasta bhada.`,
+    { exclude: from }).catch(() => {});
   return sendInteractiveButtons(from,
     `🚚 *Pool mil gaya!*\n\nRoute: aapke gaon → *${dest}*\nAapka maal: *${kg} kg*\nTruck mein jagah: ✅\n\nAapka hissa: *₹${share.toLocaleString('en-IN')}*\n_(akele truck ka kharcha: ₹1,400)_\n\nBook karein?`,
     [

@@ -77,6 +77,48 @@ export async function resolveUser(phone, profileName = '') {
   return { ...user, isNew: false };
 }
 
+/**
+ * Record inbound activity — opens/renews the farmer's 24-hour service
+ * window. Community broadcasts only go to members whose window is open,
+ * which keeps the whole system inside Meta's free tier.
+ */
+export async function touchUser(phone) {
+  const user = db.users.get(phone);
+  if (user) {
+    user.lastInboundAt = Date.now();
+    persist();
+  }
+}
+
+export const isWindowOpen = (user) =>
+  Boolean(user?.lastInboundAt && Date.now() - user.lastInboundAt < 24 * 60 * 60 * 1000);
+
+/* ── community subscriptions (channel id → member phones) ───────────── */
+
+/** PRISMA SWAP: a UserChannel join table keyed (userId, channelId). */
+export async function subscribe(phone, channelId) {
+  const user = db.users.get(phone);
+  if (!user) return false;
+  user.channels = [...new Set([...(user.channels || []), channelId])];
+  persist();
+  return true;
+}
+
+export async function unsubscribe(phone, channelId) {
+  const user = db.users.get(phone);
+  if (!user) return false;
+  user.channels = (user.channels || []).filter((c) => c !== channelId);
+  persist();
+  return true;
+}
+
+export const getSubscriptions = (phone) => db.users.get(phone)?.channels || [];
+
+/** All members of a channel (full user records, for window checks). */
+export async function listMembers(channelId) {
+  return [...db.users.values()].filter((u) => (u.channels || []).includes(channelId));
+}
+
 /* ── sessions (state machine) ───────────────────────────────────────── */
 
 export async function getSession(phone) {
