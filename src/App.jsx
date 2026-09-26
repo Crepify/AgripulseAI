@@ -13,6 +13,7 @@ import TabROI from './components/TabROI';
 import TabMarket from './components/TabMarket';
 import WhatsAppScreen, { openWhatsAppHub } from './components/WhatsAppScreen';
 import VoiceAssistant from './components/VoiceAssistant';
+import { detectLanguageByLocation } from './utils/voiceGuide';
 import HandsFreeVoiceBanner from './components/HandsFreeVoiceBanner';
 import BackgroundCanvas from './components/BackgroundCanvas';
 import InstallAppModal from './components/InstallAppModal';
@@ -53,6 +54,24 @@ function detectBrowserLanguage() {
 export default function App() {
   const [activeTab, setActiveTab] = useState('scan');
   const [selectedLang, setSelectedLang] = useState(() => detectBrowserLanguage());
+
+  // Live location → language: on first visit (no explicit choice saved yet),
+  // detect where the farmer is (GPS → IP → browser) and speak their tongue.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        if (localStorage.getItem('ap_lang')) return; // explicit choice wins
+        const lang = await detectLanguageByLocation();
+        if (!cancelled && lang && T[lang] && lang !== selectedLang) {
+          setSelectedLang(lang);
+          try { localStorage.setItem('ap_lang', lang); } catch (e) {}
+        }
+      } catch (e) {}
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [isOffline, setIsOffline] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [waUnread, setWaUnread] = useState(0);

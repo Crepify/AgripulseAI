@@ -24,6 +24,14 @@ const GREETING = {
   en: 'Hello! I am your voice assistant — go ahead, I am listening.',
 };
 
+// After every command the assistant announces it will hold the mic for
+// 35 seconds and reply to whatever is said inside that window.
+const WAIT_MSG = {
+  hi: 'मैं पैंतीस सेकंड अगले आदेश के लिए रुकूँगा।',
+  en: 'I will wait 35 seconds for your next command.',
+};
+const WAIT_MS = 35000;
+
 export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNavigate }) {
   const t = T[selectedLang] || T['en'];
   const [isListening, setIsListening] = useState(false);
@@ -45,6 +53,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
   const openRef = useRef(isOpen);
   const manualStopRef = useRef(false);
   const lastExchangeRef = useRef(null); // {q, a} — one-turn memory for follow-ups
+  const waitTimerRef = useRef(null); // 35s listening window after each reply
   const greetedRef = useRef(false);
 
   const loc = {
@@ -75,6 +84,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
   useEffect(() => {
     if (!isOpen) {
       manualStopRef.current = true;
+      clearWaitTimer();
       try { speechEngine.stopSpeaking(); speechEngine.stopListening(); } catch {}
       askCtlRef.current?.abort();
       setIsListening(false);
@@ -107,6 +117,8 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
   }, [isOpen]);
 
   const pushChat = (entry) => setChat(prev => [...prev.slice(-5), entry]);
+
+  const clearWaitTimer = () => { if (waitTimerRef.current) { clearTimeout(waitTimerRef.current); waitTimerRef.current = null; } };
 
   // Speak + optional chain: when the voice finishes, the conversation loop
   // continues automatically (Jarvis-style) unless the user stopped it.
@@ -143,6 +155,15 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     }
   }
 
+  // Answer → announce the 35s wait → listen for the next command.
+  const reply = (answerText) => {
+    if (autoListenRef.current) {
+      say(answerText, { then: () => say(WAIT_MSG[selectedLang] || WAIT_MSG.en, { then: () => startListeningFlow() }) });
+    } else {
+      say(answerText);
+    }
+  };
+
   const handleAsk = async (userText) => {
     sound.playClick();
     if (!userText) return;
@@ -156,7 +177,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
       pushChat({ q: userText, a: speechText, source: 'app', nav: targetLabel });
       lastExchangeRef.current = { q: userText, a: String(speechText).slice(0, 400) };
       onNavigate(intent.targetTab);
-      say(speechText);
+      reply(speechText);
       return;
     }
 
@@ -166,10 +187,11 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     const { a, source } = await askWeb(userText);
     pushChat({ q: userText, a, source });
     lastExchangeRef.current = { q: userText, a: String(a).slice(0, 400) };
-    say(a);
+    reply(a);
   };
 
   const onFinalHeard = (text) => {
+    clearWaitTimer();
     const heard = String(text || '').trim();
     setIsListening(false);
     if (!heard) return; // silence → the loop rests until the next tap
@@ -188,6 +210,13 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     heardRef.current = { text: '', acted: false };
     setTranscript('');
     setIsListening(true);
+    clearWaitTimer();
+    waitTimerRef.current = setTimeout(() => {
+      waitTimerRef.current = null;
+      try { speechEngine.stopListening(); } catch {}
+      setIsListening(false);
+      setTranscript('');
+    }, WAIT_MS);
     speechEngine.startListening(
       speechLangCode(selectedLang),
       (text, meta = {}) => {
@@ -207,6 +236,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
           heardRef.current.acted = true;
           onFinalHeard(heard);
         } else {
+          clearWaitTimer();
           setIsListening(false);
         }
       },
@@ -216,6 +246,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
           heardRef.current.acted = true;
           onFinalHeard(heard);
         } else {
+          clearWaitTimer();
           setIsListening(false);
         }
       }
@@ -226,6 +257,7 @@ export default function VoiceAssistant({ isOpen, onClose, selectedLang, onNaviga
     sound.playClick();
     if (isListening) {
       manualStopRef.current = true;
+      clearWaitTimer();
       speechEngine.stopListening();
       setIsListening(false);
       return;
